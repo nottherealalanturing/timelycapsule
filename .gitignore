@@ -1,0 +1,21 @@
+# Legacy pre-plan code (superseded by apps/ once T-01 scaffolds the monorepo)
+timely-capsule-api/
+timelycapsule/
+timelycapsule-mobile/
+
+# OS
+.DS_Store
+
+# Node (once apps/ exists)
+node_modules/
+dist/
+build/
+.next/
+.expo/
+.turbo/
+*.log
+
+# Env
+.env
+.env.local
+.env.*.local
