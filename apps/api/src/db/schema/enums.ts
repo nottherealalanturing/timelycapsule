@@ -140,3 +140,5 @@ export const entitlementSourceEnum = pgEnum('entitlement_source', [
 ]);
 
 export const actorTypeEnum = pgEnum('actor_type', ['user', 'recipient', 'admin', 'system']);
+
+export const idempotencyStatusEnum = pgEnum('idempotency_status', ['in_progress', 'completed']);

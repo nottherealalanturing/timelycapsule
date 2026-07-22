@@ -6,6 +6,22 @@ import { z } from 'zod';
  * per plan/05-BUILD-PLAYBOOK.md — do not add them here ahead of the ticket.
  */
 
+/**
+ * Known error codes (plan/03-ARCHITECTURE.md §14). This is the subset that
+ * exists as of T-03; feature tickets add their own (e.g. `capsule_sealed`
+ * lands with T-08) rather than this list being exhaustive up front.
+ */
+export const ERROR_CODES = [
+  'validation_failed',
+  'unauthorized',
+  'forbidden',
+  'not_found',
+  'rate_limited',
+  'idempotency_conflict',
+  'internal_error',
+] as const;
+export type ErrorCode = (typeof ERROR_CODES)[number];
+
 export const ApiErrorSchema = z.object({
   error: z.object({
     code: z.string(),
@@ -14,7 +30,7 @@ export const ApiErrorSchema = z.object({
     requestId: z.string(),
   }),
 });
-export type ApiError = z.infer<typeof ApiErrorSchema>;
+export type ApiErrorBody = z.infer<typeof ApiErrorSchema>;
 
 export const PaginatedQuerySchema = z.object({
   cursor: z.string().optional(),
