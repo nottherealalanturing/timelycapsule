@@ -1,0 +1,78 @@
+/**
+ * Meridian design tokens — plan/02-UX-DESIGN.md §6.
+ * Component library is built out in T-06; this file is the source of truth
+ * for color/spacing/radius/shadow primitives consumed by Tailwind config.
+ */
+
+:root {
+  /* Core palette (light) */
+  --color-bg-primary: #faf7f2; /* parchment */
+  --color-bg-raised: #ffffff;
+  --color-text-primary: #1c1e2e; /* ink */
+  --color-text-secondary: #8a8fa3; /* mist */
+  --color-accent-gold: #d4a24e; /* amber-gold — seal color */
+  --color-accent-violet: #6c5ce7; /* dusk-violet */
+  --color-success: #2f9e6e;
+  --color-warning: #e0a63a;
+  --color-danger: #d95656;
+  --color-info: #4a7fd4;
+
+  /* Capsule state colors */
+  --color-state-draft: #8a8fa3;
+  --color-state-sealed: #d4a24e;
+  --color-state-unlocked: #6c5ce7;
+  --color-state-opened: #7fb99a;
+  --color-state-legacy: #8c6a3f;
+  --color-state-withdrawn: #b5b8c4;
+
+  /* Typography */
+  --font-display: 'Fraunces', serif;
+  --font-ui: 'Inter', sans-serif;
+
+  /* Spacing (4pt grid) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* Radius */
+  --radius-input: 10px;
+  --radius-card: 16px;
+  --radius-modal: 20px;
+  --radius-pill: 999px;
+
+  /* Shadows (light) */
+  --shadow-sm: 0 1px 2px rgba(28, 30, 46, 0.06);
+  --shadow-md: 0 4px 12px rgba(28, 30, 46, 0.08);
+  --shadow-lg: 0 12px 32px rgba(28, 30, 46, 0.12);
+}
+
+:root[data-theme='dark'] {
+  --color-bg-primary: #0f1222; /* midnight */
+  --color-bg-raised: #171a2e;
+  --color-text-primary: #f3f1eb;
+  --color-text-secondary: #9a9fb3;
+  --color-accent-gold: #e3b865;
+  --color-accent-violet: #8b7cf0;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg-primary: #0f1222;
+    --color-bg-raised: #171a2e;
+    --color-text-primary: #f3f1eb;
+    --color-text-secondary: #9a9fb3;
+    --color-accent-gold: #e3b865;
+    --color-accent-violet: #8b7cf0;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "name": "@tc/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@tc/contracts": "workspace:*",
+    "@tc/core": "workspace:*",
+    "express": "^5.0.0",
+    "zod": "^3.24.0",
+    "pino": "^9.5.0",
+    "pino-http": "^10.3.0",
+    "helmet": "^8.0.0",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^22.10.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2",
+    "pino-pretty": "^13.0.0"
+  }
+}

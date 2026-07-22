@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "@tc/ui-web/tokens.css";
+
+/*
+ * Tailwind v4 theme mapping onto Meridian tokens (packages/ui-web/src/tokens.css).
+ * Full component styling lands in T-06 — this wiring just proves the design
+ * tokens flow from the shared package into the app.
+ */
+@theme inline {
+  --color-background: var(--color-bg-primary);
+  --color-foreground: var(--color-text-primary);
+  --color-accent: var(--color-accent-gold);
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-display);
+}
+
+body {
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-ui), Arial, Helvetica, sans-serif;
+}
