@@ -4,6 +4,8 @@ import cors from 'cors';
 import { pinoHttp } from 'pino-http';
 import { HealthResponseSchema, SystemTimeResponseSchema } from '@tc/contracts';
 import { logger } from './logger.js';
+import { errorHandler } from './middleware/error-handler.js';
+import { notFoundHandler } from './middleware/not-found.js';
 
 export function createApp(): express.Express {
   const app = express();
@@ -13,9 +15,9 @@ export function createApp(): express.Express {
   app.use(express.json());
   app.use(pinoHttp({ logger }));
 
-  // Minimal routes to prove the app boots end-to-end (T-01).
-  // Full API conventions (Zod middleware, error envelope, rate limits,
-  // idempotency) land in T-03 — do not add feature routes here yet.
+  // Bare infra routes. Feature routes (auth, capsules, ...) mount under
+  // modules/ starting T-04, each importing the middleware in
+  // src/middleware/* per apps/api/CONVENTIONS.md.
   app.get('/health', (_req, res) => {
     const body = HealthResponseSchema.parse({
       status: 'ok' as const,
@@ -30,6 +32,9 @@ export function createApp(): express.Express {
     });
     res.json(body);
   });
+
+  app.use(notFoundHandler);
+  app.use(errorHandler);
 
   return app;
 }

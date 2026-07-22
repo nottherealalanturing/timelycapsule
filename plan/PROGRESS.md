@@ -3,16 +3,17 @@
 > **Every session must update this file before ending.** This is the cross-session memory: next ticket, decisions made, and anything blocked. Keep entries short.
 
 ## Current status
-- **Next ticket:** T-03 (API skeleton & conventions)
+- **Next ticket:** T-04 (auth module — backend)
 - **Stage:** A — Foundations
-- **Blockers / pending 🧑 HUMAN SETUP:** none for T-03. Domain + Cloudflare account needed before T-07 (not yet).
+- **Blockers / pending 🧑 HUMAN SETUP:** none for T-04. Google OAuth client needed before T-05 (not yet).
 
 ## Ticket log
 | Ticket | Status | Date | Notes |
 |---|---|---|---|
 | T-01 | done | 2026-07-22 | Turborepo + pnpm workspaces scaffolded: apps/{api,web,mobile}, packages/{contracts,core,ui-web,eslint-config}. CI (GitHub Actions) green: lint/typecheck/test/build all pass. `pnpm dev` verified end-to-end (api JSON + web page rendering via @tc/core). |
 | T-02 | done | 2026-07-22 | Docker Compose Postgres 16 (host port 5433). Drizzle schema for all 19 core Stage A–C tables per 03 §13 (identity, capsules incl. 06 amendments — seals/public_id/expiry/E2E columns, scheduling, notifications, organization, billing, audit_events). Generated + applied migration (19 tables, correct partial/unique indexes verified via psql). `audit()` helper + integration test. Seed script (2 users, draft+sealed capsule, recipient, media item, tag, favorite, scheduled_action) — idempotent, reran cleanly. citext case-insensitivity verified live. CI updated with a Postgres service container so DB-backed tests run in GitHub Actions too, not just locally. |
-| T-03 | not started | | |
+| T-03 | done | 2026-07-22 | Error envelope (`ApiError` class + global `errorHandler`/`notFoundHandler`), Zod `validate()` middleware (body/params/query — query goes to `req.validatedQuery` since Express 5 makes `req.query` read-only), in-memory `rateLimit()` (token bucket, `X-RateLimit-*` headers), table-backed `idempotency()` middleware (new `idempotency_keys` table + migration — handles replay, conflict-on-different-body, conflict-on-concurrent-race via unique-violation catch), cursor pagination helpers (`encodeCursor`/`decodeCursor`/`buildPage`). Module-boundary ESLint rule (`eslint-plugin-boundaries`) verified against a real throwaway violation before committing to the approach — required `eslint-import-resolver-typescript` to resolve `.js`-suffixed imports, which wasn't obvious until debugged directly against the plugin's matcher API. `apps/api/CONVENTIONS.md` written as the DoD deliverable. 20 tests added, all passing; full lint/typecheck/test/build green. |
+| T-04 | not started | | |
 
 ## Decisions log (deviations/clarifications vs. the plan docs)
 - **Local dev ports changed to API :4001 / web :3001** (plan examples used :4000/:3000). This machine runs an unrelated project (`~/Documents/sandbox/grc-v3/digitalencodeGRC_api` + `_web`) that already occupies 3000/4000. Purely a local-dev convenience; production deploy (T-19+) is unaffected (Caddy/Cloudflare Pages don't hardcode these). Configurable via `PORT` env var (api) / `-p` flag (web).
@@ -25,6 +26,9 @@
 - **`audit_events` is NOT partitioned yet** despite 03 §13 specifying monthly range partitioning at scale. Deferred — a single table is correct pre-launch and the column shape is unaffected by migrating to partitions later. Revisit when volume warrants it (see comment in `apps/api/src/db/schema/system.ts`).
 - **`capsules.org_id` and `capsules.chain_parent_id`** are plain columns without FK constraints to `orgs`/self yet where the referenced table doesn't exist (orgs is Phase 3/T-42); `chain_parent_id` self-references `capsules` and does have its FK live now. FK to `orgs` gets added in T-42's migration.
 - Added a **Postgres service container to `.github/workflows/ci.yml`** (not in T-01's original CI) so `pnpm db:migrate` and DB-backed tests run in CI — this was a T-02 necessity, not scope creep, since every ticket from here on writes DB-touching tests.
+- **`idempotency_keys` is a new table**, not in the original 03 §13 schema list — T-03's ticket text explicitly calls for "table-backed" idempotency, and no such table existed. Uniqueness on `(key, method, path, userId)`; see the known gap noted in `apps/api/CONVENTIONS.md` about anonymous requests before T-04 auth lands.
+- **Idempotency and rate-limiting are per-route opt-ins, not globally mounted** in `app.ts`. There are no real side-effecting feature routes yet (T-04 adds the first), so global wiring would have nothing real to prove; `CONVENTIONS.md` documents the middleware order (`rateLimit → idempotency → validate → handler`) for T-04 onward to follow.
+- **Module-boundary ESLint rule needed `eslint-import-resolver-typescript`**, undocumented as a prerequisite anywhere obvious — without it, `eslint-plugin-boundaries` silently never fires on this repo's `.js`-suffixed relative imports (they fail to resolve to the real `.ts` files, so files never get classified as being inside a module). Caught by building a real throwaway two-module violation and confirming the rule actually caught it before trusting the config — worth remembering as a general practice for any lint-rule-as-architecture-guardrail work.
 
 ## Environment setup checklist (from 05 §env master list — tick as configured)
 - [x] Local: Node 20+ (v24 installed, .nvmrc pins 20 for consistency), pnpm 9, Docker
