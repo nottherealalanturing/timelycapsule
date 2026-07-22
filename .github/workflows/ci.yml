@@ -12,6 +12,22 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: timelycapsule
+          POSTGRES_PASSWORD: timelycapsule
+          POSTGRES_DB: timelycapsule
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U timelycapsule"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://timelycapsule:timelycapsule@localhost:5433/timelycapsule
     steps:
       - uses: actions/checkout@v4
 
@@ -32,6 +48,9 @@ jobs:
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Migrate database
+        run: pnpm db:migrate
 
       - name: Test
         run: pnpm test
