@@ -51,6 +51,11 @@ export const LoginRequestSchema = z.object({
 });
 export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
+export const GoogleOAuthRequestSchema = z.object({
+  idToken: z.string().min(1),
+});
+export type GoogleOAuthRequest = z.infer<typeof GoogleOAuthRequestSchema>;
+
 export const RefreshRequestSchema = z.object({
   refreshToken: z.string().min(1),
 });
