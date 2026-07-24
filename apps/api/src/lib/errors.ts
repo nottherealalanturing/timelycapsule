@@ -43,4 +43,20 @@ export class ApiError extends Error {
   static idempotencyConflict(message: string): ApiError {
     return new ApiError('idempotency_conflict', message, 409);
   }
+
+  static emailAlreadyRegistered(): ApiError {
+    return new ApiError('email_already_registered', 'Email is already registered', 409);
+  }
+
+  static invalidCredentials(): ApiError {
+    return new ApiError('invalid_credentials', 'Invalid email or password', 401);
+  }
+
+  static emailNotVerified(): ApiError {
+    return new ApiError('email_not_verified', 'Email address is not verified', 403);
+  }
+
+  static invalidOrExpiredCode(message = 'Invalid or expired code'): ApiError {
+    return new ApiError('invalid_or_expired_code', message, 400);
+  }
 }

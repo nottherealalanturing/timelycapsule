@@ -26,7 +26,7 @@ export function idempotency(db: Database) {
       return;
     }
 
-    const userId = (req as Request & { user?: { id: string } }).user?.id;
+    const userId = req.user?.id;
     const requestHash = hashBody(req.body);
     const method = req.method;
     const path = req.path;

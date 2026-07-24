@@ -15,6 +15,13 @@
       "when": 1784703790902,
       "tag": "0001_nappy_bedlam",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784925649128,
+      "tag": "0002_mature_kate_bishop",
+      "breakpoints": true
     }
   ]
 }
