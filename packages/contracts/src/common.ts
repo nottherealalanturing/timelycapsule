@@ -19,6 +19,11 @@ export const ERROR_CODES = [
   'rate_limited',
   'idempotency_conflict',
   'internal_error',
+  // T-04 auth
+  'email_already_registered',
+  'invalid_credentials',
+  'email_not_verified',
+  'invalid_or_expired_code',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

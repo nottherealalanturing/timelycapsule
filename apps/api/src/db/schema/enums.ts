@@ -142,3 +142,5 @@ export const entitlementSourceEnum = pgEnum('entitlement_source', [
 export const actorTypeEnum = pgEnum('actor_type', ['user', 'recipient', 'admin', 'system']);
 
 export const idempotencyStatusEnum = pgEnum('idempotency_status', ['in_progress', 'completed']);
+
+export const otpPurposeEnum = pgEnum('otp_purpose', ['verify_email', 'password_reset']);
