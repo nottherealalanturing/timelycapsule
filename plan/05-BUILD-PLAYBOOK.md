@@ -97,6 +97,10 @@ Endpoints: `POST /capsules`, `GET /capsules` (filters state/type/tag/q/cursor), 
 `(reveal)` routes SSR: `GET /r/:token` backing endpoints per 03 §14. Locked page per 02 §5.7 (cover, sender, Capsule ID, Seal stamps row, countdown in viewer tz, notify-me email capture, ICS download, surprise-mode 404 rule, live T-0 flip into reveal), Seal gates (Place gate with distance/bearing + `POST /r/:token/place-check`, Passphrase gate with client-side unwrap + soft throttle, Identity OTP gate), client-side decryption of content via link-fragment key, **System Pages** per 02 §5.15 with voice.md copy (loading, 404/missing, withdrawn variant, expired page + `capsule_expire` reminder emails, rotated-link, rate-limited), unlocked **reveal ceremony** per 02 §5.7 (paced scroll reveal, Fraunces reading column, media gallery with MediaViewer, sign-off), reactions + thank-you note (`POST /r/:token/react`), download-all (zip job → email link), report (`POST /r/:token/report`), save-to-account CTA (`POST /r/:token/save` for logged-in claim), OG image generation (cover + countdown via @vercel/og — never content), tz-inference write for recipient_local mode.
 **DoD:** full F2 on a phone browser with no account, fast on 3G throttle; OG preview correct in link-preview checker.
 
+### T-15b Guest mode (web) — per 01 §4.1b / 02 §5.2a / 03 §14 GUEST
+Backend: `guest_sessions` table + `capsules.guest_session_id` (+ `owner_id` made nullable) migration; `POST /guest/sessions`; guest-scoped capsule create/patch/seal (text-only micro type, ≤5,000 chars, unlock ≤ +1yr, 1 draft + 1 sealed per session, aggressive per-IP velocity limits); claim: `/auth/signup` + `/auth/oauth/google` accept optional `guestToken` → transfer capsules to the new user, burn the session (mirrors ghost-claim). E2E note: guest capsules have **no** `owner_key_wrap` (no master key exists) — the link fragment is the only key; on claim, the client re-wraps the capsule key under the new account's master key if the link is still on-device, else the capsule stays link-only (envelope shows a "link-only key" badge). Web: `/try` slimmed composer (locked rows for media/recipients/seals with signup affordances), link handoff sheet with the no-recovery warning, `/try/capsule` status page, contextual signup CTAs (post-seal, status page, second-capsule attempt). Sealed guest capsules deliver via the standard T-13/T-15 pipeline regardless of conversion (hard rule 5).
+**DoD:** full F11 in browser: guest seals a note → copies link → recipient reveal works account-free → guest signs up → capsule appears on `/home` claimed; velocity limits + 1-capsule cap tested; unconverted guest capsule still unlocks on schedule (test).
+
 ### T-16 Received inbox + contacts (web)
 `/received` per 02 §5.8 (waiting/upcoming/opened, block+report row actions), `/people` per 02 §5.9 (contacts CRUD `GET/POST/PATCH/DELETE /contacts`, groups, birthday-upcoming section, composer autocomplete integration).
 **DoD:** claimed recipient sees capsule in inbox; contact birthdays suggest capsules.
@@ -132,7 +136,7 @@ Sentry + PostHog wired (content-blind event names per 03 §19 activation funnel)
 **DoD:** `https://<domain>` serves production web; F1+F2 work end-to-end in prod; events visible in PostHog.
 
 ### T-21 Marketing site
-`(marketing)`: landing per 02 §5.1 (hero with interactive demo capsule, how-it-works, use-cases, trust section, FAQ, footer), `/pricing` (plan cards, annual toggle — "Premium coming soon" until T-26), 3 occasion pages (`/for/letters-to-my-future-self`, `/for/new-parents`, `/for/couples`) with template deep-links, `/legal/terms`, `/legal/privacy` (**🧑 HUMAN: generate from a template service e.g. Termly free, review, paste**), help section (10 markdown articles: what is sealing, can I open early, recipient guide, etc.).
+`(marketing)`: hero CTA routes into T-15b guest mode — landing per 02 §5.1 (hero with interactive demo capsule, how-it-works, use-cases, trust section, FAQ, footer), `/pricing` (plan cards, annual toggle — "Premium coming soon" until T-26), 3 occasion pages (`/for/letters-to-my-future-self`, `/for/new-parents`, `/for/couples`) with template deep-links, `/legal/terms`, `/legal/privacy` (**🧑 HUMAN: generate from a template service e.g. Termly free, review, paste**), help section (10 markdown articles: what is sealing, can I open early, recipient guide, etc.).
 **DoD:** Lighthouse ≥95 perf/SEO/a11y on landing; OG cards correct.
 
 ### T-22 Hardening pass
@@ -150,6 +154,7 @@ Rate limits on all mutation routes, security headers/CSP audit (separate media o
 ### T-23 Mobile shell
 Expo custom dev client, navigation (tabs: Home/Received/FAB/Notifications/Profile per 02 §15), Meridian native theme, auth screens + secure token storage (expo-secure-store), deep link config (`/c/*` universal links — **🧑 HUMAN:** apple-app-site-association + assetlinks.json hosting steps), API client from contracts.
 **DoD:** login + home timeline render on your physical phone via dev client.
+Also: onboarding offers **"Continue without an account"** → mobile guest mode (same T-15b endpoints + rules; slimmed composer + status screen per 02 §5.2a); claim-on-signup passes the stored `guestToken`.
 
 ### T-24 Mobile timeline, detail, received, reveal
 Ports of T-12/T-15/T-16 with native patterns: FlashList, pull-to-refresh, blurhash placeholders, long-press context menus, swipe actions, in-app reveal ceremony with haptics (seal thud/unlock crack), gallery with pinch-zoom.

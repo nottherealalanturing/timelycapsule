@@ -75,6 +75,8 @@ sessions (id, user_id FK, refresh_token_hash UNIQUE, device_name, platform enum(
           ip inet, user_agent, last_used_at, expires_at, revoked_at)
 recovery_codes (id, user_id FK, code_hash, used_at)
 push_tokens (id, user_id FK, token UNIQUE, platform, last_seen_at, invalid_at)
+guest_sessions (id, token_hash UNIQUE, ip inet, created_at, last_used_at,
+                claimed_by_user_id FK NULL, claimed_at)   -- guest mode (01 §4.1b); burned on claim
 
 -- ============ CAPSULES ============
 capsules (
@@ -82,7 +84,8 @@ capsules (
   public_id text UNIQUE NOT NULL,        -- 8-char human-readable handle (06 §D)
   seals jsonb NOT NULL DEFAULT '[]',     -- unlock conditions beyond time (06 §B)
   expires_after interval, expiry_strict bool DEFAULT false, expired_at timestamptz,
-  owner_id uuid FK->users,
+  owner_id uuid FK->users NULL,          -- NULL only for unclaimed guest capsules
+  guest_session_id uuid FK->guest_sessions NULL,  -- exactly one of owner_id/guest_session_id set pre-claim
   org_id uuid FK->orgs NULL,
   type capsule_type NOT NULL,           -- self|personal|group|birthday|anniversary|public|legacy|emergency|campaign|micro
   state capsule_state NOT NULL DEFAULT 'draft',
@@ -346,6 +349,14 @@ POST /auth/verify-email {code}             POST /auth/verify-email/resend
 POST /auth/password/forgot {email}         POST /auth/password/reset {token,newPassword}
 GET  /auth/sessions                        DELETE /auth/sessions/:id
 POST /auth/totp/setup → {qr,secret}        POST /auth/totp/confirm {code} → {recoveryCodes}
+
+GUEST (per 01 §4.1b — anonymous, heavily rate-limited per IP)
+POST /guest/sessions → 201 {guestToken}    -- opaque token, stored hashed; client persists locally
+POST /guest/capsules {…} → draft           -- Bearer guestToken; text-only, 1 draft + 1 sealed max
+PATCH /guest/capsules/:id                  POST /guest/capsules/:id/seal   (unlock ≤ now+1yr)
+GET  /guest/capsules/:id                   -- status page data (envelope only)
+-- claim: /auth/signup and /auth/oauth/* accept optional {guestToken}; on success the guest
+-- session's capsules get user_id set and the guest session is burned (guest → claimed)
 
 USERS & SETTINGS
 GET/PATCH /me                              GET /me/storage → {used, quota, largest[]}

@@ -81,6 +81,7 @@ Semantic tokens only in code (`--color-bg-primary`, never raw hex in components)
 - Sections: How it works (3 steps: Create → Seal → It arrives), use-case carousel (Future self / Parents / Couples / Legacy — each with a real-feel example capsule), trust section (delivery guarantee, encryption, export promise, "your capsules outlive our roadmap" commitment), pricing teaser, FAQ, footer (legal, status, help).
 - Sticky header → transparent over hero, solid on scroll. Dark-mode aware.
 - **Occasion landing pages** (`/for/new-parents`, `/for/letters-to-my-future-self`, …) same skeleton, swapped copy + template deep-link — the SEO engine.
+- Hero CTA "Create your first capsule — free" routes into **guest mode** (§5.2a) — no signup wall between the landing page and writing.
 
 ### 5.2 Auth screens (`/signup`, `/login`, `/reset`, `/verify`)
 - Single centered card (max 400), logo, warm gradient bg. Signup: Apple + Google buttons first, divider, email+password. Inline zxcvbn strength meter. Legal checkboxes: single ToS/Privacy consent line.
@@ -88,6 +89,13 @@ Semantic tokens only in code (`--color-bg-primary`, never raw hex in components)
 - Verify email: 6-digit OTP (not link-only — works when mail app is on another device), resend with 60s cooldown, change-email escape hatch.
 - Errors: field-level; generic "invalid credentials" (no user enumeration); rate-limit state shows countdown.
 - Recipient magic-link landing: skips all of this — see 5.10.
+
+#### 5.2a Guest mode (`/try`, mobile: "Continue without an account" on onboarding) — per 01 §4.1b
+- **Entry:** landing hero CTA, `/try` deep link, or mobile onboarding skip. No interstitials — the guest lands **directly in a slimmed composer** (cover picker, title, letter block only; media/recipients/seals sections rendered as locked rows with a one-line "Sign up free to add photos & email delivery" affordance, not hidden).
+- **Schedule:** same DateTimeSchedulePicker, capped at +1 year with inline copy ("Guests can travel up to a year — accounts go to 50").
+- **Seal:** same ceremony, then a **link handoff sheet**: the capsule link (with `#k=` fragment) + copy button + "This link is the only key. We can't recover it — save it somewhere safe." + optional "email me my own link" is NOT offered (no verified email); instead the primary post-seal CTA is **"Keep it safe with a free account"** (claims the capsule per F11).
+- **Guest status page** (`/try/capsule`, device-local): cover, countdown, re-copy link, signup CTA. One capsule only — trying to start a second routes to signup ("One per traveler — free accounts get five").
+- Voice: same warm time-travel register; guest limits always phrased as invitations upward, never as scolding.
 
 ### 5.3 Onboarding (first run, ≤ 3 steps, skippable)
 1. "What brings you here?" — chips (Letters to myself / Messages to loved ones / Family memories / Legacy / Just exploring) → personalizes template suggestions + home empty state.
@@ -189,6 +197,8 @@ Layout: dark sidebar (Dashboard, Users, Capsules, Reports, Legacy queue, Billing
 **F8 Account deletion:** Settings → Delete → password/2FA re-auth → consequences screen lists undelivered capsules to others, each with radio: "Deliver as scheduled (anonymized sender name retained)" vs "Withdraw" → 30-day pending window (login cancels) → purge; deliver-anyway capsules move to an escrowed system owner; legal audit stubs retained.
 
 **F9 Group capsule:** Organizer creates Group type → sets seal deadline + unlock date → invites contributors (link/email) → contributors add entries (each sees own + optionally others', organizer setting) → reminder cadence to non-contributors → seal deadline: auto-seals with whatever's in (organizer warned 48h/24h before if pending invites) → unlocks to recipient(s).
+
+**F11 Guest → account conversion:** Visitor hits landing → "Create your first capsule" → guest composer (no signup) → writes text note → schedules (≤1 yr) → seal ceremony → link handoff sheet (copies link) → post-seal CTA "Keep it safe with a free account" → signup (guest token sent along) → capsule **claimed** into the new account, appears on `/home` timeline with full abilities (announce email can now be added pre-unlock, withdraw/extend available) → normal F1 upsell path continues. If the guest never converts: capsule still delivers on schedule (hard rule 5).
 
 **F10 Timezone-sensitive delivery:** Sender picks "recipient's local 9:00 AM" → recipient tz unknown until they first open the locked link or have an account → fallback chain: recipient profile tz → tz inferred at first link-visit (stored) → sender's tz (sender told: "We'll use your timezone unless Amara visits the capsule page first").
 

@@ -268,11 +268,20 @@ Each module: **Purpose · Features · States · Validation/Business rules · Per
 ### 4.1 Authentication & Identity
 - **Purpose:** Own the identity layer for creators and (lightweight) recipients.
 - **Features:** Email+password signup, Sign in with Apple (required for iOS), Google OAuth, email verification, password reset, 2FA (TOTP + 10 recovery codes), session management (list/revoke devices), magic-link login for recipients, phone verification (Phase 2, for SMS delivery), account deletion.
-- **States (account):** `unverified → active → suspended → pending_deletion(30d) → deleted`. Recipient-only "ghost" identities: `ghost → claimed` (when they sign up with the same verified email, their received capsules attach automatically).
+- **States (account):** `unverified → active → suspended → pending_deletion(30d) → deleted`. Recipient-only "ghost" identities: `ghost → claimed` (when they sign up with the same verified email, their received capsules attach automatically). Anonymous **guest sessions** (no account, see §4.1b): `guest → claimed` on signup with the guest token present.
 - **Validation:** Email RFC + MX check; password ≥ 10 chars, zxcvbn score ≥ 3; verification required before sealing any capsule to others (self-capsules allowed pre-verification to reduce activation friction, but delivery holds until verified).
 - **Permissions:** n/a (this module gates everything else).
 - **Dependencies:** Notification module (verification emails), Redis (rate limits, token store).
 - **Business rules:** OAuth accounts can add a password later; account merge flow when OAuth email == existing email (verified-email match auto-links). Sessions: JWT access (15 min) + rotating refresh (30 d, revocable, stored hashed).
+
+### 4.1b Guest Mode (web + mobile — "try before you sign up")
+- **Purpose:** let a visitor experience the core loop (write → seal → deliver) with zero signup friction, then convert. Guests are the bottom rung of the ability ladder: **Guest → Free (signup) → Premium/Family/Business (subscription)** — every step up unlocks more, nothing sealed is ever lost on the way up.
+- **What a guest CAN do:** open/receive capsules via link (unchanged — recipients never needed accounts); create **one** guest capsule: text-only Time-locked note (≤ 5,000 chars, no media), unlock between +5 min and **+1 year**, delivered **by shareable link only** (guest copies the `/c/:token#k=…` link and sends it themselves — could be to their own future self); see a minimal status page for that one capsule (countdown + link recovery from the same device).
+- **What requires signup (Free):** email/SMS delivery + announce/reminder notifications (we have no verified sender identity for a guest), media, more than 1 capsule, dashboard/timeline, recipients management, withdraw/extend, recovery kit, everything else.
+- **Identity:** server issues an anonymous **guest session** (opaque token, stored hashed; persisted device-locally). Zero-access E2E applies identically — capsule key is generated client-side and travels only in the link fragment; the server holds ciphertext + envelope. No password → no recovery: lose the link, lose the capsule (stated plainly at seal time).
+- **Conversion & claim:** signup (any method) with the guest token present **claims** the guest capsule into the new account (same spirit as recipient ghost-claim). Conversion prompts are contextual, never blocking: after the seal ceremony ("Create a free account to keep track of this capsule + get email delivery"), on the status page, and on any limit hit (guest paywall = signup sheet, not payment sheet).
+- **Abuse guardrails:** 1 active sealed + 1 draft per guest session; per-IP velocity limits on guest session + seal creation; guest capsules excluded from any public surface; standard report/withdraw handling applies.
+- **Delivery promise unchanged:** once sealed, a guest capsule delivers on schedule regardless of whether the guest ever signs up (hard rule 5 applies to guests too).
 
 ### 4.2 Profiles
 - **Purpose:** Light identity presentation (this is not a social network).
@@ -360,6 +369,9 @@ Full design in `03-ARCHITECTURE.md §Notification System`. Product surface: per-
 ## 20. Monetization
 
 ### Plans
+
+> Below Free sits **Guest** (no account, §4.1b): 1 text-only capsule, link-only delivery, +1 yr max horizon, no storage/media, no dashboard. Signup is the first "upgrade"; subscription is the second. The ladder is Guest → Free → Premium/Family/Business, and moving up never loses or re-locks anything already sealed.
+
 | | **Free** | **Premium** $7.99/mo · $59.99/yr | **Family** $12.99/mo · $99.99/yr (6 seats) | **Business** $10/seat/mo (min 5) | **Enterprise** custom |
 |---|---|---|---|---|---|
 | Active sealed capsules | 5 | Unlimited | Unlimited | Unlimited | Unlimited |

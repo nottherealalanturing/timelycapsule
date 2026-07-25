@@ -96,6 +96,27 @@ export const capsules = pgTable(
   ],
 );
 
+/**
+ * Draft snapshot history (T-08 ticket text: "Capsule versions (draft
+ * snapshots, keep 20)"). One row written per PATCH to a draft, holding the
+ * *pre-patch* state so a user can step back through edit history; trimmed
+ * to the last 20 per capsule on every insert (see modules/capsules/versions.ts).
+ * Snapshots stop once a capsule seals — sealed content is immutable, so
+ * there is nothing further to version.
+ */
+export const capsuleVersions = pgTable(
+  'capsule_versions',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    capsuleId: uuid('capsule_id')
+      .notNull()
+      .references(() => capsules.id, { onDelete: 'cascade' }),
+    snapshot: jsonb('snapshot').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('capsule_versions_capsule_id_created_at_idx').on(t.capsuleId, t.createdAt)],
+);
+
 export const capsuleRecipients = pgTable(
   'capsule_recipients',
   {
