@@ -1,5 +1,6 @@
 import {
   ForgotPasswordRequestSchema,
+  GoogleOAuthRequestSchema,
   LoginRequestSchema,
   LogoutRequestSchema,
   PatchMeRequestSchema,
@@ -54,6 +55,20 @@ export function authRouter(db: Database): Router {
       try {
         const result = await service.login(db, req.body, deviceMeta(req));
         res.status(200).json(result);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/auth/oauth/google',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
+    validate({ body: GoogleOAuthRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const { created, user, tokens } = await service.googleOAuth(db, req.body.idToken, deviceMeta(req));
+        res.status(created ? 201 : 200).json({ user, tokens });
       } catch (err) {
         next(err);
       }
