@@ -83,4 +83,12 @@ export class ApiError extends Error {
   static uploadIncomplete(message = 'Media is still uploading or processing'): ApiError {
     return new ApiError('upload_incomplete', message, 409);
   }
+
+  static recipientAlreadyAdded(message = 'This recipient has already been added to this capsule'): ApiError {
+    return new ApiError('recipient_already_added', message, 409);
+  }
+
+  static recipientLocked(message = 'Recipients can only be edited before the capsule unlocks'): ApiError {
+    return new ApiError('recipient_locked', message, 409);
+  }
 }

@@ -31,6 +31,9 @@ export const ERROR_CODES = [
   'quota_exceeded',
   'plan_required',
   'upload_incomplete',
+  // T-09 recipients
+  'recipient_already_added',
+  'recipient_locked',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
