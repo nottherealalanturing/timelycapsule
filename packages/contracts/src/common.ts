@@ -24,6 +24,13 @@ export const ERROR_CODES = [
   'invalid_credentials',
   'email_not_verified',
   'invalid_or_expired_code',
+  // T-08 capsules
+  'capsule_sealed',
+  'capsule_withdrawn',
+  'unlock_in_past',
+  'quota_exceeded',
+  'plan_required',
+  'upload_incomplete',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

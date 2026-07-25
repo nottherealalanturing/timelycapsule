@@ -22,6 +22,13 @@
       "when": 1784925649128,
       "tag": "0002_mature_kate_bishop",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785012408413,
+      "tag": "0003_chilly_mercury",
+      "breakpoints": true
     }
   ]
 }

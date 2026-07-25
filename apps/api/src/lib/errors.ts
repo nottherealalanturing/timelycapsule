@@ -59,4 +59,28 @@ export class ApiError extends Error {
   static invalidOrExpiredCode(message = 'Invalid or expired code'): ApiError {
     return new ApiError('invalid_or_expired_code', message, 400);
   }
+
+  static capsuleSealed(message = 'Capsule is sealed and cannot be edited'): ApiError {
+    return new ApiError('capsule_sealed', message, 409);
+  }
+
+  static capsuleWithdrawn(message = 'Capsule has been withdrawn'): ApiError {
+    return new ApiError('capsule_withdrawn', message, 409);
+  }
+
+  static unlockInPast(message = 'Unlock time is invalid'): ApiError {
+    return new ApiError('unlock_in_past', message, 422);
+  }
+
+  static quotaExceeded(limit: string): ApiError {
+    return new ApiError('quota_exceeded', `Plan limit reached: ${limit}`, 403, { limit });
+  }
+
+  static planRequired(feature: string): ApiError {
+    return new ApiError('plan_required', `This feature requires a paid plan: ${feature}`, 403, { feature });
+  }
+
+  static uploadIncomplete(message = 'Media is still uploading or processing'): ApiError {
+    return new ApiError('upload_incomplete', message, 409);
+  }
 }
