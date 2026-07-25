@@ -1,0 +1,30 @@
+{
+  "algorithm": "AES-256-GCM",
+  "tagLengthBits": 128,
+  "vectors": [
+    {
+      "name": "short-ascii-no-aad",
+      "keyB64": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+      "ivB64": "AAAAAAAAAAAAAAAA",
+      "aad": null,
+      "plaintext": "TimelyCapsule test vector #1",
+      "ciphertextB64": "WtXYu9lVwNx429xZfQzl_KE3diVN4hRA8r6Qsl7_fOBGydXwfF-InmIqyEY"
+    },
+    {
+      "name": "short-ascii-with-aad",
+      "keyB64": "EBESExQVFhcYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8",
+      "ivB64": "AQIDBAUGBwgJCgsM",
+      "aad": "chunk-index-0",
+      "plaintext": "TimelyCapsule test vector #2, now with associated data",
+      "ciphertextB64": "WSCKhyhbC6U176FJuh_rmlosnU-TOc9PNcBok9EsYQnOV_pg_i3BSYeZHsSOlMN0tuTO3HAugdbageoAcLWWSmD1C3ktzQ"
+    },
+    {
+      "name": "empty-plaintext",
+      "keyB64": "__79_Pv6-fj39vX08_Lx8O_u7ezr6uno5-bl5OPi4eA",
+      "ivB64": "qrvM3e7_ABEiM0RV",
+      "aad": null,
+      "plaintext": "",
+      "ciphertextB64": "7MkQy0prb0gzMk936nTEAg"
+    }
+  ]
+}
