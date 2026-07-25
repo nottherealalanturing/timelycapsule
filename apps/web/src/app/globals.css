@@ -2,20 +2,55 @@
 @import "@tc/ui-web/tokens.css";
 
 /*
+ * Tailwind v4's automatic content detection only walks within this app's
+ * own directory tree — it never reaches a sibling workspace package like
+ * packages/ui-web, even though components from there render here. Without
+ * this, every utility class used only inside @tc/ui-web (not literally
+ * repeated in an apps/web file) silently never gets generated.
+ */
+@source "../../../../packages/ui-web/src";
+
+/*
  * Tailwind v4 theme mapping onto Meridian tokens (packages/ui-web/src/tokens.css).
- * Full component styling lands in T-06 — this wiring just proves the design
- * tokens flow from the shared package into the app.
+ * Semantic Tailwind utilities (bg-accent, text-secondary, rounded-card, ...)
+ * read from these — never hardcode a hex value in a component.
  */
 @theme inline {
   --color-background: var(--color-bg-primary);
+  --color-raised: var(--color-bg-raised);
   --color-foreground: var(--color-text-primary);
+  --color-secondary: var(--color-text-secondary);
   --color-accent: var(--color-accent-gold);
-  --font-sans: var(--font-ui);
-  --font-display: var(--font-display);
+  --color-accent-violet: var(--color-accent-violet);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
+
+  --color-state-draft: var(--color-state-draft);
+  --color-state-sealed: var(--color-state-sealed);
+  --color-state-unlocked: var(--color-state-unlocked);
+  --color-state-opened: var(--color-state-opened);
+  --color-state-legacy: var(--color-state-legacy);
+  --color-state-withdrawn: var(--color-state-withdrawn);
+
+  /* Self-hosted via next/font in layout.tsx — overrides tokens.css's plain
+     family-name strings, which only apply when a font is loaded via <link>. */
+  --font-sans: var(--font-inter), var(--font-ui), sans-serif;
+  --font-display: var(--font-fraunces), serif;
+
+  --radius-input: var(--radius-input);
+  --radius-card: var(--radius-card);
+  --radius-modal: var(--radius-modal);
+  --radius-pill: var(--radius-pill);
+
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
 }
 
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
-  font-family: var(--font-ui), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }

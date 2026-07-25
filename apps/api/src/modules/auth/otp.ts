@@ -3,7 +3,7 @@ import { and, desc, eq, gt, isNull } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { emailOtpCodes } from '../../db/schema/index.js';
 import { ApiError } from '../../lib/errors.js';
-import { logger } from '../../logger.js';
+import { sendPasswordReset, sendVerifyEmailCode } from '../email/index.js';
 
 const VERIFY_CODE_TTL_MS = 15 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
@@ -13,11 +13,7 @@ function hashOtp(raw: string): string {
   return createHash('sha256').update(raw).digest('hex');
 }
 
-/**
- * 6-digit numeric code for email verification. Delivery is console-only
- * until T-07's email infrastructure lands — this is the dev/test stand-in
- * for the real Resend adapter.
- */
+/** 6-digit numeric code for email verification, delivered via modules/email (T-07). */
 export async function issueEmailVerifyCode(
   db: Database,
   userId: string,
@@ -35,7 +31,7 @@ export async function issueEmailVerifyCode(
     expiresAt: new Date(Date.now() + VERIFY_CODE_TTL_MS),
   });
 
-  logger.info({ event: 'otp_issued', purpose: 'verify_email', userId, email, code: raw }, 'Email OTP (console adapter until T-07)');
+  await sendVerifyEmailCode(db, email, raw);
   return raw;
 }
 
@@ -94,7 +90,8 @@ export async function issuePasswordResetToken(
     expiresAt: new Date(Date.now() + RESET_TOKEN_TTL_MS),
   });
 
-  logger.info({ event: 'otp_issued', purpose: 'password_reset', userId, email, code: raw }, 'Email OTP (console adapter until T-07)');
+  const resetUrl = `${process.env.APP_URL ?? 'http://localhost:3001'}/reset?token=${raw}`;
+  await sendPasswordReset(db, email, resetUrl);
   return raw;
 }
 

@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { oauthAccounts, users } from '../../db/schema/index.js';
 import { ApiError } from '../../lib/errors.js';
-import { logger } from '../../logger.js';
+import { sendNewDeviceAlert } from '../email/index.js';
 import { claimGhostRecipients } from './ghost-claim.js';
 import { verifyGoogleIdToken, type GoogleIdTokenPayload } from './google.js';
 import {
@@ -87,8 +87,7 @@ export async function login(
   }
 
   if (await isNewDevice(db, user.id, meta)) {
-    // Stub per T-04 ticket text — the real new-device email lands in T-07.
-    logger.info({ event: 'login_new_device', userId: user.id, ip: meta.ip }, 'New device login');
+    await sendNewDeviceAlert(db, user.email, meta.ip);
   }
 
   const { tokens } = await createSession(db, user.id, meta);
@@ -172,7 +171,7 @@ export async function googleOAuth(
   }
 
   if (await isNewDevice(db, user.id, meta)) {
-    logger.info({ event: 'login_new_device', userId: user.id, ip: meta.ip }, 'New device login');
+    await sendNewDeviceAlert(db, user.email, meta.ip);
   }
 
   const { tokens } = await createSession(db, user.id, meta);
