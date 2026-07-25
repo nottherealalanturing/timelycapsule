@@ -10,6 +10,7 @@ import { notFoundHandler } from './middleware/not-found.js';
 import { authRouter } from './modules/auth/index.js';
 import { capsulesRouter } from './modules/capsules/index.js';
 import { emailWebhookRouter } from './modules/email/index.js';
+import { blocksRouter, recipientsRouter } from './modules/recipients/index.js';
 
 export function createApp(db: Database): express.Express {
   const app = express();
@@ -34,6 +35,8 @@ export function createApp(db: Database): express.Express {
   // apps/api/CONVENTIONS.md.
   app.use('/v1', authRouter(db));
   app.use('/v1', capsulesRouter(db));
+  app.use('/v1', recipientsRouter(db));
+  app.use('/v1', blocksRouter(db));
   app.use('/v1', emailWebhookRouter(db));
 
   app.get('/health', (_req, res) => {

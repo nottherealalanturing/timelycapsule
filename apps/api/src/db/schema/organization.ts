@@ -46,6 +46,25 @@ export const favorites = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.capsuleId] })],
 );
 
+/**
+ * A user silently blocking future capsules from a given sender email
+ * (plan/03-ARCHITECTURE.md §13/§17 threat #5). Checked on recipient
+ * creation (modules/recipients) — a blocked add still reports success to
+ * the sender ("masked success") but the recipient row is created already
+ * `blocked_suppressed`, so nothing is ever actually delivered.
+ */
+export const blocks = pgTable(
+  'blocks',
+  {
+    blockerUserId: uuid('blocker_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blockedEmail: citext('blocked_email').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.blockerUserId, t.blockedEmail] })],
+);
+
 export const contacts = pgTable(
   'contacts',
   {
