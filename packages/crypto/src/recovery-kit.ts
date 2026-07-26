@@ -1,7 +1,7 @@
-import { decodeBase32, encodeBase32 } from './base32.js';
-import { deriveKeyFromRecoveryCode } from './kdf.js';
-import { generateRecoveryCodeBytes, generateSalt } from './random.js';
-import { extractSalt, unwrapKey, wrapKey } from './wrap.js';
+import { decodeBase32, encodeBase32 } from './base32';
+import { deriveKeyFromRecoveryCode } from './kdf';
+import { generateRecoveryCodeBytes, generateSalt } from './random';
+import { extractSalt, unwrapKey, wrapKey } from './wrap';
 
 /**
  * Recovery kit (plan/06-FEATURE-ADDENDUM.md §A): a printable code that

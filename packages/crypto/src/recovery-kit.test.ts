@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { generateMasterKey } from './master-key.js';
+import { generateMasterKey } from './master-key';
 import {
   formatRecoveryCode,
   generateRecoveryCode,
   parseRecoveryCode,
   restoreMasterKeyFromRecoveryCode,
   wrapMasterKeyWithRecoveryCode,
-} from './recovery-kit.js';
+} from './recovery-kit';
 
 describe('recovery kit', () => {
   it('restores the master key from the recovery code', async () => {

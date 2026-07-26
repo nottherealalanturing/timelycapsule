@@ -1,6 +1,6 @@
-import { generateAesKey, generateSalt } from './random.js';
-import { deriveKeyFromPassword } from './kdf.js';
-import { extractSalt, unwrapKey, wrapKey } from './wrap.js';
+import { generateAesKey, generateSalt } from './random';
+import { deriveKeyFromPassword } from './kdf';
+import { extractSalt, unwrapKey, wrapKey } from './wrap';
 
 /**
  * The owner master key: generated once at signup, never rotated (only

@@ -36,13 +36,14 @@ function toUserResponse(user: UserRow): User {
     locale: user.locale,
     status: user.status,
     emailVerifiedAt: user.emailVerifiedAt?.toISOString() ?? null,
+    masterKeyWrap: user.masterKeyWrap ? user.masterKeyWrap.toString('base64') : null,
     createdAt: user.createdAt.toISOString(),
   };
 }
 
 export async function signup(
   db: Database,
-  input: { email: string; password: string; displayName: string },
+  input: { email: string; password: string; displayName: string; masterKeyWrap: string; recoveryKeyWrap: string },
   meta: DeviceMeta,
 ): Promise<AuthResponse> {
   const [existing] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
@@ -58,6 +59,8 @@ export async function signup(
       passwordHash,
       displayName: input.displayName,
       status: 'unverified',
+      masterKeyWrap: Buffer.from(input.masterKeyWrap, 'base64'),
+      recoveryKeyWrap: Buffer.from(input.recoveryKeyWrap, 'base64'),
     })
     .returning() as [UserRow];
 

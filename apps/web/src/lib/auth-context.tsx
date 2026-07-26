@@ -1,9 +1,17 @@
 'use client';
 
 import type { User } from '@tc/contracts';
+import {
+  formatRecoveryCode,
+  generateMasterKey,
+  generateRecoveryCode,
+  wrapMasterKeyWithPassword,
+  wrapMasterKeyWithRecoveryCode,
+} from '@tc/crypto';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { authApi } from './api-client';
+import { useMasterKey } from './master-key-context';
 import { clearTokens, getTokens, setTokens } from './token-store';
 
 const ME_QUERY_KEY = ['me'] as const;
@@ -11,7 +19,8 @@ const ME_QUERY_KEY = ['me'] as const;
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  signup: (input: { email: string; password: string; displayName: string }) => Promise<User>;
+  /** Resolves with the one-time formatted recovery kit — the caller MUST show it to the user before navigating away (06 §A "mandatory nag"). */
+  signup: (input: { email: string; password: string; displayName: string }) => Promise<{ user: User; recoveryKit: string }>;
   login: (input: { email: string; password: string }) => Promise<User>;
   googleOAuth: (idToken: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -24,6 +33,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [hasTokens] = useState(() => Boolean(getTokens()));
+  const { setMasterKey, clearMasterKey, unlockWithPassword } = useMasterKey();
 
   const { data: user = null, isLoading } = useQuery({
     queryKey: ME_QUERY_KEY,
@@ -55,12 +65,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signup: AuthContextValue['signup'] = useCallback(
     async (input) => {
-      const { user: newUser, tokens } = await authApi.signup(input);
+      // Generate + wrap the owner master key entirely client-side before it
+      // ever reaches the server (06 §A) — the server only ever stores the
+      // two resulting ciphertexts (masterKeyWrap/recoveryKeyWrap).
+      const masterKey = generateMasterKey();
+      const masterKeyWrap = await wrapMasterKeyWithPassword(masterKey, input.password);
+      const recoveryCodeBytes = generateRecoveryCode();
+      const recoveryKeyWrap = await wrapMasterKeyWithRecoveryCode(masterKey, recoveryCodeBytes);
+      const recoveryKit = formatRecoveryCode(recoveryCodeBytes);
+
+      const { user: newUser, tokens } = await authApi.signup({ ...input, masterKeyWrap, recoveryKeyWrap });
       setTokens(tokens);
       setUser(newUser);
-      return newUser;
+      // Already unwrapped in memory from generation above — no need to
+      // round-trip through unlockWithPassword.
+      setMasterKey(masterKey);
+      return { user: newUser, recoveryKit };
     },
-    [setUser],
+    [setUser, setMasterKey],
   );
 
   const login: AuthContextValue['login'] = useCallback(
@@ -68,9 +90,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { user: loggedInUser, tokens } = await authApi.login(input);
       setTokens(tokens);
       setUser(loggedInUser);
+      if (loggedInUser.masterKeyWrap) {
+        // A wrong password would already have failed authApi.login() above,
+        // so this unwrap is expected to succeed; if it doesn't (e.g. a
+        // corrupted wrap), login still proceeds — the composer's unlock
+        // gate is what actually enforces having a usable key.
+        try {
+          await unlockWithPassword(loggedInUser.masterKeyWrap, input.password);
+        } catch {
+          clearMasterKey();
+        }
+      }
       return loggedInUser;
     },
-    [setUser],
+    [setUser, unlockWithPassword, clearMasterKey],
   );
 
   const googleOAuth: AuthContextValue['googleOAuth'] = useCallback(
@@ -89,8 +122,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       clearTokens();
       setUser(null);
+      clearMasterKey();
     }
-  }, [setUser]);
+  }, [setUser, clearMasterKey]);
 
   return (
     <AuthContext.Provider

@@ -1,7 +1,7 @@
-import { bs } from './buffer-source.js';
-import { AES_TAG_BITS, STREAM_CHUNK_BYTES } from './constants.js';
-import { concatBytes } from './encoding.js';
-import { generateIv } from './random.js';
+import { bs } from './buffer-source';
+import { AES_TAG_BITS, STREAM_CHUNK_BYTES } from './constants';
+import { concatBytes } from './encoding';
+import { generateIv } from './random';
 
 async function importAesKey(rawKey: Uint8Array, usages: KeyUsage[]): Promise<CryptoKey> {
   return crypto.subtle.importKey('raw', bs(rawKey), { name: 'AES-GCM' }, false, usages);
@@ -26,7 +26,13 @@ export async function encryptBytes(
 ): Promise<Encrypted> {
   const cryptoKey = await importAesKey(key, ['encrypt']);
   const buffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: bs(iv), additionalData: aad && bs(aad), tagLength: AES_TAG_BITS },
+    // additionalData must be omitted entirely when there's no AAD — Node's
+    // WebCrypto tolerates `additionalData: undefined`, but real browsers
+    // (spec-strict WebIDL) reject it with "Not a BufferSource" since the
+    // key is present even though its value is undefined.
+    aad
+      ? { name: 'AES-GCM', iv: bs(iv), additionalData: bs(aad), tagLength: AES_TAG_BITS }
+      : { name: 'AES-GCM', iv: bs(iv), tagLength: AES_TAG_BITS },
     cryptoKey,
     bs(plaintext),
   );
@@ -41,7 +47,9 @@ export async function decryptBytes(
 ): Promise<Uint8Array> {
   const cryptoKey = await importAesKey(key, ['decrypt']);
   const buffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: bs(iv), additionalData: aad && bs(aad), tagLength: AES_TAG_BITS },
+    aad
+      ? { name: 'AES-GCM', iv: bs(iv), additionalData: bs(aad), tagLength: AES_TAG_BITS }
+      : { name: 'AES-GCM', iv: bs(iv), tagLength: AES_TAG_BITS },
     cryptoKey,
     bs(ciphertext),
   );

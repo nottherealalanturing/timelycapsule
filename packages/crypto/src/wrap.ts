@@ -1,6 +1,6 @@
-import { decryptBytes, encryptBytes } from './aes.js';
-import { fromBase64Url, toBase64Url, concatBytes } from './encoding.js';
-import { AES_IV_BYTES, SALT_BYTES } from './constants.js';
+import { decryptBytes, encryptBytes } from './aes';
+import { fromBase64Url, toBase64Url, concatBytes } from './encoding';
+import { AES_IV_BYTES, SALT_BYTES } from './constants';
 
 /**
  * A wrapped (encrypted) key, serialized as one opaque base64url string for

@@ -1,5 +1,6 @@
 import {
   boolean,
+  customType,
   date,
   index,
   integer,
@@ -12,6 +13,12 @@ import {
 } from 'drizzle-orm/pg-core';
 import { citext, inet } from './custom-types';
 import { oauthProviderEnum, otpPurposeEnum, platformEnum, userStatusEnum } from './enums';
+
+const bytea = customType<{ data: Buffer }>({
+  dataType() {
+    return 'bytea';
+  },
+});
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -26,6 +33,16 @@ export const users = pgTable('users', {
   locale: text('locale').notNull().default('en'),
   status: userStatusEnum('status').notNull().default('unverified'),
   ghostClaimedAt: timestamp('ghost_claimed_at', { withTimezone: true }),
+  // Zero-access E2E (06 §A / 03 §8): the owner master key never reaches the
+  // server unwrapped. masterKeyWrap is that key encrypted under
+  // Argon2id(password) client-side (@tc/crypto's master-key.ts), re-wrapped
+  // on password change; recoveryKeyWrap is the same key wrapped under a
+  // printable recovery code instead, so a lost password isn't fully fatal.
+  // Both null for accounts created before this column existed and for
+  // OAuth-only accounts with no password to derive a wrap key from (T-11
+  // decisions log: composer prompts those users to set a password first).
+  masterKeyWrap: bytea('master_key_wrap'),
+  recoveryKeyWrap: bytea('recovery_key_wrap'),
   totpSecretEnc: text('totp_secret_enc'),
   totpEnabled: boolean('totp_enabled').default(false),
   quietHours: jsonb('quiet_hours'), // {start:"22:00", end:"08:00"}

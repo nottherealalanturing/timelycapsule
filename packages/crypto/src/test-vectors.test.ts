@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { decryptBytes, encryptBytes } from './aes.js';
-import { fromBase64Url } from './encoding.js';
+import { decryptBytes, encryptBytes } from './aes';
+import { fromBase64Url } from './encoding';
 
 /**
  * Published test vectors (plan/05-BUILD-PLAYBOOK.md T-07b: "consumed by

@@ -21,6 +21,14 @@ export const UserSchema = z.object({
   locale: z.string(),
   status: z.enum(['unverified', 'active', 'suspended', 'pending_deletion', 'deleted', 'ghost']),
   emailVerifiedAt: z.string().nullable(),
+  /**
+   * The owner master key, still wrapped under Argon2id(password) — base64,
+   * `@tc/crypto`'s master-key.ts unwraps it client-side with the password
+   * already in hand (login form, or the unlock re-prompt). Null for
+   * accounts predating this column and for OAuth-only accounts with no
+   * password to derive a wrap key from (T-11 decisions log).
+   */
+  masterKeyWrap: z.string().nullable(),
   createdAt: z.string(),
 });
 export type User = z.infer<typeof UserSchema>;
@@ -42,6 +50,15 @@ export const SignupRequestSchema = z.object({
   email: z.string().email(),
   password: PasswordSchema,
   displayName: z.string().min(1).max(120),
+  /**
+   * Client-generated owner master key, already wrapped twice before it
+   * ever reaches the server (base64): once under Argon2id(password) and
+   * once under a printable recovery code the signup UI must have shown
+   * the user already (06 §A "mandatory nag"). The server only ever stores
+   * ciphertext here — see users.masterKeyWrap/recoveryKeyWrap.
+   */
+  masterKeyWrap: z.string().min(1),
+  recoveryKeyWrap: z.string().min(1),
 });
 export type SignupRequest = z.infer<typeof SignupRequestSchema>;
 

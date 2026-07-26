@@ -1,6 +1,6 @@
 import { argon2id } from 'hash-wasm';
-import { ARGON2ID_PARAMS } from './constants.js';
-import { bs } from './buffer-source.js';
+import { ARGON2ID_PARAMS } from './constants';
+import { bs } from './buffer-source';
 
 /**
  * Derives a wrapping key from a low-entropy secret (password or passphrase)

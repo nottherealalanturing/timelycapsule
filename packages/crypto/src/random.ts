@@ -1,4 +1,4 @@
-import { AES_IV_BYTES, AES_KEY_BYTES, RECOVERY_CODE_BYTES, SALT_BYTES } from './constants.js';
+import { AES_IV_BYTES, AES_KEY_BYTES, RECOVERY_CODE_BYTES, SALT_BYTES } from './constants';
 
 function randomBytes(length: number): Uint8Array {
   return crypto.getRandomValues(new Uint8Array(length));
