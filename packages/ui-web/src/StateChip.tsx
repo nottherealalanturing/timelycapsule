@@ -1,22 +1,28 @@
 import { cn } from './cn';
 
-export type CapsuleState = 'draft' | 'sealed' | 'unlocked' | 'opened' | 'legacy' | 'withdrawn';
+// Matches @tc/contracts' CapsuleStateSchema exactly (03-ARCHITECTURE.md §8).
+// The original T-06 version of this component predated the real state
+// machine (T-08) and had 'opened'/'legacy' — neither is a capsule state
+// ('opened' is a per-recipient status, 'legacy' is a capsule type) — and
+// was missing 'sealing'/'expired'. Fixed here since T-12's DoD requires
+// every real state to be visually distinct.
+export type CapsuleState = 'draft' | 'sealing' | 'sealed' | 'unlocked' | 'expired' | 'withdrawn';
 
 const STATE_LABEL: Record<CapsuleState, string> = {
   draft: 'Draft',
+  sealing: 'Sealing…',
   sealed: 'Sealed',
   unlocked: 'Unlocked',
-  opened: 'Opened',
-  legacy: 'Legacy',
+  expired: 'Expired',
   withdrawn: 'Withdrawn',
 };
 
 const STATE_COLOR_VAR: Record<CapsuleState, string> = {
   draft: '--color-state-draft',
+  sealing: '--color-state-sealing',
   sealed: '--color-state-sealed',
   unlocked: '--color-state-unlocked',
-  opened: '--color-state-opened',
-  legacy: '--color-state-legacy',
+  expired: '--color-state-expired',
   withdrawn: '--color-state-withdrawn',
 };
 

@@ -11,32 +11,11 @@ import {
 } from '@tc/crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { capsulesApi } from './api-client';
+import { decodeIvCiphertext, encodeIvCiphertext } from './capsule-crypto';
 import { useMasterKey } from './master-key-context';
 
 /** Empty TipTap document — the shape TipTap's JSON export always has at minimum. */
 const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
-
-/** Matches @tc/crypto's AES_IV_BYTES (not exported from the package's public surface). */
-const IV_BYTES = 12;
-
-/**
- * contentDocEnc's wire format must be pure base64 — the server decodes it
- * with `Buffer.from(x, 'base64')` (see apps/api's patchCapsule) with no
- * awareness of any internal structure. So iv||ciphertext are concatenated
- * as raw bytes first, then the whole thing is base64-encoded once, mirroring
- * @tc/crypto's own wrapKey format rather than inventing a delimited string.
- */
-function encodeContentDocEnc(iv: Uint8Array, ciphertext: Uint8Array): string {
-  const combined = new Uint8Array(iv.length + ciphertext.length);
-  combined.set(iv, 0);
-  combined.set(ciphertext, iv.length);
-  return btoa(String.fromCharCode(...combined));
-}
-
-function decodeContentDocEnc(b64: string): { iv: Uint8Array; ciphertext: Uint8Array } {
-  const combined = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return { iv: combined.slice(0, IV_BYTES), ciphertext: combined.slice(IV_BYTES) };
-}
 
 function draftCacheKey(capsuleId: string): string {
   return `tc:draft:${capsuleId}`;
@@ -151,7 +130,7 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
         setContentDocState(cached.contentDoc);
         pendingPatchRef.current = cached.patch;
       } else if (loaded.contentDocEnc) {
-        const { iv, ciphertext } = decodeContentDocEnc(loaded.contentDocEnc);
+        const { iv, ciphertext } = decodeIvCiphertext(loaded.contentDocEnc);
         const plaintext = await decryptBytes(capsuleKey, iv, ciphertext);
         const doc = JSON.parse(new TextDecoder().decode(plaintext));
         setCapsule(loaded);
@@ -180,7 +159,7 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
     try {
       const doc = new TextEncoder().encode(JSON.stringify(contentDocRef.current));
       const { iv, ciphertext } = await encryptBytes(capsuleKeyRef.current, doc);
-      const contentDocEnc = encodeContentDocEnc(iv, ciphertext);
+      const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
 
       const { capsule: updated } = await capsulesApi.patch(capsuleId, { ...patchToSend, contentDocEnc });
       setCapsule(updated);
@@ -236,6 +215,9 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
       throw new Error('Capsule key not ready yet');
     }
     const { iv, ciphertext } = await encryptBytes(capsuleKeyRef.current, bytes);
+    // Raw bytes here, not base64 — this blob is uploaded as binary (PUT to
+    // R2), unlike contentDocEnc which travels inside a JSON PATCH body and
+    // therefore needs encodeIvCiphertext's base64 wrapping.
     const combined = new Uint8Array(iv.length + ciphertext.length);
     combined.set(iv, 0);
     combined.set(ciphertext, iv.length);

@@ -1,18 +1,21 @@
 'use client';
 
-import { ThemeToggle } from '@tc/ui-web';
-import { useRouter } from 'next/navigation';
+import { Button, ThemeToggle } from '@tc/ui-web';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '../../lib/auth-context';
 
 /**
- * Protected shell for the signed-in app. Full sidebar/nav per
- * 02-UX-DESIGN.md §5.4 lands in T-12 — this just gates access and provides
- * a stable layout for /home's empty state (T-06 DoD).
+ * Left-sidebar shell per 02-UX-DESIGN.md §5.4's web layout. Only "Home" is
+ * a real nav item — Received/People/Collections/Notifications/Settings
+ * arrive with their own tickets (T-16/17/18); adding dead links for pages
+ * that don't exist yet would violate "don't build ahead of the ticket."
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const pathname = usePathname();
+  const { user, loading, logout } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -27,12 +30,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
-      <header className="flex items-center justify-between border-b border-[var(--color-text-secondary)]/15 px-6 py-4">
-        <span className="font-[var(--font-display)] text-lg text-foreground">TimelyCapsule</span>
-        <ThemeToggle />
-      </header>
-      <main>{children}</main>
+    <div className="flex min-h-screen">
+      <aside className="flex w-56 shrink-0 flex-col gap-6 border-r border-[var(--color-text-secondary)]/15 px-4 py-6">
+        <Link href="/home" className="px-2 font-[var(--font-display)] text-lg text-foreground">
+          TimelyCapsule
+        </Link>
+
+        <Link href="/capsule/new">
+          <Button fullWidth>New Capsule</Button>
+        </Link>
+
+        <nav className="flex flex-col gap-1">
+          <Link
+            href="/home"
+            className={`rounded-[var(--radius-input)] px-3 py-2 text-sm ${
+              pathname === '/home' ? 'bg-[var(--color-bg-raised)] font-medium text-foreground' : 'text-secondary hover:text-foreground'
+            }`}
+          >
+            Home
+          </Link>
+        </nav>
+
+        <div className="mt-auto flex flex-col gap-3">
+          <div className="flex items-center justify-between px-2">
+            <span className="truncate text-sm text-secondary">{user.displayName}</span>
+            <ThemeToggle />
+          </div>
+          <Button variant="ghost" size="sm" onClick={() => void logout()}>
+            Log out
+          </Button>
+        </div>
+      </aside>
+
+      <main className="min-w-0 flex-1">{children}</main>
     </div>
   );
 }

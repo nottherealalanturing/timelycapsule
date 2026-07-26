@@ -4,6 +4,7 @@ import {
   CapsuleActivityResponseSchema,
   CapsuleListResponseSchema,
   CapsuleResponseSchema,
+  SystemTimeResponseSchema,
   CompleteMediaRequestSchema,
   CreateCapsuleRequestSchema,
   CreateMediaTicketRequestSchema,
@@ -182,6 +183,10 @@ export const authApi = {
 
   patchMe: (input: PatchMeRequest) =>
     request('/me', MeResponseSchema, { method: 'PATCH', auth: true, body: PatchMeRequestSchema.parse(input) }),
+};
+
+export const systemApi = {
+  time: () => request('/system/time', SystemTimeResponseSchema),
 };
 
 export const capsulesApi = {
