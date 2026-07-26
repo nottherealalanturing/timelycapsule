@@ -17,13 +17,13 @@
   --color-danger: #d95656;
   --color-info: #4a7fd4;
 
-  /* Capsule state colors */
+  /* Capsule state colors — one per real CapsuleStateSchema value (03-ARCHITECTURE.md §8) */
   --color-state-draft: #8a8fa3;
+  --color-state-sealing: #4a9fd8;
   --color-state-sealed: #d4a24e;
   --color-state-unlocked: #6c5ce7;
-  --color-state-opened: #7fb99a;
-  --color-state-legacy: #8c6a3f;
-  --color-state-withdrawn: #b5b8c4;
+  --color-state-expired: #6b7280;
+  --color-state-withdrawn: #a85d5d;
 
   /* Typography */
   --font-display: 'Fraunces', serif;
