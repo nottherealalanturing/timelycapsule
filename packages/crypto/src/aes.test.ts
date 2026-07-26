@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decryptBytes, decryptStream, encryptBytes, encryptStream } from './aes.js';
-import { generateAesKey } from './random.js';
+import { decryptBytes, decryptStream, encryptBytes, encryptStream } from './aes';
+import { generateAesKey } from './random';
 
 describe('encryptBytes / decryptBytes', () => {
   it('round-trips', async () => {

@@ -36,6 +36,13 @@
       "when": 1785015863463,
       "tag": "0004_flowery_doctor_spectrum",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785029693398,
+      "tag": "0005_crazy_talisman",
+      "breakpoints": true
     }
   ]
 }

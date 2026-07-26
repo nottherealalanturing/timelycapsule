@@ -22,7 +22,13 @@ type App = ReturnType<typeof createApp>;
 async function signupAndVerify(app: App, email: string, password: string) {
   const signupRes = await request(app)
     .post('/v1/auth/signup')
-    .send({ email, password, displayName: 'Test User' });
+    .send({
+      email,
+      password,
+      displayName: 'Test User',
+      masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+      recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+    });
   expect(signupRes.status).toBe(201);
   createdUserIds.push(signupRes.body.user.id);
 
@@ -74,6 +80,30 @@ describe('auth module (T-04)', () => {
     expect(refreshAfterLogout.status).toBe(401);
   });
 
+  it('stores the master key wrap at signup and returns it (still wrapped) on login', async () => {
+    const app = createApp(db);
+    const email = uniqueEmail();
+    const masterKeyWrap = 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=';
+    const signupRes = await request(app)
+      .post('/v1/auth/signup')
+      .send({
+        email,
+        password: 'correct-horse-battery-staple',
+        displayName: 'Test User',
+        masterKeyWrap,
+        recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+      });
+    expect(signupRes.status).toBe(201);
+    createdUserIds.push(signupRes.body.user.id);
+    expect(signupRes.body.user.masterKeyWrap).toBe(masterKeyWrap);
+
+    const login = await request(app)
+      .post('/v1/auth/login')
+      .send({ email, password: 'correct-horse-battery-staple' });
+    expect(login.status).toBe(200);
+    expect(login.body.user.masterKeyWrap).toBe(masterKeyWrap);
+  });
+
   it('rejects signup with an already-registered email', async () => {
     const app = createApp(db);
     const email = uniqueEmail();
@@ -81,7 +111,13 @@ describe('auth module (T-04)', () => {
 
     const dup = await request(app)
       .post('/v1/auth/signup')
-      .send({ email, password: 'another-password-1', displayName: 'Dup' });
+      .send({
+        email,
+        password: 'another-password-1',
+        displayName: 'Dup',
+        masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+        recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+      });
     expect(dup.status).toBe(409);
     expect(dup.body.error.code).toBe('email_already_registered');
   });
@@ -103,7 +139,13 @@ describe('auth module (T-04)', () => {
     const email = uniqueEmail();
     const signupRes = await request(app)
       .post('/v1/auth/signup')
-      .send({ email, password: 'correct-horse-battery-staple', displayName: 'Test User' });
+      .send({
+        email,
+        password: 'correct-horse-battery-staple',
+        displayName: 'Test User',
+        masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+        recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+      });
     createdUserIds.push(signupRes.body.user.id);
     const token = signupRes.body.tokens.accessToken;
 

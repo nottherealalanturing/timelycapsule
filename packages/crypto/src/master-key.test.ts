@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { generateMasterKey, rewrapMasterKeyWithNewPassword, unwrapMasterKeyWithPassword, wrapMasterKeyWithPassword } from './master-key.js';
+import { generateMasterKey, rewrapMasterKeyWithNewPassword, unwrapMasterKeyWithPassword, wrapMasterKeyWithPassword } from './master-key';
 
 describe('master key wrap/unwrap', () => {
   it('round-trips with the correct password', async () => {

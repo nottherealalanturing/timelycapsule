@@ -34,6 +34,9 @@ export const ERROR_CODES = [
   // T-09 recipients
   'recipient_already_added',
   'recipient_locked',
+  // T-10 media
+  'unsupported_media_type',
+  'file_too_large',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

@@ -1,7 +1,7 @@
-import { fromBase64Url, toBase64Url } from './encoding.js';
-import { deriveKeyFromPassword } from './kdf.js';
-import { generateAesKey, generateSalt } from './random.js';
-import { extractSalt, unwrapKey, wrapKey } from './wrap.js';
+import { fromBase64Url, toBase64Url } from './encoding';
+import { deriveKeyFromPassword } from './kdf';
+import { generateAesKey, generateSalt } from './random';
+import { extractSalt, unwrapKey, wrapKey } from './wrap';
 
 const ZERO_SALT = new Uint8Array(16); // key-to-key wraps don't need a KDF salt — see wrap.ts
 

@@ -22,7 +22,13 @@ async function createVerifiedUser() {
   const email = uniqueEmail();
   const signupRes = await request(app)
     .post('/v1/auth/signup')
-    .send({ email, password: 'correct-horse-battery-staple', displayName: 'Test User' });
+    .send({
+      email,
+      password: 'correct-horse-battery-staple',
+      displayName: 'Test User',
+      masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+      recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+    });
   expect(signupRes.status).toBe(201);
   const userId = signupRes.body.user.id as string;
   createdUserIds.push(userId);
@@ -72,6 +78,24 @@ describe('capsules module (T-08)', () => {
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);
     expect(res.body.data[0]).not.toHaveProperty('contentDocEnc');
     expect(res.body.data[0]).not.toHaveProperty('ownerKeyWrap');
+  });
+
+  it('round-trips base64 ciphertext through contentDocEnc/ownerKeyWrap bytea columns', async () => {
+    const { app, accessToken } = await createVerifiedUser();
+    const create = await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' });
+    const id = create.body.capsule.id;
+
+    const contentDocEnc = Buffer.from('not actually ciphertext, just some bytes \x00\x01\xff').toString('base64');
+    const ownerKeyWrap = Buffer.from('wrapped key bytes \x02\x03').toString('base64');
+
+    const patchRes = await authed(app, accessToken).patch(`/v1/capsules/${id}`).send({ contentDocEnc, ownerKeyWrap });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.capsule.contentDocEnc).toBe(contentDocEnc);
+    expect(patchRes.body.capsule.ownerKeyWrap).toBe(ownerKeyWrap);
+
+    const getRes = await authed(app, accessToken).get(`/v1/capsules/${id}`);
+    expect(getRes.body.capsule.contentDocEnc).toBe(contentDocEnc);
+    expect(getRes.body.capsule.ownerKeyWrap).toBe(ownerKeyWrap);
   });
 
   it('rejects fetching or patching another user\'s capsule (404, not leaked)', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { deriveKeyFromPassword, deriveKeyFromRecoveryCode } from './kdf.js';
-import { generateRecoveryCodeBytes, generateSalt } from './random.js';
+import { deriveKeyFromPassword, deriveKeyFromRecoveryCode } from './kdf';
+import { generateRecoveryCodeBytes, generateSalt } from './random';
 
 describe('deriveKeyFromPassword', () => {
   it('is deterministic for the same password+salt', async () => {

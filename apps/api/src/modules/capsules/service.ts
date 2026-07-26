@@ -127,6 +127,16 @@ export async function patchCapsule(
   if (patch.unlockAt !== undefined) {
     updateValues.unlockAt = patch.unlockAt ? new Date(patch.unlockAt) : null;
   }
+  // contentDocEnc/ownerKeyWrap are bytea columns; the wire format is base64
+  // (see mappers.ts's outbound base64OrNull) but nothing decoded it back on
+  // the way in — every PATCH was writing the raw base64 *text* into a bytea
+  // column instead of the decoded bytes.
+  if (patch.contentDocEnc !== undefined) {
+    updateValues.contentDocEnc = patch.contentDocEnc ? Buffer.from(patch.contentDocEnc, 'base64') : null;
+  }
+  if (patch.ownerKeyWrap !== undefined) {
+    updateValues.ownerKeyWrap = patch.ownerKeyWrap ? Buffer.from(patch.ownerKeyWrap, 'base64') : null;
+  }
   if (patch.seals) {
     updateValues.passphraseHint = extractPassphraseHint(patch.seals);
   }

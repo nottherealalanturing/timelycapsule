@@ -18,7 +18,13 @@ async function createUser() {
   const email = uniqueEmail();
   const signupRes = await request(app)
     .post('/v1/auth/signup')
-    .send({ email, password: 'correct-horse-battery-staple', displayName: 'Test User' });
+    .send({
+      email,
+      password: 'correct-horse-battery-staple',
+      displayName: 'Test User',
+      masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+      recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+    });
   expect(signupRes.status).toBe(201);
   const userId = signupRes.body.user.id as string;
   createdUserIds.push(userId);

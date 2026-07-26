@@ -91,4 +91,12 @@ export class ApiError extends Error {
   static recipientLocked(message = 'Recipients can only be edited before the capsule unlocks'): ApiError {
     return new ApiError('recipient_locked', message, 409);
   }
+
+  static unsupportedMediaType(mime: string): ApiError {
+    return new ApiError('unsupported_media_type', `Unsupported media type: ${mime}`, 415, { mime });
+  }
+
+  static fileTooLarge(limitBytes: number): ApiError {
+    return new ApiError('file_too_large', `File exceeds the plan's per-file size limit`, 413, { limitBytes });
+  }
 }

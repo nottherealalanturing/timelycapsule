@@ -7,8 +7,8 @@ import {
   unwrapCapsuleKeyWithPassphrase,
   wrapCapsuleKeyForOwner,
   wrapCapsuleKeyWithPassphrase,
-} from './capsule-key.js';
-import { generateMasterKey } from './master-key.js';
+} from './capsule-key';
+import { generateMasterKey } from './master-key';
 
 describe('capsule key — owner wrap', () => {
   it('round-trips under the owner master key', async () => {

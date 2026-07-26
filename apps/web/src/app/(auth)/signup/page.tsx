@@ -17,19 +17,56 @@ export default function SignupPage() {
   const [agreed, setAgreed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [recoveryKit, setRecoveryKit] = useState<string | null>(null);
+  const [savedConfirmed, setSavedConfirmed] = useState(false);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      await signup({ email, password, displayName });
-      router.push('/verify');
+      const { recoveryKit: kit } = await signup({ email, password, displayName });
+      setRecoveryKit(kit);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.');
     } finally {
       setLoading(false);
     }
+  }
+
+  if (recoveryKit) {
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="font-[var(--font-display)] text-xl text-foreground">Save your recovery code</h1>
+        <p className="text-sm text-secondary">
+          Your capsules are end-to-end encrypted — we never see their contents, which means we can&apos;t recover
+          your account if you lose both your password and this code. Save it somewhere safe (a password manager,
+          printed and filed away). This is the only time it will be shown.
+        </p>
+        <div className="rounded-lg border border-[var(--color-text-secondary)]/20 bg-[var(--color-surface-raised)] p-4 text-center font-mono text-lg tracking-wider text-foreground">
+          {recoveryKit}
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => navigator.clipboard.writeText(recoveryKit)}
+        >
+          Copy to clipboard
+        </Button>
+        <label className="flex items-start gap-2 text-sm text-secondary">
+          <input
+            type="checkbox"
+            checked={savedConfirmed}
+            onChange={(e) => setSavedConfirmed(e.target.checked)}
+            className="mt-0.5"
+          />
+          I&apos;ve saved this recovery code somewhere safe.
+        </label>
+        <Button type="button" fullWidth disabled={!savedConfirmed} onClick={() => router.push('/verify')}>
+          Continue
+        </Button>
+      </div>
+    );
   }
 
   async function handleGoogle(idToken: string) {
