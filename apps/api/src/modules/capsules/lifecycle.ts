@@ -77,6 +77,15 @@ export async function sealCapsule(db: Database, ownerId: string, capsuleId: stri
     idempotencyKey: `capsule_unlock:${capsuleId}`,
   });
 
+  if (row.announceOnSeal) {
+    await db.insert(scheduledActions).values({
+      kind: 'announce',
+      subjectId: capsuleId,
+      runAt: now,
+      idempotencyKey: `announce:${capsuleId}:${now.getTime()}`,
+    });
+  }
+
   await audit(db, { actorType: 'user', actorId: ownerId, action: 'capsule.sealed', subjectType: 'capsule', subjectId: capsuleId });
   return toCapsule(sealed);
 }

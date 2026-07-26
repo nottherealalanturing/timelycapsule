@@ -185,6 +185,30 @@ describe('capsules module (T-08)', () => {
       const actions = await db.select().from(scheduledActions).where(eq(scheduledActions.subjectId, id));
       expect(actions.some((a) => a.kind === 'capsule_unlock' && a.state === 'pending')).toBe(true);
     });
+
+    it('also creates a pending announce scheduled_action on seal when announceOnSeal is set (default true)', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const create = await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' });
+      const id = create.body.capsule.id;
+      await authed(app, accessToken).patch(`/v1/capsules/${id}`).send({ unlockAt: futureIso(MIN_5 + 60_000) });
+      await authed(app, accessToken).post(`/v1/capsules/${id}/seal`).send({});
+
+      const actions = await db.select().from(scheduledActions).where(eq(scheduledActions.subjectId, id));
+      expect(actions.some((a) => a.kind === 'announce' && a.state === 'pending')).toBe(true);
+    });
+
+    it('skips the announce scheduled_action when announceOnSeal is false', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const create = await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' });
+      const id = create.body.capsule.id;
+      await authed(app, accessToken)
+        .patch(`/v1/capsules/${id}`)
+        .send({ unlockAt: futureIso(MIN_5 + 60_000), announceOnSeal: false });
+      await authed(app, accessToken).post(`/v1/capsules/${id}/seal`).send({});
+
+      const actions = await db.select().from(scheduledActions).where(eq(scheduledActions.subjectId, id));
+      expect(actions.some((a) => a.kind === 'announce')).toBe(false);
+    });
   });
 
   describe('withdraw semantics (invariant 3)', () => {
