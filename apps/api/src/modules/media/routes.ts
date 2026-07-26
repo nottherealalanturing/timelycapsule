@@ -5,7 +5,7 @@ import type { Database } from '../../db/client.js';
 import { idempotency } from '../../middleware/idempotency.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
-import { completeMedia, createMediaTicket, deleteMedia, getMediaViewUrl, patchMedia } from './service.js';
+import { completeMedia, createMediaTicket, deleteMedia, getMediaViewUrl, listMedia, patchMedia } from './service.js';
 
 const CapsuleIdParamSchema = z.object({ id: z.string().uuid() });
 const MediaIdParamSchema = z.object({ id: z.string().uuid() });
@@ -14,6 +14,15 @@ export function mediaRouter(db: Database): Router {
   const router = Router();
   router.use('/capsules', requireAuth());
   router.use('/media', requireAuth());
+
+  router.get('/capsules/:id/media', validate({ params: CapsuleIdParamSchema }), async (req, res, next) => {
+    try {
+      const data = await listMedia(db, req.user!.id, req.params.id as string);
+      res.status(200).json({ data });
+    } catch (err) {
+      next(err);
+    }
+  });
 
   router.post(
     '/capsules/:id/media/tickets',

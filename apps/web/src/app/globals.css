@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "@tc/ui-web/tokens.css";
+@import "leaflet/dist/leaflet.css";
 
 /*
  * Tailwind v4's automatic content detection only walks within this app's

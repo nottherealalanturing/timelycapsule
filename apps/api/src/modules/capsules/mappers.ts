@@ -45,6 +45,8 @@ export function toCapsule(row: CapsuleRow): Capsule {
     purgeAfter: isoOrNull(row.purgeAfter),
     withdrawnAt: isoOrNull(row.withdrawnAt),
     legacyConfig: row.legacyConfig as Capsule['legacyConfig'],
+    recurrence: row.recurrence as Capsule['recurrence'],
+    breakGlass: row.breakGlass ?? 'disabled',
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
