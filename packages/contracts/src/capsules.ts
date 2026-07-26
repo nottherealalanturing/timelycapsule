@@ -85,6 +85,15 @@ export const PatchCapsuleRequestSchema = z
     expiresAfter: z.string().nullable(), // Postgres interval literal, e.g. "24 hours"
     expiryStrict: z.boolean(),
     legacyConfig: z.record(z.string(), z.unknown()).nullable(),
+    // Not in T-08's original contract — the DB column existed since T-02
+    // but nothing exposed it until T-11's composer needed the "repeat
+    // yearly" toggle. `{freq:"yearly", count|until}` per 03-ARCHITECTURE.md
+    // §8; the scheduler actually acting on it is still T-13's job.
+    recurrence: z.record(z.string(), z.unknown()).nullable(),
+    // Same story as recurrence above — column existed since T-02, exposed
+    // now because T-11's composer needs the "break-glass for self" toggle.
+    // The actual early-open request flow (F3, 48h delay) is a later ticket.
+    breakGlass: z.enum(['disabled', 'allowed']),
   })
   .partial();
 export type PatchCapsuleRequest = z.infer<typeof PatchCapsuleRequestSchema>;
@@ -140,6 +149,8 @@ export const CapsuleSchema = z.object({
   purgeAfter: z.string().nullable(),
   withdrawnAt: z.string().nullable(),
   legacyConfig: z.record(z.string(), z.unknown()).nullable(),
+  recurrence: z.record(z.string(), z.unknown()).nullable(),
+  breakGlass: z.enum(['disabled', 'allowed']),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

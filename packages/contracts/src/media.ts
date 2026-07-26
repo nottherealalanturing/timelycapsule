@@ -74,6 +74,9 @@ export type MediaItem = z.infer<typeof MediaItemSchema>;
 export const MediaResponseSchema = z.object({ media: MediaItemSchema });
 export type MediaResponse = z.infer<typeof MediaResponseSchema>;
 
+export const MediaListResponseSchema = z.object({ data: z.array(MediaItemSchema) });
+export type MediaListResponse = z.infer<typeof MediaListResponseSchema>;
+
 export const MediaViewResponseSchema = z.object({
   url: z.string(),
   expiresInSeconds: z.number(),

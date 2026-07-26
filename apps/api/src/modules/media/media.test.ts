@@ -108,6 +108,19 @@ describe('media module (T-10)', () => {
     }
   });
 
+  it('lists a capsule\'s media items in position order', async () => {
+    const { app, accessToken } = await createUser();
+    const capsuleId = await createDraftCapsule(app, accessToken);
+    await uploadReadyMedia(app, accessToken, capsuleId, { name: 'a.jpg', mime: 'image/jpeg', sizeBytes: 1024 });
+    await uploadReadyMedia(app, accessToken, capsuleId, { name: 'b.jpg', mime: 'image/jpeg', sizeBytes: 1024 });
+
+    const res = await authed(app, accessToken).get(`/v1/capsules/${capsuleId}/media`);
+    expect(res.status).toBe(200);
+    expect(res.body.data).toHaveLength(2);
+    expect(res.body.data[0].position).toBe(0);
+    expect(res.body.data[1].position).toBe(1);
+  });
+
   it('rejects an unsupported MIME type', async () => {
     const { app, accessToken } = await createUser();
     const capsuleId = await createDraftCapsule(app, accessToken);

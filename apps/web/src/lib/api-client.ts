@@ -1,21 +1,48 @@
 import {
   ApiErrorSchema,
   AuthResponseSchema,
+  CapsuleActivityResponseSchema,
+  CapsuleListResponseSchema,
+  CapsuleResponseSchema,
+  CompleteMediaRequestSchema,
+  CreateCapsuleRequestSchema,
+  CreateMediaTicketRequestSchema,
+  CreateMediaTicketResponseSchema,
+  CreateRecipientRequestSchema,
+  CreateRecipientResponseSchema,
+  ExtendCapsuleRequestSchema,
   ForgotPasswordRequestSchema,
   GoogleOAuthRequestSchema,
   LoginRequestSchema,
+  MediaListResponseSchema,
+  MediaResponseSchema,
+  MediaViewResponseSchema,
   MeResponseSchema,
+  PatchCapsuleRequestSchema,
+  PatchMediaRequestSchema,
   PatchMeRequestSchema,
+  PatchRecipientRequestSchema,
+  RecipientResponseSchema,
+  RecipientsListResponseSchema,
   RefreshResponseSchema,
   ResetPasswordRequestSchema,
   SignupRequestSchema,
   VerifyEmailRequestSchema,
   type AuthResponse,
+  type CompleteMediaRequest,
+  type CreateCapsuleRequest,
+  type CreateMediaTicketRequest,
+  type CreateRecipientRequest,
+  type ExtendCapsuleRequest,
   type ForgotPasswordRequest,
   type GoogleOAuthRequest,
+  type ListCapsulesQuery,
   type LoginRequest,
   type MeResponse,
+  type PatchCapsuleRequest,
+  type PatchMediaRequest,
   type PatchMeRequest,
+  type PatchRecipientRequest,
   type ResetPasswordRequest,
   type SignupRequest,
   type VerifyEmailRequest,
@@ -155,6 +182,101 @@ export const authApi = {
 
   patchMe: (input: PatchMeRequest) =>
     request('/me', MeResponseSchema, { method: 'PATCH', auth: true, body: PatchMeRequestSchema.parse(input) }),
+};
+
+export const capsulesApi = {
+  create: (input: CreateCapsuleRequest) =>
+    request('/capsules', CapsuleResponseSchema, { method: 'POST', auth: true, body: CreateCapsuleRequestSchema.parse(input) }),
+
+  list: (query: Partial<ListCapsulesQuery> = {}) => {
+    const entries = Object.entries(query).filter(([, v]) => v !== undefined) as [string, string | number][];
+    const params = new URLSearchParams(entries.map(([k, v]) => [k, String(v)]));
+    return request(`/capsules?${params}`, CapsuleListResponseSchema, { auth: true });
+  },
+
+  get: (id: string) => request(`/capsules/${id}`, CapsuleResponseSchema, { auth: true }),
+
+  patch: (id: string, input: PatchCapsuleRequest) =>
+    request(`/capsules/${id}`, CapsuleResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: PatchCapsuleRequestSchema.partial().parse(input),
+    }),
+
+  seal: (id: string) => request(`/capsules/${id}/seal`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  duplicate: (id: string) =>
+    request(`/capsules/${id}/duplicate`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  archive: (id: string) => request(`/capsules/${id}/archive`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  unarchive: (id: string) =>
+    request(`/capsules/${id}/unarchive`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  trash: (id: string) => request(`/capsules/${id}/trash`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  restore: (id: string) => request(`/capsules/${id}/restore`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  withdraw: (id: string) => request(`/capsules/${id}/withdraw`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  extend: (id: string, input: ExtendCapsuleRequest) =>
+    request(`/capsules/${id}/extend`, CapsuleResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: ExtendCapsuleRequestSchema.parse(input),
+    }),
+
+  activity: (id: string) => request(`/capsules/${id}/activity`, CapsuleActivityResponseSchema, { auth: true }),
+};
+
+export const recipientsApi = {
+  list: (capsuleId: string) => request(`/capsules/${capsuleId}/recipients`, RecipientsListResponseSchema, { auth: true }),
+
+  create: (capsuleId: string, input: CreateRecipientRequest) =>
+    request(`/capsules/${capsuleId}/recipients`, CreateRecipientResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CreateRecipientRequestSchema.parse(input),
+    }),
+
+  patch: (capsuleId: string, recipientId: string, input: PatchRecipientRequest) =>
+    request(`/capsules/${capsuleId}/recipients/${recipientId}`, RecipientResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: PatchRecipientRequestSchema.parse(input),
+    }),
+
+  delete: (capsuleId: string, recipientId: string) =>
+    request(`/capsules/${capsuleId}/recipients/${recipientId}`, z.void(), { method: 'DELETE', auth: true }),
+};
+
+export const mediaApi = {
+  list: (capsuleId: string) => request(`/capsules/${capsuleId}/media`, MediaListResponseSchema, { auth: true }),
+
+  createTicket: (capsuleId: string, input: CreateMediaTicketRequest) =>
+    request(`/capsules/${capsuleId}/media/tickets`, CreateMediaTicketResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CreateMediaTicketRequestSchema.parse(input),
+    }),
+
+  complete: (mediaId: string, input: CompleteMediaRequest) =>
+    request(`/media/${mediaId}/complete`, MediaResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CompleteMediaRequestSchema.parse(input),
+    }),
+
+  patch: (mediaId: string, input: PatchMediaRequest) =>
+    request(`/media/${mediaId}`, MediaResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: PatchMediaRequestSchema.parse(input),
+    }),
+
+  delete: (mediaId: string) => request(`/media/${mediaId}`, z.void(), { method: 'DELETE', auth: true }),
+
+  view: (mediaId: string) => request(`/media/${mediaId}/view`, MediaViewResponseSchema, { auth: true }),
 };
 
 export type { AuthResponse, MeResponse };

@@ -47,6 +47,19 @@ async function adjustCapsuleSizeBytes(db: Database, capsuleId: string, deltaByte
     .where(eq(capsules.id, capsuleId));
 }
 
+/**
+ * Not in the original T-10 ticket text or 03-ARCHITECTURE.md §14's route
+ * list — added when T-11's composer needed a way to show a capsule's
+ * already-uploaded media (for reorder/captions/delete and to survive a
+ * page refresh), which nothing else exposed. Mirrors
+ * `modules/recipients/service.ts`'s `listRecipients` shape.
+ */
+export async function listMedia(db: Database, ownerId: string, capsuleId: string): Promise<MediaItem[]> {
+  await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
+  const rows = await db.select().from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId)).orderBy(mediaItems.position);
+  return rows.map(toMediaItem);
+}
+
 export async function createMediaTicket(
   db: Database,
   ownerId: string,
