@@ -5,6 +5,7 @@ import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
 import { blocks, capsuleRecipients, capsules, users } from '../../db/schema/index.js';
 import { assertWithinRecipientLimit, findOwnedCapsuleOrThrow } from '../capsules/index.js';
+import { sendSomethingWaiting } from '../email/index.js';
 import { generateAccessToken, hashAccessToken } from './access-token.js';
 import { toRecipient } from './mappers.js';
 
@@ -178,25 +179,70 @@ export async function deleteRecipient(db: Database, ownerId: string, capsuleId: 
 }
 
 /** Stub per T-09 ticket text — real email delivery is T-14's job. */
-export async function resendInvite(db: Database, ownerId: string, capsuleId: string, recipientId: string): Promise<void> {
-  const capsule = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
-  assertCanManageRecipients(capsule);
-
+/**
+ * Sends the recipient their magic link — the "something is waiting" email.
+ * The link is supplied by the caller (the owner's browser), never
+ * constructed here: it carries the capsule key in its URL fragment, which
+ * the server is never allowed to hold (T-14 decisions log). Shared by both
+ * the first real send (`sendAnnounce`, gated on sealed+announceOnSeal) and
+ * a manual resend (`resendInvite`, gated only on the recipient being
+ * manageable — the owner may resend any time pre-unlock).
+ */
+async function sendRecipientLink(
+  db: Database,
+  ownerId: string,
+  capsuleId: string,
+  recipientId: string,
+  link: string,
+  auditAction: 'recipient.announced' | 'recipient.invite_resent',
+): Promise<void> {
+  const [owner] = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, ownerId)).limit(1);
+  const [capsule] = await db.select({ teaser: capsules.teaser }).from(capsules).where(eq(capsules.id, capsuleId)).limit(1);
   const [recipient] = await db
-    .select({ id: capsuleRecipients.id })
+    .select()
     .from(capsuleRecipients)
     .where(and(eq(capsuleRecipients.id, recipientId), eq(capsuleRecipients.capsuleId, capsuleId)))
     .limit(1);
   if (!recipient) {
     throw ApiError.notFound('Recipient not found');
   }
+  if (!recipient.email || recipient.status === 'blocked_suppressed') {
+    // Masked success — see T-09's block-suppression design (PROGRESS.md decisions log):
+    // the owner sees an ordinary success, but nothing is ever actually sent.
+    return;
+  }
+
+  await sendSomethingWaiting(db, recipient.email, {
+    senderName: owner?.displayName ?? 'Someone',
+    teaser: capsule?.teaser ?? null,
+    link,
+  });
+
+  if (recipient.status === 'added') {
+    await db.update(capsuleRecipients).set({ status: 'invited' }).where(eq(capsuleRecipients.id, recipientId));
+  }
 
   await audit(db, {
     actorType: 'user',
     actorId: ownerId,
-    action: 'recipient.invite_resent',
+    action: auditAction,
     subjectType: 'capsule',
     subjectId: capsuleId,
     metadata: { recipientId },
   });
+}
+
+/** First real announce send — only once the capsule is actually sealed with announceOnSeal set, otherwise there's nothing to announce yet. */
+export async function sendAnnounce(db: Database, ownerId: string, capsuleId: string, recipientId: string, link: string): Promise<void> {
+  const capsule = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
+  if (capsule.state !== 'sealed' || !capsule.announceOnSeal) {
+    throw ApiError.announceNotAllowed();
+  }
+  await sendRecipientLink(db, ownerId, capsuleId, recipientId, link, 'recipient.announced');
+}
+
+export async function resendInvite(db: Database, ownerId: string, capsuleId: string, recipientId: string, link: string): Promise<void> {
+  const capsule = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
+  assertCanManageRecipients(capsule);
+  await sendRecipientLink(db, ownerId, capsuleId, recipientId, link, 'recipient.invite_resent');
 }

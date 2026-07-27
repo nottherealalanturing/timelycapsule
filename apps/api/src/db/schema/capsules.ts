@@ -198,3 +198,24 @@ export const reactions = pgTable(
   },
   (t) => [index('reactions_capsule_id_idx').on(t.capsuleId)],
 );
+
+/**
+ * Identity Seal OTP codes (T-15, plan/06-FEATURE-ADDENDUM.md §B) — a
+ * dedicated table rather than reusing `email_otp_codes`, since that one is
+ * scoped to an authenticated `userId` and recipients have no account.
+ */
+export const recipientOtpCodes = pgTable(
+  'recipient_otp_codes',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    recipientId: uuid('recipient_id')
+      .notNull()
+      .references(() => capsuleRecipients.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('recipient_otp_codes_recipient_id_idx').on(t.recipientId)],
+);

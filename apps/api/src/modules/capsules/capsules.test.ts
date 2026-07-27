@@ -186,7 +186,7 @@ describe('capsules module (T-08)', () => {
       expect(actions.some((a) => a.kind === 'capsule_unlock' && a.state === 'pending')).toBe(true);
     });
 
-    it('also creates a pending announce scheduled_action on seal when announceOnSeal is set (default true)', async () => {
+    it('does NOT schedule an announce action on seal (T-14: the owner\'s browser triggers it directly, since the server can never hold the recipient link\'s capsule-key fragment)', async () => {
       const { app, accessToken } = await createVerifiedUser();
       const create = await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' });
       const id = create.body.capsule.id;
@@ -194,20 +194,30 @@ describe('capsules module (T-08)', () => {
       await authed(app, accessToken).post(`/v1/capsules/${id}/seal`).send({});
 
       const actions = await db.select().from(scheduledActions).where(eq(scheduledActions.subjectId, id));
-      expect(actions.some((a) => a.kind === 'announce' && a.state === 'pending')).toBe(true);
+      expect(actions.some((a) => a.kind === 'announce')).toBe(false);
     });
 
-    it('skips the announce scheduled_action when announceOnSeal is false', async () => {
+    it('schedules an owner T-1d pre-unlock reminder on seal (subjectId=capsuleId, not ownerId)', async () => {
       const { app, accessToken } = await createVerifiedUser();
       const create = await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' });
       const id = create.body.capsule.id;
-      await authed(app, accessToken)
-        .patch(`/v1/capsules/${id}`)
-        .send({ unlockAt: futureIso(MIN_5 + 60_000), announceOnSeal: false });
+      await authed(app, accessToken).patch(`/v1/capsules/${id}`).send({ unlockAt: futureIso(2 * DAY) });
+      await authed(app, accessToken).post(`/v1/capsules/${id}/seal`).send({});
+
+      const ownerReminders = await db.select().from(scheduledActions).where(eq(scheduledActions.subjectId, id));
+      expect(ownerReminders.some((a) => a.kind === 'reminder' && a.state === 'pending')).toBe(true);
+    });
+
+    it('does not schedule a T-7d/T-1d reminder that would already be in the past', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const create = await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' });
+      const id = create.body.capsule.id;
+      // unlockAt just past MIN_5 — both T-7d and T-1d would fall before "now".
+      await authed(app, accessToken).patch(`/v1/capsules/${id}`).send({ unlockAt: futureIso(MIN_5 + 60_000) });
       await authed(app, accessToken).post(`/v1/capsules/${id}/seal`).send({});
 
       const actions = await db.select().from(scheduledActions).where(eq(scheduledActions.subjectId, id));
-      expect(actions.some((a) => a.kind === 'announce')).toBe(false);
+      expect(actions.some((a) => a.kind === 'reminder')).toBe(false);
     });
   });
 

@@ -43,6 +43,13 @@
       "when": 1785029693398,
       "tag": "0005_crazy_talisman",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785108545923,
+      "tag": "0006_sloppy_living_mummy",
+      "breakpoints": true
     }
   ]
 }

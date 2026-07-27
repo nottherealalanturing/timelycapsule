@@ -6,6 +6,10 @@ import { logger } from '../../logger.js';
  * plan/04-ZERO-COST-PLAN.md: "Drop Redis entirely. Use pg-boss... The
  * scheduled_actions table stays as designed; pg-boss just handles
  * execution." One queue per action_kind so each handler subscribes narrowly.
+ * `announce` is deliberately absent — T-14 moved it to a synchronous,
+ * client-triggered send (see PROGRESS.md decisions log: the server can
+ * never hold the capsule key that goes in the recipient link's fragment,
+ * so nothing schedules an `announce` action anymore).
  */
 export const QUEUE_NAMES = [
   'capsule_unlock',
@@ -13,7 +17,6 @@ export const QUEUE_NAMES = [
   'reminder',
   'breakglass_open',
   'trash_purge',
-  'announce',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];

@@ -7,7 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import '../../env.js';
 import { db, pool } from '../../db/client.js';
 import { errorHandler } from '../../middleware/error-handler.js';
-import { outboundMessages } from '../../db/schema/index.js';
+import { capsuleRecipients, capsules, notifications, outboundMessages, users } from '../../db/schema/index.js';
 import { emailWebhookRouter } from './webhook.js';
 
 function buildTestApp() {
@@ -42,10 +42,14 @@ function signedPost(app: express.Express, secret: string, body: unknown) {
 describe('POST /webhooks/resend', () => {
   const secret = process.env.RESEND_WEBHOOK_SECRET!;
   const createdIds: string[] = [];
+  const createdUserIds: string[] = [];
 
   afterAll(async () => {
     for (const id of createdIds) {
       await db.delete(outboundMessages).where(eq(outboundMessages.id, id));
+    }
+    for (const id of createdUserIds) {
+      await db.delete(users).where(eq(users.id, id));
     }
     await pool.end();
   });
@@ -95,5 +99,67 @@ describe('POST /webhooks/resend', () => {
 
     const [updated] = await db.select().from(outboundMessages).where(eq(outboundMessages.id, row!.id));
     expect(updated?.state).toBe('bounced');
+  });
+
+  it('escalates on the 2nd hard bounce to the same address: flags the recipient + notifies + emails the owner', async () => {
+    const app = buildTestApp();
+    const bouncedEmail = `bounce-${randomUUID()}@example.com`;
+
+    const [owner] = await db
+      .insert(users)
+      .values({ email: `owner-${randomUUID()}@example.com`, displayName: 'Bounce Test Owner', status: 'active' })
+      .returning();
+    createdUserIds.push(owner!.id);
+
+    const [capsule] = await db
+      .insert(capsules)
+      .values({
+        ownerId: owner!.id,
+        type: 'personal',
+        publicId: randomUUID().slice(0, 8).toUpperCase(),
+        state: 'sealed',
+        unlockAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        title: 'Escalation test capsule',
+      })
+      .returning();
+
+    const [recipient] = await db
+      .insert(capsuleRecipients)
+      .values({ capsuleId: capsule!.id, email: bouncedEmail, accessTokenHash: randomUUID(), status: 'added' })
+      .returning();
+
+    // First bounce — below the 2-hard-bounce threshold, no escalation yet.
+    const [firstRow] = await db
+      .insert(outboundMessages)
+      .values({ channel: 'email', toRef: bouncedEmail, template: 'something-waiting', providerId: `resend-${randomUUID()}` })
+      .returning();
+    createdIds.push(firstRow!.id);
+    await signedPost(app, secret, { type: 'email.bounced', data: { email_id: firstRow!.providerId, to: [bouncedEmail] } });
+
+    const [afterFirst] = await db.select().from(capsuleRecipients).where(eq(capsuleRecipients.id, recipient!.id));
+    expect(afterFirst?.status).toBe('added'); // not yet escalated
+
+    // Second bounce — crosses the threshold.
+    const [secondRow] = await db
+      .insert(outboundMessages)
+      .values({ channel: 'email', toRef: bouncedEmail, template: 'something-waiting', providerId: `resend-${randomUUID()}` })
+      .returning();
+    createdIds.push(secondRow!.id);
+    const res = await signedPost(app, secret, { type: 'email.bounced', data: { email_id: secondRow!.providerId, to: [bouncedEmail] } });
+    expect(res.status).toBe(200);
+
+    const [afterSecond] = await db.select().from(capsuleRecipients).where(eq(capsuleRecipients.id, recipient!.id));
+    expect(afterSecond?.status).toBe('bounced');
+
+    const inAppNotifications = await db.select().from(notifications).where(eq(notifications.userId, owner!.id));
+    expect(inAppNotifications.some((n) => n.category === 'delivery')).toBe(true);
+
+    const bounceAlertEmails = await db.select().from(outboundMessages).where(eq(outboundMessages.toRef, owner!.email));
+    createdIds.push(...bounceAlertEmails.map((m) => m.id));
+    expect(bounceAlertEmails.some((m) => m.template === 'bounce-alert' && m.state === 'sent')).toBe(true);
+
+    await db.delete(notifications).where(eq(notifications.userId, owner!.id));
+    await db.delete(capsuleRecipients).where(eq(capsuleRecipients.id, recipient!.id));
+    await db.delete(capsules).where(eq(capsules.id, capsule!.id));
   });
 });

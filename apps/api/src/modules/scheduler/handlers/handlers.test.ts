@@ -1,13 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { afterAll, describe, expect, it } from 'vitest';
 import '../../../env.js';
 import { db, pool } from '../../../db/client.js';
-import { auditEvents, capsuleRecipients, capsules, mediaItems, scheduledActions, users } from '../../../db/schema/index.js';
+import { auditEvents, capsuleRecipients, capsules, mediaItems, outboundMessages, scheduledActions, users } from '../../../db/schema/index.js';
 import { VirtualClock } from '../../../lib/clock.js';
 import { getStorageAdapter } from '../../media/index.js';
 import { createTestCapsule, createTestRecipient, createTestUser, insertScheduledAction } from '../test-helpers.js';
-import { announceHandler } from './announce.js';
 import { breakglassOpenHandler } from './breakglass-open.js';
 import { capsuleUnlockHandler } from './capsule-unlock.js';
 import { runAction, type ActionHandler } from './dispatch.js';
@@ -108,11 +107,14 @@ describe('scheduler action handlers (T-13)', () => {
     expect(openedRow.status).toBe('opened'); // untouched
   });
 
-  it('announce: no-ops safely for a capsule that still exists', async () => {
+  it('recipient_unlock sends a real unlock email (T-14) and records it in the outbound ledger', async () => {
     const capsule = await seedSealedCapsule();
-    await announceHandler({ db, clock: new VirtualClock(new Date()), subjectId: capsule.id });
-    const alarms = await db.select().from(auditEvents).where(and(eq(auditEvents.subjectId, capsule.id), eq(auditEvents.action, 'capsule.announced')));
-    expect(alarms).toHaveLength(1);
+    const recipient = await createTestRecipient(db, capsule.id, { status: 'invited' });
+
+    await recipientUnlockHandler({ db, clock: new VirtualClock(new Date()), subjectId: recipient.id });
+
+    const sent = await db.select().from(outboundMessages).where(eq(outboundMessages.toRef, recipient.email!));
+    expect(sent.some((m) => m.template === 'capsule-unlocked' && m.state === 'sent')).toBe(true);
   });
 
   it('breakglass_open: only fires when sealed and breakGlass is allowed', async () => {
@@ -130,11 +132,27 @@ describe('scheduler action handlers (T-13)', () => {
   });
 
   it('reminder: skips a recipient who opted out', async () => {
-    const capsule = await seedSealedCapsule();
+    const capsule = await seedSealedCapsule({ unlockAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) });
     const optedOut = await createTestRecipient(db, capsule.id, { status: 'added', reminderOptIn: { enabled: false } });
     await reminderHandler({ db, clock: new VirtualClock(new Date()), subjectId: optedOut.id });
-    const alarms = await db.select().from(auditEvents).where(and(eq(auditEvents.subjectId, capsule.id), eq(auditEvents.action, 'recipient.reminder_sent')));
-    expect(alarms).toHaveLength(0);
+    const sent = await db.select().from(outboundMessages).where(eq(outboundMessages.toRef, optedOut.email!));
+    expect(sent).toHaveLength(0);
+  });
+
+  it('reminder: sends a real email to an opted-in recipient', async () => {
+    const capsule = await seedSealedCapsule({ unlockAt: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) });
+    const optedIn = await createTestRecipient(db, capsule.id, { status: 'added' });
+    await reminderHandler({ db, clock: new VirtualClock(new Date()), subjectId: optedIn.id });
+    const sent = await db.select().from(outboundMessages).where(eq(outboundMessages.toRef, optedIn.email!));
+    expect(sent.some((m) => m.template === 'pre-unlock-reminder' && m.state === 'sent')).toBe(true);
+  });
+
+  it('reminder: disambiguates a capsule subjectId as the owner\'s own T-1d reminder', async () => {
+    const capsule = await seedSealedCapsule({ unlockAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
+    const [owner] = await db.select().from(users).where(eq(users.id, capsule.ownerId));
+    await reminderHandler({ db, clock: new VirtualClock(new Date()), subjectId: capsule.id });
+    const sent = await db.select().from(outboundMessages).where(eq(outboundMessages.toRef, owner!.email));
+    expect(sent.some((m) => m.template === 'pre-unlock-reminder' && m.state === 'sent')).toBe(true);
   });
 
   it('trash_purge: deletes R2 objects and hard-deletes the capsule row', async () => {

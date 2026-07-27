@@ -56,6 +56,12 @@ export function Composer({ capsuleId }: { capsuleId: string }) {
     try {
       await draft.flush();
       await capsulesApi.seal(capsuleId);
+      // Only now — right after seal succeeds — does "something is waiting" become true.
+      // The link is built from the capsule key still held in this session's memory; the
+      // server never sees it (T-14 decisions log).
+      if (draft.capsule?.announceOnSeal) {
+        await draft.sendAnnounceToAll(capsuleId);
+      }
       setConfirmOpen(false);
       setCeremonyOpen(true);
     } finally {
