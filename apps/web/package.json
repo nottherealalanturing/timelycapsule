@@ -20,6 +20,7 @@
     "@tiptap/starter-kit": "^3.29.0",
     "@tiptap/suggestion": "^3.29.0",
     "chrono-node": "^2.10.1",
+    "fflate": "^0.8.3",
     "framer-motion": "^12.42.2",
     "leaflet": "^1.9.4",
     "next": "16.2.11",

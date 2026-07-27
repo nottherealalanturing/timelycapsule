@@ -3,6 +3,7 @@
 import type { Capsule, PatchCapsuleRequest } from '@tc/contracts';
 import {
   decryptBytes,
+  encodeCapsuleKeyForLink,
   encryptBytes,
   generateCapsuleKey,
   unwrapCapsuleKeyForOwner,
@@ -10,7 +11,7 @@ import {
   wrapCapsuleKeyWithPassphrase,
 } from '@tc/crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { capsulesApi } from './api-client';
+import { capsulesApi, recipientsApi } from './api-client';
 import { decodeIvCiphertext, encodeIvCiphertext } from './capsule-crypto';
 import { useMasterKey } from './master-key-context';
 
@@ -66,6 +67,21 @@ export interface CapsuleDraft {
   encryptForCapsule: (bytes: Uint8Array) => Promise<Uint8Array>;
   /** Wraps this capsule's key under a passphrase (Passphrase Seal) — base64, safe to send to the server. */
   wrapForPassphrase: (passphrase: string) => Promise<string>;
+  /**
+   * Remembers a just-created recipient's one-time raw access token in
+   * memory (never persisted) so `sendAnnounceToAll`/`resendInvite` can
+   * later build that recipient's full magic link — call right after
+   * `recipientsApi.create` resolves, while the token is still in hand.
+   */
+  registerRecipientToken: (recipientId: string, accessToken: string) => void;
+  /**
+   * Builds and sends the "something is waiting" email for every recipient
+   * added this session (via `registerRecipientToken`), immediately after a
+   * successful seal. The capsule key never leaves this hook — only the
+   * fully-assembled link (built here, client-side) is sent to the server,
+   * which drops it into the email unparsed (T-14 decisions log).
+   */
+  sendAnnounceToAll: (capsuleId: string) => Promise<void>;
 }
 
 const AUTOSAVE_IDLE_MS = 3000;
@@ -88,6 +104,10 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
 
   const capsuleKeyRef = useRef<Uint8Array | null>(null);
   const pendingPatchRef = useRef<PatchCapsuleRequest>({});
+  // recipientId -> one-time raw access token, held only for this browser session (T-14
+  // decisions log) — never persisted, since it's what lets sendAnnounceToAll build each
+  // recipient's magic link without the server ever holding the capsule key.
+  const recipientTokensRef = useRef<Map<string, string>>(new Map());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // TipTap's useEditor only binds `onUpdate` once (its options aren't
   // re-read every render), so anything that callback reaches only ever
@@ -231,5 +251,34 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
     return wrapCapsuleKeyWithPassphrase(capsuleKeyRef.current, passphrase);
   }, []);
 
-  return { capsule, contentDoc, loading, ready, autosaveStatus, patch, setContentDoc, flush, encryptForCapsule, wrapForPassphrase };
+  const registerRecipientToken = useCallback((recipientId: string, accessToken: string) => {
+    recipientTokensRef.current.set(recipientId, accessToken);
+  }, []);
+
+  const sendAnnounceToAll = useCallback(async (capsuleIdForLink: string) => {
+    if (!capsuleKeyRef.current) return;
+    const fragment = encodeCapsuleKeyForLink(capsuleKeyRef.current);
+    const entries = Array.from(recipientTokensRef.current.entries());
+    await Promise.allSettled(
+      entries.map(([recipientId, accessToken]) => {
+        const link = `${window.location.origin}/c/${accessToken}#${fragment}`;
+        return recipientsApi.announce(capsuleIdForLink, recipientId, link);
+      }),
+    );
+  }, []);
+
+  return {
+    capsule,
+    contentDoc,
+    loading,
+    ready,
+    autosaveStatus,
+    patch,
+    setContentDoc,
+    flush,
+    encryptForCapsule,
+    wrapForPassphrase,
+    registerRecipientToken,
+    sendAnnounceToAll,
+  };
 }

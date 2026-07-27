@@ -37,6 +37,12 @@ export const ERROR_CODES = [
   // T-10 media
   'unsupported_media_type',
   'file_too_large',
+  // T-14 notifications
+  'announce_not_allowed',
+  // T-15 reveal
+  'seal_not_satisfied',
+  'gate_expired',
+  'already_saved',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

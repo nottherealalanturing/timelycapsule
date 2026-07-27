@@ -57,6 +57,7 @@ export const CoverSchema = z.object({
   value: z.string(),
   theme: z.string().optional(),
 });
+export type Cover = z.infer<typeof CoverSchema>;
 
 // --- Requests ---
 

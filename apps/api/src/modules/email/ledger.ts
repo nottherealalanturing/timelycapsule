@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { outboundMessages } from '../../db/schema/index.js';
 
@@ -39,4 +39,13 @@ export async function markStateByProviderId(
   state: 'delivered' | 'bounced' | 'failed',
 ): Promise<void> {
   await db.update(outboundMessages).set({ state }).where(eq(outboundMessages.providerId, providerId));
+}
+
+/** "2 hard bounces → address flagged" (03-ARCHITECTURE.md §11) — counts every bounced send to this address, any template. */
+export async function countBouncesForAddress(db: Database, toRef: string): Promise<number> {
+  const rows = await db
+    .select({ id: outboundMessages.id })
+    .from(outboundMessages)
+    .where(and(eq(outboundMessages.toRef, toRef), eq(outboundMessages.state, 'bounced')));
+  return rows.length;
 }

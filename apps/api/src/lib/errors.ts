@@ -99,4 +99,16 @@ export class ApiError extends Error {
   static fileTooLarge(limitBytes: number): ApiError {
     return new ApiError('file_too_large', `File exceeds the plan's per-file size limit`, 413, { limitBytes });
   }
+
+  static announceNotAllowed(message = 'This capsule is not sealed or announce-on-seal is disabled'): ApiError {
+    return new ApiError('announce_not_allowed', message, 409);
+  }
+
+  static sealNotSatisfied(sealType: string): ApiError {
+    return new ApiError('seal_not_satisfied', `The ${sealType} seal hasn't been satisfied yet`, 403, { sealType });
+  }
+
+  static alreadySaved(): ApiError {
+    return new ApiError('already_saved', 'This capsule has already been saved to a different account', 409);
+  }
 }

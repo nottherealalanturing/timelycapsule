@@ -23,12 +23,23 @@ import {
   PatchMediaRequestSchema,
   PatchMeRequestSchema,
   PatchRecipientRequestSchema,
+  PlaceCheckRequestSchema,
+  PlaceCheckResponseSchema,
+  ReactRequestSchema,
   RecipientResponseSchema,
   RecipientsListResponseSchema,
   RefreshResponseSchema,
+  RemindRequestSchema,
+  ReportRequestSchema,
+  RequestIdentityCodeResponseSchema,
   ResetPasswordRequestSchema,
+  RevealResponseSchema,
+  SendAnnounceRequestSchema,
   SignupRequestSchema,
+  TzInferRequestSchema,
   VerifyEmailRequestSchema,
+  VerifyIdentityRequestSchema,
+  VerifyIdentityResponseSchema,
   type AuthResponse,
   type CompleteMediaRequest,
   type CreateCapsuleRequest,
@@ -44,6 +55,9 @@ import {
   type PatchMediaRequest,
   type PatchMeRequest,
   type PatchRecipientRequest,
+  type PlaceCheckRequest,
+  type ReactRequest,
+  type ReportRequest,
   type ResetPasswordRequest,
   type SignupRequest,
   type VerifyEmailRequest,
@@ -253,6 +267,25 @@ export const recipientsApi = {
 
   delete: (capsuleId: string, recipientId: string) =>
     request(`/capsules/${capsuleId}/recipients/${recipientId}`, z.void(), { method: 'DELETE', auth: true }),
+
+  /**
+   * The server never holds the capsule key that goes in `link`'s `#k=`
+   * fragment (T-14 decisions log) — this client-constructed link is
+   * relayed through unparsed, dropped straight into the announce email.
+   */
+  announce: (capsuleId: string, recipientId: string, link: string) =>
+    request(`/capsules/${capsuleId}/recipients/${recipientId}/announce`, z.object({}), {
+      method: 'POST',
+      auth: true,
+      body: SendAnnounceRequestSchema.parse({ link }),
+    }),
+
+  resendInvite: (capsuleId: string, recipientId: string, link: string) =>
+    request(`/capsules/${capsuleId}/recipients/${recipientId}/resend-invite`, z.object({}), {
+      method: 'POST',
+      auth: true,
+      body: SendAnnounceRequestSchema.parse({ link }),
+    }),
 };
 
 export const mediaApi = {
@@ -282,6 +315,45 @@ export const mediaApi = {
   delete: (mediaId: string) => request(`/media/${mediaId}`, z.void(), { method: 'DELETE', auth: true }),
 
   view: (mediaId: string) => request(`/media/${mediaId}/view`, MediaViewResponseSchema, { auth: true }),
+};
+
+export const revealApi = {
+  get: (token: string, gates: { placeGate?: string; identityGate?: string } = {}) => {
+    const query = new URLSearchParams();
+    if (gates.placeGate) query.set('placeGate', gates.placeGate);
+    if (gates.identityGate) query.set('identityGate', gates.identityGate);
+    const qs = query.toString();
+    return request(`/r/${token}${qs ? `?${qs}` : ''}`, RevealResponseSchema);
+  },
+
+  requestIdentityCode: (token: string) =>
+    request(`/r/${token}/verify/request`, RequestIdentityCodeResponseSchema, { method: 'POST', body: {} }),
+
+  verifyIdentity: (token: string, code: string) =>
+    request(`/r/${token}/verify`, VerifyIdentityResponseSchema, {
+      method: 'POST',
+      body: VerifyIdentityRequestSchema.parse({ code }),
+    }),
+
+  placeCheck: (token: string, input: PlaceCheckRequest) =>
+    request(`/r/${token}/place-check`, PlaceCheckResponseSchema, {
+      method: 'POST',
+      body: PlaceCheckRequestSchema.parse(input),
+    }),
+
+  remind: (token: string, enabled: boolean) =>
+    request(`/r/${token}/remind`, z.void(), { method: 'POST', body: RemindRequestSchema.parse({ enabled }) }),
+
+  react: (token: string, input: ReactRequest) =>
+    request(`/r/${token}/react`, z.void(), { method: 'POST', body: ReactRequestSchema.parse(input) }),
+
+  report: (token: string, input: ReportRequest) =>
+    request(`/r/${token}/report`, z.void(), { method: 'POST', body: ReportRequestSchema.parse(input) }),
+
+  tzInfer: (token: string, tz: string) =>
+    request(`/r/${token}/tz-infer`, z.void(), { method: 'POST', body: TzInferRequestSchema.parse({ tz }) }),
+
+  save: (token: string) => request(`/r/${token}/save`, z.void(), { method: 'POST', auth: true, body: {} }),
 };
 
 export type { AuthResponse, MeResponse };

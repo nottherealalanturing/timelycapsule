@@ -190,17 +190,19 @@ describe('recipients module (T-09)', () => {
     expect(res.body.data[0]).not.toHaveProperty('accessTokenHash');
   });
 
-  it('resend-invite is a stub that succeeds and requires the recipient to exist', async () => {
+  it('resend-invite sends the client-relayed link (T-14) and requires the recipient to exist', async () => {
     const { app, accessToken } = await createUser();
     const capsuleId = await createDraftCapsule(app, accessToken);
     const create = await authed(app, accessToken).post(`/v1/capsules/${capsuleId}/recipients`).send({ email: uniqueEmail() });
 
-    const res = await authed(app, accessToken).post(`/v1/capsules/${capsuleId}/recipients/${create.body.recipient.id}/resend-invite`).send({});
+    const res = await authed(app, accessToken)
+      .post(`/v1/capsules/${capsuleId}/recipients/${create.body.recipient.id}/resend-invite`)
+      .send({ link: 'https://timelycapsule.com/c/faketoken#k=fakekey' });
     expect(res.status).toBe(202);
 
     const missing = await authed(app, accessToken)
       .post(`/v1/capsules/${capsuleId}/recipients/${randomUUID()}/resend-invite`)
-      .send({});
+      .send({ link: 'https://timelycapsule.com/c/faketoken#k=fakekey' });
     expect(missing.status).toBe(404);
   });
 

@@ -1,11 +1,11 @@
-import { CreateRecipientRequestSchema, PatchRecipientRequestSchema } from '@tc/contracts';
+import { CreateRecipientRequestSchema, PatchRecipientRequestSchema, SendAnnounceRequestSchema } from '@tc/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../../db/client.js';
 import { idempotency } from '../../middleware/idempotency.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
-import { createRecipient, deleteRecipient, listRecipients, patchRecipient, resendInvite } from './service.js';
+import { createRecipient, deleteRecipient, listRecipients, patchRecipient, resendInvite, sendAnnounce } from './service.js';
 
 const IdParamSchema = z.object({ id: z.string().uuid() });
 const RecipientParamsSchema = z.object({ id: z.string().uuid(), rid: z.string().uuid() });
@@ -66,10 +66,24 @@ export function recipientsRouter(db: Database): Router {
   router.post(
     '/capsules/:id/recipients/:rid/resend-invite',
     idempotency(db),
-    validate({ params: RecipientParamsSchema }),
+    validate({ params: RecipientParamsSchema, body: SendAnnounceRequestSchema }),
     async (req, res, next) => {
       try {
-        await resendInvite(db, req.user!.id, req.params.id as string, req.params.rid as string);
+        await resendInvite(db, req.user!.id, req.params.id as string, req.params.rid as string, req.body.link);
+        res.status(202).json({});
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/capsules/:id/recipients/:rid/announce',
+    idempotency(db),
+    validate({ params: RecipientParamsSchema, body: SendAnnounceRequestSchema }),
+    async (req, res, next) => {
+      try {
+        await sendAnnounce(db, req.user!.id, req.params.id as string, req.params.rid as string, req.body.link);
         res.status(202).json({});
       } catch (err) {
         next(err);

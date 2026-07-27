@@ -34,11 +34,18 @@ export function RecipientsBlock({ capsuleId, draft }: { capsuleId: string; capsu
     if (!value) return;
     setError(null);
     try {
-      if (isEmail(value)) {
-        await recipientsApi.create(capsuleId, { email: value });
-      } else {
-        await recipientsApi.create(capsuleId, { phone: value });
+      const { recipient, accessToken } = isEmail(value)
+        ? await recipientsApi.create(capsuleId, { email: value })
+        : await recipientsApi.create(capsuleId, { phone: value });
+      draft.registerRecipientToken(recipient.id, accessToken);
+
+      // Adding a recipient to an already-sealed, already-announced capsule (recipients
+      // stay editable pre-unlock, T-09 invariant 1) is this recipient's only chance at an
+      // announce email — sealing itself already happened, so nothing will trigger it later.
+      if (draft.capsule?.state === 'sealed' && draft.capsule.announceOnSeal) {
+        await draft.sendAnnounceToAll(capsuleId);
       }
+
       setInput('');
       await refresh();
     } catch {

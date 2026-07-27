@@ -4,19 +4,22 @@ import type { Database } from '../../db/client.js';
 import { logger } from '../../logger.js';
 import { getEmailAdapter } from './get-adapter.js';
 import { markFailed, markSent, recordQueued } from './ledger.js';
+import { BounceAlert } from './templates/BounceAlert.js';
+import { CapsuleUnlocked } from './templates/CapsuleUnlocked.js';
 import { NewDeviceAlert } from './templates/NewDeviceAlert.js';
+import { OpenedNotice } from './templates/OpenedNotice.js';
 import { PasswordReset } from './templates/PasswordReset.js';
+import { PreUnlockReminder, type PreUnlockReminderProps } from './templates/PreUnlockReminder.js';
+import { ReactionReceived } from './templates/ReactionReceived.js';
+import { SomethingWaiting } from './templates/SomethingWaiting.js';
 import { VerifyEmail } from './templates/VerifyEmail.js';
 
+/** Best-effort — swallows send failures so auth flows never fail just because email delivery did. */
 async function sendTemplated(
   db: Database,
   input: { to: string; template: string; subject: string; node: ReactNode; payload?: unknown },
 ): Promise<void> {
-  const [html, text] = await Promise.all([
-    render(input.node),
-    render(input.node, { plainText: true }),
-  ]);
-
+  const [html, text] = await Promise.all([render(input.node), render(input.node, { plainText: true })]);
   const row = await recordQueued(db, { toRef: input.to, template: input.template, payload: input.payload });
 
   try {
@@ -25,7 +28,29 @@ async function sendTemplated(
   } catch (err) {
     await markFailed(db, row.id, (row.attempts ?? 0) + 1);
     logger.error({ event: 'email_send_failed', template: input.template, to: input.to, err }, 'Email send failed');
-    // Best-effort: auth flows must not fail just because email delivery did.
+  }
+}
+
+/**
+ * Rethrows on failure — used by T-13 scheduler handlers, which already have
+ * their own retry-with-backoff via `scheduled_actions`/pg-boss (T-14
+ * decisions log: outbound_messages is the delivery ledger, scheduled_actions
+ * is the retry mechanism, rather than standing up a second parallel queue).
+ * On failure the ledger row is marked `failed` for this attempt, then the
+ * error propagates so the caller's dispatch wrapper re-arms the action.
+ */
+async function sendTemplatedOrThrow(
+  db: Database,
+  input: { to: string; template: string; subject: string; node: ReactNode; payload?: unknown },
+): Promise<void> {
+  const [html, text] = await Promise.all([render(input.node), render(input.node, { plainText: true })]);
+  const row = await recordQueued(db, { toRef: input.to, template: input.template, payload: input.payload });
+  try {
+    const { providerId } = await getEmailAdapter().send({ to: input.to, subject: input.subject, html, text });
+    await markSent(db, row.id, providerId);
+  } catch (err) {
+    await markFailed(db, row.id, (row.attempts ?? 0) + 1);
+    throw err;
   }
 }
 
@@ -53,5 +78,82 @@ export async function sendNewDeviceAlert(db: Database, to: string, ip: string | 
     template: 'new-device',
     subject: 'New login to your account',
     node: NewDeviceAlert({ ip, when: new Date().toUTCString() }),
+  });
+}
+
+export async function sendSomethingWaiting(
+  db: Database,
+  to: string,
+  input: { senderName: string; teaser: string | null; link: string },
+): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'something-waiting',
+    subject: `${input.senderName} sealed something for you`,
+    node: SomethingWaiting(input),
+    payload: input,
+  });
+}
+
+export async function sendCapsuleUnlocked(db: Database, to: string, input: { senderName: string }): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'capsule-unlocked',
+    subject: 'Your capsule is open',
+    node: CapsuleUnlocked(input),
+    payload: input,
+  });
+}
+
+export async function sendPreUnlockReminder(db: Database, to: string, input: PreUnlockReminderProps): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'pre-unlock-reminder',
+    subject: input.audience === 'owner' ? 'Your words arrive soon' : 'Almost time',
+    node: PreUnlockReminder(input),
+    payload: input,
+  });
+}
+
+export async function sendOpenedNotice(
+  db: Database,
+  to: string,
+  input: { recipientName: string; capsuleTitle: string | null; dashboardUrl: string },
+): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'opened-notice',
+    subject: `${input.recipientName} opened your capsule`,
+    node: OpenedNotice(input),
+    payload: input,
+  });
+}
+
+export async function sendReactionReceived(
+  db: Database,
+  to: string,
+  input: { recipientName: string; emoji: string; note: string | null; dashboardUrl: string },
+): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'reaction-received',
+    subject: `${input.recipientName} reacted to your capsule`,
+    node: ReactionReceived(input),
+    payload: input,
+  });
+}
+
+/** Best-effort — fired from the Resend webhook handler, which must still ack the webhook even if this fails. */
+export async function sendBounceAlert(
+  db: Database,
+  to: string,
+  input: { recipientEmail: string; capsuleTitle: string | null; daysUntilUnlock: number | null; manageUrl: string },
+): Promise<void> {
+  await sendTemplated(db, {
+    to,
+    template: 'bounce-alert',
+    subject: 'We couldn’t reach a recipient',
+    node: BounceAlert(input),
+    payload: input,
   });
 }
