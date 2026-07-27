@@ -5,6 +5,7 @@ import { oauthAccounts, users } from '../../db/schema/index.js';
 import { ApiError } from '../../lib/errors.js';
 import { sendNewDeviceAlert } from '../email/index.js';
 import { claimGhostRecipients } from './ghost-claim.js';
+import { claimGuestSession } from '../guest/index.js';
 import { verifyGoogleIdToken, type GoogleIdTokenPayload } from './google.js';
 import {
   consumeEmailVerifyCode,
@@ -43,7 +44,7 @@ function toUserResponse(user: UserRow): User {
 
 export async function signup(
   db: Database,
-  input: { email: string; password: string; displayName: string; masterKeyWrap: string; recoveryKeyWrap: string },
+  input: { email: string; password: string; displayName: string; masterKeyWrap: string; recoveryKeyWrap: string; guestToken?: string },
   meta: DeviceMeta,
 ): Promise<AuthResponse> {
   const [existing] = await db.select().from(users).where(eq(users.email, input.email)).limit(1);
@@ -65,6 +66,7 @@ export async function signup(
     .returning() as [UserRow];
 
   await issueEmailVerifyCode(db, user.id, user.email);
+  await claimGuestSession(db, user.id, input.guestToken);
   const { tokens } = await createSession(db, user.id, meta);
 
   return { user: toUserResponse(user), tokens };
@@ -108,6 +110,7 @@ export async function googleOAuth(
   idToken: string,
   meta: DeviceMeta,
   verify: (token: string) => Promise<GoogleIdTokenPayload> = verifyGoogleIdToken,
+  guestToken?: string,
 ): Promise<{ created: boolean } & AuthResponse> {
   const payload = await verify(idToken);
   if (!payload.emailVerified) {
@@ -172,6 +175,8 @@ export async function googleOAuth(
   if (user.status === 'suspended' || user.status === 'deleted') {
     throw ApiError.forbidden('Account is not active');
   }
+
+  await claimGuestSession(db, user.id, guestToken);
 
   if (await isNewDevice(db, user.id, meta)) {
     await sendNewDeviceAlert(db, user.email, meta.ip);

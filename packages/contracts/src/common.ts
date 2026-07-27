@@ -43,6 +43,11 @@ export const ERROR_CODES = [
   'seal_not_satisfied',
   'gate_expired',
   'already_saved',
+  // T-15b guest mode
+  'guest_session_invalid',
+  'guest_capsule_limit',
+  'guest_capsule_locked',
+  'owner_key_wrap_already_set',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

@@ -2,15 +2,27 @@
 
 import { Button, Input, PasswordStrengthMeter } from '@tc/ui-web';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useState, type FormEvent } from 'react';
 import { GoogleSignInButton } from '../../../components/GoogleSignInButton';
 import { ApiClientError } from '../../../lib/api-client';
 import { useAuth } from '../../../lib/auth-context';
+import { clearGuestSession, getGuestToken } from '../../../lib/guest-store';
 
 export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupForm />
+    </Suspense>
+  );
+}
+
+function SignupForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { signup, googleOAuth } = useAuth();
+  // Present when arriving from /try's post-seal or status-page CTA (T-15b) — claims the guest capsule on success.
+  const guestToken = searchParams.get('guestToken') ?? getGuestToken() ?? undefined;
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +37,8 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     try {
-      const { recoveryKit: kit } = await signup({ email, password, displayName });
+      const { recoveryKit: kit } = await signup({ email, password, displayName, guestToken });
+      if (guestToken) clearGuestSession();
       setRecoveryKit(kit);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.');
@@ -72,7 +85,8 @@ export default function SignupPage() {
   async function handleGoogle(idToken: string) {
     setError(null);
     try {
-      await googleOAuth(idToken);
+      await googleOAuth(idToken, guestToken);
+      if (guestToken) clearGuestSession();
       router.push('/home');
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.');

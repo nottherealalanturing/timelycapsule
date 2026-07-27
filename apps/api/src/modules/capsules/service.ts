@@ -104,6 +104,27 @@ export async function getCapsule(db: Database, ownerId: string, capsuleId: strin
   return toCapsule(row);
 }
 
+/**
+ * One-time post-claim key attach (T-15b) — see SetOwnerKeyWrapRequestSchema
+ * for why this is deliberately state-independent (allowed even sealed) but
+ * still refuses to overwrite an existing wrap.
+ */
+export async function setOwnerKeyWrap(db: Database, ownerId: string, capsuleId: string, ownerKeyWrap: string): Promise<Capsule> {
+  const row = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
+  if (row.ownerKeyWrap) {
+    throw ApiError.ownerKeyWrapAlreadySet();
+  }
+
+  const [updated] = (await db
+    .update(capsules)
+    .set({ ownerKeyWrap: Buffer.from(ownerKeyWrap, 'base64'), updatedAt: new Date() })
+    .where(eq(capsules.id, capsuleId))
+    .returning()) as [CapsuleRow];
+
+  await audit(db, { actorType: 'user', actorId: ownerId, action: 'capsule.owner_key_wrap_attached', subjectType: 'capsule', subjectId: capsuleId });
+  return toCapsule(updated);
+}
+
 export async function patchCapsule(
   db: Database,
   ownerId: string,

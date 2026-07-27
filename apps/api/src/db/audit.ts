@@ -2,7 +2,7 @@ import type { Database } from './client.js';
 import { auditEvents } from './schema/index.js';
 
 export interface AuditEventInput {
-  actorType: 'user' | 'recipient' | 'admin' | 'system';
+  actorType: 'user' | 'recipient' | 'admin' | 'system' | 'guest';
   actorId?: string;
   action: string;
   subjectType: string;

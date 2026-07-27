@@ -14,6 +14,10 @@ import {
   ExtendCapsuleRequestSchema,
   ForgotPasswordRequestSchema,
   GoogleOAuthRequestSchema,
+  CreateGuestCapsuleRequestSchema,
+  GuestCapsuleResponseSchema,
+  GuestSessionResponseSchema,
+  PatchGuestCapsuleRequestSchema,
   LoginRequestSchema,
   MediaListResponseSchema,
   MediaResponseSchema,
@@ -48,6 +52,8 @@ import {
   type ExtendCapsuleRequest,
   type ForgotPasswordRequest,
   type GoogleOAuthRequest,
+  type CreateGuestCapsuleRequest,
+  type PatchGuestCapsuleRequest,
   type ListCapsulesQuery,
   type LoginRequest,
   type MeResponse,
@@ -117,17 +123,21 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   auth?: boolean;
+  /** A guest session token (T-15b) — mutually exclusive with `auth`, no refresh flow. */
+  bearer?: string;
   /** internal: prevents infinite retry loops on the refresh call itself */
   _retried?: boolean;
 }
 
 async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = false, _retried = false } = options;
+  const { method = 'GET', body, auth = false, bearer, _retried = false } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
   if (auth) {
     const tokens = getTokens();
     if (tokens) headers.Authorization = `Bearer ${tokens.accessToken}`;
+  } else if (bearer) {
+    headers.Authorization = `Bearer ${bearer}`;
   }
 
   const res = await fetch(`${API_URL}${path}`, {
@@ -354,6 +364,30 @@ export const revealApi = {
     request(`/r/${token}/tz-infer`, z.void(), { method: 'POST', body: TzInferRequestSchema.parse({ tz }) }),
 
   save: (token: string) => request(`/r/${token}/save`, z.void(), { method: 'POST', auth: true, body: {} }),
+};
+
+export const guestApi = {
+  createSession: () => request('/guest/sessions', GuestSessionResponseSchema, { method: 'POST', body: {} }),
+
+  createCapsule: (guestToken: string, input: CreateGuestCapsuleRequest) =>
+    request('/guest/capsules', GuestCapsuleResponseSchema, {
+      method: 'POST',
+      bearer: guestToken,
+      body: CreateGuestCapsuleRequestSchema.parse(input),
+    }),
+
+  patchCapsule: (guestToken: string, capsuleId: string, input: PatchGuestCapsuleRequest) =>
+    request(`/guest/capsules/${capsuleId}`, GuestCapsuleResponseSchema, {
+      method: 'PATCH',
+      bearer: guestToken,
+      body: PatchGuestCapsuleRequestSchema.parse(input),
+    }),
+
+  sealCapsule: (guestToken: string, capsuleId: string) =>
+    request(`/guest/capsules/${capsuleId}/seal`, GuestCapsuleResponseSchema, { method: 'POST', bearer: guestToken, body: {} }),
+
+  getCapsule: (guestToken: string, capsuleId: string) =>
+    request(`/guest/capsules/${capsuleId}`, GuestCapsuleResponseSchema, { bearer: guestToken }),
 };
 
 export type { AuthResponse, MeResponse };

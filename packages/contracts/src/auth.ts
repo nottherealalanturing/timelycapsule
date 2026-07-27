@@ -59,6 +59,8 @@ export const SignupRequestSchema = z.object({
    */
   masterKeyWrap: z.string().min(1),
   recoveryKeyWrap: z.string().min(1),
+  /** Present when converting a guest session (01 §4.1b / T-15b) — claims that session's capsule(s) into the new account. */
+  guestToken: z.string().min(1).optional(),
 });
 export type SignupRequest = z.infer<typeof SignupRequestSchema>;
 
@@ -70,6 +72,8 @@ export type LoginRequest = z.infer<typeof LoginRequestSchema>;
 
 export const GoogleOAuthRequestSchema = z.object({
   idToken: z.string().min(1),
+  /** Present when converting a guest session (01 §4.1b / T-15b) — claims that session's capsule(s) into the new account. */
+  guestToken: z.string().min(1).optional(),
 });
 export type GoogleOAuthRequest = z.infer<typeof GoogleOAuthRequestSchema>;
 

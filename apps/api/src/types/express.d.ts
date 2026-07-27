@@ -8,6 +8,10 @@ declare global {
         id: string;
         sessionId: string;
       };
+      /** Set by modules/guest's `requireGuestSession` middleware once a bearer guest token verifies. */
+      guestSession?: {
+        id: string;
+      };
     }
   }
 }

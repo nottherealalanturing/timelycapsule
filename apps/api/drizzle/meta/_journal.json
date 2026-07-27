@@ -50,6 +50,20 @@
       "when": 1785108545923,
       "tag": "0006_sloppy_living_mummy",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1785112489800,
+      "tag": "0007_wandering_sasquatch",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1785112938210,
+      "tag": "0008_wealthy_black_panther",
+      "breakpoints": true
     }
   ]
 }

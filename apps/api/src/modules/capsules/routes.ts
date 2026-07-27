@@ -3,6 +3,7 @@ import {
   ExtendCapsuleRequestSchema,
   ListCapsulesQuerySchema,
   PatchCapsuleRequestSchema,
+  SetOwnerKeyWrapRequestSchema,
 } from '@tc/contracts';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -25,6 +26,7 @@ import {
   getCapsule,
   listCapsules,
   patchCapsule,
+  setOwnerKeyWrap,
   unarchiveCapsule,
 } from './service.js';
 
@@ -61,6 +63,19 @@ export function capsulesRouter(db: Database): Router {
       next(err);
     }
   });
+
+  router.patch(
+    '/capsules/:id/owner-key-wrap',
+    validate({ params: IdParamSchema, body: SetOwnerKeyWrapRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const capsule = await setOwnerKeyWrap(db, req.user!.id, req.params.id as string, req.body.ownerKeyWrap);
+        res.status(200).json({ capsule });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.patch(
     '/capsules/:id',

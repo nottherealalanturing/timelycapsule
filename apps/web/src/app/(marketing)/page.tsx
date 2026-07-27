@@ -12,7 +12,7 @@ export default function MarketingHome() {
         Messages, memories, and media — sealed today, delivered at exactly the right moment.
       </p>
       <div className="flex gap-3">
-        <Link href="/signup">
+        <Link href="/try">
           <Button size="lg">Create your first capsule — free</Button>
         </Link>
         <Link href="/login">

@@ -12,7 +12,9 @@ export const recipientUnlockHandler: ActionHandler = async ({ db, subjectId: rec
 
   if (recipient.email) {
     const [capsule] = await db.select({ ownerId: capsules.ownerId }).from(capsules).where(eq(capsules.id, recipient.capsuleId)).limit(1);
-    const [owner] = capsule ? await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, capsule.ownerId)).limit(1) : [];
+    const [owner] = capsule?.ownerId
+      ? await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, capsule.ownerId)).limit(1)
+      : [];
     await sendCapsuleUnlocked(db, recipient.email, { senderName: owner?.displayName ?? 'Someone' });
   }
 

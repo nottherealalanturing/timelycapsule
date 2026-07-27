@@ -1,6 +1,7 @@
 export * from './enums';
 export * from './custom-types';
 export * from './identity';
+export * from './guest';
 export * from './capsules';
 export * from './scheduling';
 export * from './notifications';
