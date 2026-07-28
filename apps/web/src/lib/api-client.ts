@@ -5,8 +5,16 @@ import {
   CapsuleListResponseSchema,
   CapsuleResponseSchema,
   SystemTimeResponseSchema,
+  BlocksListResponseSchema,
   CompleteMediaRequestSchema,
+  ContactGroupResponseSchema,
+  ContactGroupsListResponseSchema,
+  ContactResponseSchema,
+  ContactsListResponseSchema,
+  CreateBlockRequestSchema,
   CreateCapsuleRequestSchema,
+  CreateContactGroupRequestSchema,
+  CreateContactRequestSchema,
   CreateMediaTicketRequestSchema,
   CreateMediaTicketResponseSchema,
   CreateRecipientRequestSchema,
@@ -24,12 +32,15 @@ import {
   MediaViewResponseSchema,
   MeResponseSchema,
   PatchCapsuleRequestSchema,
+  PatchContactGroupRequestSchema,
+  PatchContactRequestSchema,
   PatchMediaRequestSchema,
   PatchMeRequestSchema,
   PatchRecipientRequestSchema,
   PlaceCheckRequestSchema,
   PlaceCheckResponseSchema,
   ReactRequestSchema,
+  ReceivedListResponseSchema,
   RecipientResponseSchema,
   RecipientsListResponseSchema,
   RefreshResponseSchema,
@@ -39,6 +50,7 @@ import {
   ResetPasswordRequestSchema,
   RevealResponseSchema,
   SendAnnounceRequestSchema,
+  SetContactGroupMemberRequestSchema,
   SignupRequestSchema,
   TzInferRequestSchema,
   VerifyEmailRequestSchema,
@@ -46,7 +58,10 @@ import {
   VerifyIdentityResponseSchema,
   type AuthResponse,
   type CompleteMediaRequest,
+  type CreateBlockRequest,
   type CreateCapsuleRequest,
+  type CreateContactGroupRequest,
+  type CreateContactRequest,
   type CreateMediaTicketRequest,
   type CreateRecipientRequest,
   type ExtendCapsuleRequest,
@@ -58,6 +73,8 @@ import {
   type LoginRequest,
   type MeResponse,
   type PatchCapsuleRequest,
+  type PatchContactGroupRequest,
+  type PatchContactRequest,
   type PatchMediaRequest,
   type PatchMeRequest,
   type PatchRecipientRequest,
@@ -388,6 +405,64 @@ export const guestApi = {
 
   getCapsule: (guestToken: string, capsuleId: string) =>
     request(`/guest/capsules/${capsuleId}`, GuestCapsuleResponseSchema, { bearer: guestToken }),
+};
+
+export const receivedApi = {
+  list: () => request('/received', ReceivedListResponseSchema, { auth: true }),
+
+  report: (recipientId: string, input: ReportRequest) =>
+    request(`/received/${recipientId}/report`, z.void(), { method: 'POST', auth: true, body: ReportRequestSchema.parse(input) }),
+};
+
+export const blocksApi = {
+  list: () => request('/blocks', BlocksListResponseSchema, { auth: true }),
+
+  create: (input: CreateBlockRequest) =>
+    request('/blocks', z.object({ block: z.unknown() }), { method: 'POST', auth: true, body: CreateBlockRequestSchema.parse(input) }),
+
+  delete: (email: string) => request(`/blocks/${encodeURIComponent(email)}`, z.void(), { method: 'DELETE', auth: true }),
+};
+
+export const contactsApi = {
+  list: () => request('/contacts', ContactsListResponseSchema, { auth: true }),
+
+  create: (input: CreateContactRequest) =>
+    request('/contacts', ContactResponseSchema, { method: 'POST', auth: true, body: CreateContactRequestSchema.parse(input) }),
+
+  patch: (id: string, input: PatchContactRequest) =>
+    request(`/contacts/${id}`, ContactResponseSchema, { method: 'PATCH', auth: true, body: PatchContactRequestSchema.parse(input) }),
+
+  delete: (id: string) => request(`/contacts/${id}`, z.void(), { method: 'DELETE', auth: true }),
+};
+
+export const contactGroupsApi = {
+  list: () => request('/contact-groups', ContactGroupsListResponseSchema, { auth: true }),
+
+  create: (input: CreateContactGroupRequest) =>
+    request('/contact-groups', ContactGroupResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CreateContactGroupRequestSchema.parse(input),
+    }),
+
+  patch: (id: string, input: PatchContactGroupRequest) =>
+    request(`/contact-groups/${id}`, ContactGroupResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: PatchContactGroupRequestSchema.parse(input),
+    }),
+
+  delete: (id: string) => request(`/contact-groups/${id}`, z.void(), { method: 'DELETE', auth: true }),
+
+  addMember: (groupId: string, contactId: string) =>
+    request(`/contact-groups/${groupId}/members`, z.void(), {
+      method: 'POST',
+      auth: true,
+      body: SetContactGroupMemberRequestSchema.parse({ contactId }),
+    }),
+
+  removeMember: (groupId: string, contactId: string) =>
+    request(`/contact-groups/${groupId}/members/${contactId}`, z.void(), { method: 'DELETE', auth: true }),
 };
 
 export type { AuthResponse, MeResponse };

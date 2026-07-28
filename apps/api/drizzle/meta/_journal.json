@@ -64,6 +64,13 @@
       "when": 1785112938210,
       "tag": "0008_wealthy_black_panther",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1785239076426,
+      "tag": "0009_mysterious_infant_terrible",
+      "breakpoints": true
     }
   ]
 }

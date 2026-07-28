@@ -1,42 +1,61 @@
 'use client';
 
-import type { CapsuleType } from '@tc/contracts';
+import type { CapsuleType, Contact } from '@tc/contracts';
 import { Button, Input } from '@tc/ui-web';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { recipientsApi } from '../../lib/api-client';
+import { useEffect, useRef, useState } from 'react';
+import { contactsApi, recipientsApi } from '../../lib/api-client';
 import type { CapsuleDraft } from '../../lib/use-capsule-draft';
+import type { InitialRecipient } from './Composer';
 
 function isEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
-export function RecipientsBlock({ capsuleId, draft }: { capsuleId: string; capsuleType: CapsuleType; draft: CapsuleDraft }) {
+function matchesContact(contact: Contact, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return false;
+  return Boolean(
+    contact.name.toLowerCase().includes(q) || contact.email?.toLowerCase().includes(q) || contact.phone?.includes(q),
+  );
+}
+
+export function RecipientsBlock({
+  capsuleId,
+  draft,
+  initialRecipient,
+}: {
+  capsuleId: string;
+  capsuleType: CapsuleType;
+  draft: CapsuleDraft;
+  initialRecipient?: InitialRecipient;
+}) {
   const queryClient = useQueryClient();
   const queryKey = ['recipients', capsuleId] as const;
   const { data: recipients = [] } = useQuery({
     queryKey,
     queryFn: async () => (await recipientsApi.list(capsuleId)).data,
   });
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: async () => (await contactsApi.list()).data,
+  });
   const [input, setInput] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey });
   }
 
-  if (draft.capsule?.type === 'self') {
-    return null;
-  }
-
-  async function addRecipient() {
-    const value = input.trim();
-    if (!value) return;
+  async function addRecipient(overrides?: { email?: string; phone?: string; displayName?: string }) {
+    const email = overrides?.email ?? (isEmail(input.trim()) ? input.trim() : undefined);
+    const phone = overrides?.phone ?? (!overrides?.email && !isEmail(input.trim()) ? input.trim() : undefined);
+    const displayName = overrides?.displayName;
+    if (!email && !phone) return;
     setError(null);
     try {
-      const { recipient, accessToken } = isEmail(value)
-        ? await recipientsApi.create(capsuleId, { email: value })
-        : await recipientsApi.create(capsuleId, { phone: value });
+      const { recipient, accessToken } = await recipientsApi.create(capsuleId, { email, phone, displayName });
       draft.registerRecipientToken(recipient.id, accessToken);
 
       // Adding a recipient to an already-sealed, already-announced capsule (recipients
@@ -47,11 +66,29 @@ export function RecipientsBlock({ capsuleId, draft }: { capsuleId: string; capsu
       }
 
       setInput('');
+      setSuggestionsOpen(false);
       await refresh();
     } catch {
       setError('Could not add that recipient');
     }
   }
+
+  // "Start a capsule" from /people's birthday-upcoming section (02-UX-DESIGN.md
+  // §5.9) — add the suggested contact once, on first load, if nothing's been
+  // added yet (guards against re-adding on a later remount/refresh).
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !initialRecipient || recipients.length > 0) return;
+    prefilled.current = true;
+    void addRecipient(initialRecipient);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRecipient, recipients.length]);
+
+  if (draft.capsule?.type === 'self') {
+    return null;
+  }
+
+  const suggestions = suggestionsOpen ? contacts.filter((c) => matchesContact(c, input)).slice(0, 5) : [];
 
   async function removeRecipient(id: string) {
     await recipientsApi.delete(capsuleId, id);
@@ -78,19 +115,45 @@ export function RecipientsBlock({ capsuleId, draft }: { capsuleId: string; capsu
         ))}
       </div>
 
-      <div className="flex gap-2">
-        <Input
-          label="Email or phone"
-          placeholder="ada@example.com"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault();
-              void addRecipient();
-            }
-          }}
-        />
+      <div className="relative flex gap-2">
+        <div className="flex-1">
+          <Input
+            label="Email or phone"
+            placeholder="ada@example.com"
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              setSuggestionsOpen(true);
+            }}
+            onFocus={() => setSuggestionsOpen(true)}
+            onBlur={() => setTimeout(() => setSuggestionsOpen(false), 150)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void addRecipient();
+              }
+            }}
+          />
+          {suggestions.length > 0 ? (
+            <ul className="absolute z-10 mt-1 w-full rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] py-1 shadow-[var(--shadow-md)]">
+              {suggestions.map((contact) => (
+                <li key={contact.id}>
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() =>
+                      void addRecipient({ email: contact.email ?? undefined, phone: contact.phone ?? undefined, displayName: contact.name })
+                    }
+                    className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-[var(--color-bg-base)]"
+                  >
+                    {contact.name}{' '}
+                    <span className="text-secondary">{contact.email ?? contact.phone}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
         <Button type="button" variant="secondary" onClick={() => void addRecipient()}>
           Add
         </Button>

@@ -6,3 +6,5 @@ export * from './media';
 export * from './notifications';
 export * from './reveal';
 export * from './guest';
+export * from './contacts';
+export * from './received';

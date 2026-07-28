@@ -9,9 +9,11 @@ import { errorHandler } from './middleware/error-handler.js';
 import { notFoundHandler } from './middleware/not-found.js';
 import { authRouter } from './modules/auth/index.js';
 import { capsulesRouter } from './modules/capsules/index.js';
+import { contactsRouter } from './modules/contacts/index.js';
 import { emailWebhookRouter } from './modules/email/index.js';
 import { mediaRouter } from './modules/media/index.js';
 import { notificationsRouter } from './modules/notifications/index.js';
+import { receivedRouter } from './modules/received/index.js';
 import { blocksRouter, recipientsRouter } from './modules/recipients/index.js';
 import { revealRouter } from './modules/reveal/index.js';
 import { guestRouter } from './modules/guest/index.js';
@@ -45,6 +47,8 @@ export function createApp(db: Database): express.Express {
   app.use('/v1', notificationsRouter(db));
   app.use('/v1', revealRouter(db));
   app.use('/v1', guestRouter(db));
+  app.use('/v1', contactsRouter(db));
+  app.use('/v1', receivedRouter(db));
   app.use('/v1', emailWebhookRouter(db));
 
   app.get('/health', (_req, res) => {
