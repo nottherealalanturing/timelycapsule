@@ -2,13 +2,13 @@
 
 import type { Capsule, MediaItem, Recipient } from '@tc/contracts';
 import { Button, Dialog, Skeleton, StateChip, useToast } from '@tc/ui-web';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 import { CountdownDisplay } from '../../../../components/CountdownDisplay';
 import { resolveUnlockDate } from '../../../../components/CapsuleCard';
-import { ApiClientError, capsulesApi, mediaApi, recipientsApi } from '../../../../lib/api-client';
+import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, mediaApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
 import { decodeIvCiphertext } from '../../../../lib/capsule-crypto';
 import { useMasterKey } from '../../../../lib/master-key-context';
 import { MasterKeyGate } from '../../../../components/MasterKeyGate';
@@ -97,12 +97,52 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
   const [extendOpen, setExtendOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [newUnlockAt, setNewUnlockAt] = useState('');
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [collectionsOpen, setCollectionsOpen] = useState(false);
+  const [purgeConfirming, setPurgeConfirming] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['capsule', id],
     queryFn: () => capsulesApi.get(id),
   });
   const capsule = data?.capsule;
+
+  const { data: tagsData } = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() });
+  const allTags = tagsData?.data ?? [];
+
+  const { data: collectionsData } = useQuery({ queryKey: ['collections'], queryFn: () => collectionsApi.list() });
+  const allCollections = collectionsData?.data ?? [];
+  const { data: membershipData } = useQuery({
+    queryKey: ['collection-membership', id],
+    queryFn: async () => {
+      const memberOf = await Promise.all(
+        allCollections.map(async (c) => ({ id: c.id, isMember: (await capsulesApi.list({ collectionId: c.id, limit: 100 })).data.some((cap) => cap.id === id) })),
+      );
+      return memberOf;
+    },
+    enabled: collectionsOpen && allCollections.length > 0,
+  });
+  const membership = membershipData ?? [];
+
+  const favoriteMutation = useMutation({
+    mutationFn: (value: boolean) => favoritesApi.set(id, value),
+    onSuccess: () => void refresh(),
+  });
+
+  const tagsMutation = useMutation({
+    mutationFn: (tagIds: string[]) => tagsApi.putForCapsule(id, tagIds),
+    onSuccess: () => void refresh(),
+  });
+
+  const [newTagName, setNewTagName] = useState('');
+  const createTagMutation = useMutation({
+    mutationFn: (name: string) => tagsApi.create({ name }),
+    onSuccess: async (res) => {
+      setNewTagName('');
+      await queryClient.invalidateQueries({ queryKey: ['tags'] });
+      tagsMutation.mutate([...(capsule?.tagIds ?? []), res.tag.id]);
+    },
+  });
 
   const { data: recipientsData } = useQuery({
     queryKey: ['recipients', id],
@@ -154,7 +194,29 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
 
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-[var(--font-display)] text-2xl text-foreground">{capsule.title || 'Untitled capsule'}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-[var(--font-display)] text-2xl text-foreground">{capsule.title || 'Untitled capsule'}</h1>
+            <button
+              type="button"
+              aria-label={capsule.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+              onClick={() => favoriteMutation.mutate(!capsule.isFavorite)}
+              className={capsule.isFavorite ? 'text-[var(--color-accent-gold)]' : 'text-secondary'}
+            >
+              ★
+            </button>
+          </div>
+          {capsule.tagIds.length > 0 ? (
+            <div className="mt-1 flex flex-wrap gap-1">
+              {capsule.tagIds.map((tagId) => {
+                const tag = allTags.find((t) => t.id === tagId);
+                return tag ? (
+                  <span key={tagId} className="rounded-[var(--radius-pill)] border border-[var(--color-text-secondary)]/30 px-2 py-0.5 text-xs text-secondary">
+                    {tag.name}
+                  </span>
+                ) : null;
+              })}
+            </div>
+          ) : null}
           {capsule.state === 'sealed' && unlockDate ? (
             <p className="mt-1 text-sm text-secondary">
               Unlocks in <CountdownDisplay target={unlockDate} className="font-medium text-foreground" />
@@ -167,6 +229,12 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" size="sm" onClick={() => setTagsOpen(true)}>
+            Tags
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setCollectionsOpen(true)}>
+            Add to collection
+          </Button>
           <Button variant="secondary" size="sm" onClick={() => void runAction(() => capsulesApi.duplicate(id).then((r) => router.push(`/capsule/${r.capsule.id}/edit`)), 'Duplicated')}>
             Duplicate
           </Button>
@@ -190,9 +258,31 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
             </Button>
           )}
           {capsule.trashedAt ? (
-            <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.restore(id), 'Restored')}>
-              Restore
-            </Button>
+            <>
+              <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.restore(id), 'Restored')}>
+                Restore
+              </Button>
+              {purgeConfirming ? (
+                <>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() =>
+                      void runAction(() => capsulesApi.purge(id).then(() => router.push('/trash')), 'Deleted forever')
+                    }
+                  >
+                    Confirm delete forever
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setPurgeConfirming(false)}>
+                    Cancel
+                  </Button>
+                </>
+              ) : (
+                <Button variant="destructive" size="sm" onClick={() => setPurgeConfirming(true)}>
+                  Delete forever
+                </Button>
+              )}
+            </>
           ) : (
             <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.trash(id), 'Moved to trash')}>
               Trash
@@ -313,6 +403,79 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           >
             Withdraw
           </Button>
+        </div>
+      </Dialog>
+
+      <Dialog open={tagsOpen} onOpenChange={setTagsOpen} title="Tags" width="sm">
+        <div className="flex flex-col gap-3">
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newTagName.trim()) createTagMutation.mutate(newTagName.trim());
+            }}
+          >
+            <input
+              value={newTagName}
+              onChange={(e) => setNewTagName(e.target.value)}
+              placeholder="New tag name"
+              className="flex-1 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-1.5 text-sm text-foreground"
+            />
+            <Button type="submit" size="sm" variant="secondary" loading={createTagMutation.isPending} disabled={!newTagName.trim()}>
+              Create
+            </Button>
+          </form>
+
+          {allTags.length === 0 ? (
+            <p className="text-sm text-secondary">No tags yet — create your first one above.</p>
+          ) : (
+            allTags.map((tag) => {
+              const checked = capsule.tagIds.includes(tag.id);
+              return (
+                <label key={tag.id} className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => {
+                      const next = checked ? capsule.tagIds.filter((t) => t !== tag.id) : [...capsule.tagIds, tag.id];
+                      tagsMutation.mutate(next);
+                    }}
+                  />
+                  {tag.name}
+                </label>
+              );
+            })
+          )}
+        </div>
+      </Dialog>
+
+      <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen} title="Add to collection" width="sm">
+        <div className="flex flex-col gap-2">
+          {allCollections.length === 0 ? (
+            <p className="text-sm text-secondary">No collections yet — create one from the Collections page.</p>
+          ) : (
+            allCollections.map((collection) => {
+              const isMember = membership.find((m) => m.id === collection.id)?.isMember ?? false;
+              return (
+                <label key={collection.id} className="flex items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={isMember}
+                    onChange={() =>
+                      void runAction(
+                        () =>
+                          isMember
+                            ? collectionsApi.removeItem(collection.id, id)
+                            : collectionsApi.addItem(collection.id, { capsuleId: id }),
+                        isMember ? 'Removed from collection' : 'Added to collection',
+                      ).then(() => queryClient.invalidateQueries({ queryKey: ['collection-membership', id] }))
+                    }
+                  />
+                  {collection.name}
+                </label>
+              );
+            })
+          )}
         </div>
       </Dialog>
     </div>

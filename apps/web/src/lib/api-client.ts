@@ -5,7 +5,10 @@ import {
   CapsuleListResponseSchema,
   CapsuleResponseSchema,
   SystemTimeResponseSchema,
+  AddCollectionItemRequestSchema,
   BlocksListResponseSchema,
+  CollectionResponseSchema,
+  CollectionsListResponseSchema,
   CompleteMediaRequestSchema,
   ContactGroupResponseSchema,
   ContactGroupsListResponseSchema,
@@ -13,12 +16,14 @@ import {
   ContactsListResponseSchema,
   CreateBlockRequestSchema,
   CreateCapsuleRequestSchema,
+  CreateCollectionRequestSchema,
   CreateContactGroupRequestSchema,
   CreateContactRequestSchema,
   CreateMediaTicketRequestSchema,
   CreateMediaTicketResponseSchema,
   CreateRecipientRequestSchema,
   CreateRecipientResponseSchema,
+  CreateTagRequestSchema,
   ExtendCapsuleRequestSchema,
   ForgotPasswordRequestSchema,
   GoogleOAuthRequestSchema,
@@ -32,38 +37,49 @@ import {
   MediaViewResponseSchema,
   MeResponseSchema,
   PatchCapsuleRequestSchema,
+  PatchCollectionRequestSchema,
   PatchContactGroupRequestSchema,
   PatchContactRequestSchema,
   PatchMediaRequestSchema,
   PatchMeRequestSchema,
   PatchRecipientRequestSchema,
+  PatchTagRequestSchema,
   PlaceCheckRequestSchema,
   PlaceCheckResponseSchema,
+  PutCapsuleTagsRequestSchema,
+  PutFavoriteRequestSchema,
   ReactRequestSchema,
   ReceivedListResponseSchema,
   RecipientResponseSchema,
   RecipientsListResponseSchema,
   RefreshResponseSchema,
   RemindRequestSchema,
+  ReorderCollectionItemsRequestSchema,
   ReportRequestSchema,
   RequestIdentityCodeResponseSchema,
   ResetPasswordRequestSchema,
   RevealResponseSchema,
+  SearchResponseSchema,
   SendAnnounceRequestSchema,
   SetContactGroupMemberRequestSchema,
   SignupRequestSchema,
+  TagResponseSchema,
+  TagsListResponseSchema,
   TzInferRequestSchema,
   VerifyEmailRequestSchema,
   VerifyIdentityRequestSchema,
   VerifyIdentityResponseSchema,
+  type AddCollectionItemRequest,
   type AuthResponse,
   type CompleteMediaRequest,
   type CreateBlockRequest,
   type CreateCapsuleRequest,
+  type CreateCollectionRequest,
   type CreateContactGroupRequest,
   type CreateContactRequest,
   type CreateMediaTicketRequest,
   type CreateRecipientRequest,
+  type CreateTagRequest,
   type ExtendCapsuleRequest,
   type ForgotPasswordRequest,
   type GoogleOAuthRequest,
@@ -73,13 +89,16 @@ import {
   type LoginRequest,
   type MeResponse,
   type PatchCapsuleRequest,
+  type PatchCollectionRequest,
   type PatchContactGroupRequest,
   type PatchContactRequest,
   type PatchMediaRequest,
   type PatchMeRequest,
   type PatchRecipientRequest,
+  type PatchTagRequest,
   type PlaceCheckRequest,
   type ReactRequest,
+  type ReorderCollectionItemsRequest,
   type ReportRequest,
   type ResetPasswordRequest,
   type SignupRequest,
@@ -137,7 +156,7 @@ async function tryRefresh(): Promise<boolean> {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   auth?: boolean;
   /** A guest session token (T-15b) — mutually exclusive with `auth`, no refresh flow. */
@@ -273,6 +292,8 @@ export const capsulesApi = {
     }),
 
   activity: (id: string) => request(`/capsules/${id}/activity`, CapsuleActivityResponseSchema, { auth: true }),
+
+  purge: (id: string) => request(`/capsules/${id}/purge`, z.void(), { method: 'POST', auth: true, body: {} }),
 };
 
 export const recipientsApi = {
@@ -463,6 +484,71 @@ export const contactGroupsApi = {
 
   removeMember: (groupId: string, contactId: string) =>
     request(`/contact-groups/${groupId}/members/${contactId}`, z.void(), { method: 'DELETE', auth: true }),
+};
+
+export const tagsApi = {
+  list: () => request('/tags', TagsListResponseSchema, { auth: true }),
+
+  create: (input: CreateTagRequest) =>
+    request('/tags', TagResponseSchema, { method: 'POST', auth: true, body: CreateTagRequestSchema.parse(input) }),
+
+  patch: (id: string, input: PatchTagRequest) =>
+    request(`/tags/${id}`, TagResponseSchema, { method: 'PATCH', auth: true, body: PatchTagRequestSchema.parse(input) }),
+
+  delete: (id: string) => request(`/tags/${id}`, z.void(), { method: 'DELETE', auth: true }),
+
+  putForCapsule: (capsuleId: string, tagIds: string[]) =>
+    request(`/capsules/${capsuleId}/tags`, z.void(), {
+      method: 'PUT',
+      auth: true,
+      body: PutCapsuleTagsRequestSchema.parse({ tagIds }),
+    }),
+};
+
+export const favoritesApi = {
+  set: (capsuleId: string, value: boolean) =>
+    request(`/capsules/${capsuleId}/favorite`, z.void(), {
+      method: 'PUT',
+      auth: true,
+      body: PutFavoriteRequestSchema.parse({ value }),
+    }),
+};
+
+export const collectionsApi = {
+  list: () => request('/collections', CollectionsListResponseSchema, { auth: true }),
+
+  create: (input: CreateCollectionRequest) =>
+    request('/collections', CollectionResponseSchema, { method: 'POST', auth: true, body: CreateCollectionRequestSchema.parse(input) }),
+
+  patch: (id: string, input: PatchCollectionRequest) =>
+    request(`/collections/${id}`, CollectionResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: PatchCollectionRequestSchema.parse(input),
+    }),
+
+  delete: (id: string) => request(`/collections/${id}`, z.void(), { method: 'DELETE', auth: true }),
+
+  addItem: (collectionId: string, input: AddCollectionItemRequest) =>
+    request(`/collections/${collectionId}/items`, z.void(), {
+      method: 'POST',
+      auth: true,
+      body: AddCollectionItemRequestSchema.parse(input),
+    }),
+
+  removeItem: (collectionId: string, capsuleId: string) =>
+    request(`/collections/${collectionId}/items/${capsuleId}`, z.void(), { method: 'DELETE', auth: true }),
+
+  reorderItems: (collectionId: string, input: ReorderCollectionItemsRequest) =>
+    request(`/collections/${collectionId}/items`, z.void(), {
+      method: 'PUT',
+      auth: true,
+      body: ReorderCollectionItemsRequestSchema.parse(input),
+    }),
+};
+
+export const searchApi = {
+  query: (q: string) => request(`/search?q=${encodeURIComponent(q)}`, SearchResponseSchema, { auth: true }),
 };
 
 export type { AuthResponse, MeResponse };

@@ -71,6 +71,13 @@
       "when": 1785239076426,
       "tag": "0009_mysterious_infant_terrible",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1785241716423,
+      "tag": "0010_groovy_gateway",
+      "breakpoints": true
     }
   ]
 }

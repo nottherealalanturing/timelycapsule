@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { CapsuleCard, resolveUnlockDate } from '../../../components/CapsuleCard';
 import { CountdownDisplay } from '../../../components/CountdownDisplay';
-import { capsulesApi } from '../../../lib/api-client';
+import { capsulesApi, tagsApi } from '../../../lib/api-client';
 import { useAuth } from '../../../lib/auth-context';
 
 const TEMPLATES: { label: string; type: CapsuleType }[] = [
@@ -46,10 +46,22 @@ export default function HomePage() {
   const [view, setView] = useState<'timeline' | 'grid'>('timeline');
   const [stateFilter, setStateFilter] = useState<CapsuleState | undefined>(undefined);
   const [typeFilter, setTypeFilter] = useState<CapsuleType | undefined>(undefined);
+  const [favoriteOnly, setFavoriteOnly] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string | undefined>(undefined);
+
+  const { data: tagsData } = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() });
+  const allTags = tagsData?.data ?? [];
 
   const { data, isLoading } = useQuery({
-    queryKey: ['capsules', stateFilter, typeFilter],
-    queryFn: () => capsulesApi.list({ state: stateFilter, type: typeFilter, limit: 100 }),
+    queryKey: ['capsules', stateFilter, typeFilter, favoriteOnly, tagFilter],
+    queryFn: () =>
+      capsulesApi.list({
+        state: stateFilter,
+        type: typeFilter,
+        favorite: favoriteOnly || undefined,
+        tag: tagFilter,
+        limit: 100,
+      }),
   });
   const capsules = useMemo(() => data?.data ?? [], [data]);
 
@@ -95,7 +107,7 @@ export default function HomePage() {
     );
   }
 
-  if (capsules.length === 0 && !stateFilter && !typeFilter) {
+  if (capsules.length === 0 && !stateFilter && !typeFilter && !favoriteOnly && !tagFilter) {
     return (
       <div className="px-8 py-10">
         <EmptyState
@@ -156,6 +168,29 @@ export default function HomePage() {
               <option value="self">Self</option>
               <option value="personal">Someone else</option>
             </select>
+            {allTags.length > 0 ? (
+              <select
+                value={tagFilter ?? ''}
+                onChange={(e) => setTagFilter(e.target.value || undefined)}
+                className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-1.5 text-sm text-foreground"
+              >
+                <option value="">All tags</option>
+                {allTags.map((tag) => (
+                  <option key={tag.id} value={tag.name}>
+                    {tag.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setFavoriteOnly((v) => !v)}
+              className={`rounded-[var(--radius-input)] border px-3 py-1.5 text-sm ${
+                favoriteOnly ? 'border-[var(--color-accent-gold)] text-[var(--color-accent-gold)]' : 'border-[var(--color-text-secondary)]/20 text-secondary'
+              }`}
+            >
+              ★ Favorites
+            </button>
           </div>
           <div className="flex gap-1 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 p-1">
             <button

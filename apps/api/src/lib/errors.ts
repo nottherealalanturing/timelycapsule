@@ -127,4 +127,8 @@ export class ApiError extends Error {
   static ownerKeyWrapAlreadySet(): ApiError {
     return new ApiError('owner_key_wrap_already_set', 'This capsule already has an owner key wrap', 409);
   }
+
+  static tagAlreadyExists(): ApiError {
+    return new ApiError('tag_already_exists', 'A tag with this name already exists', 409);
+  }
 }

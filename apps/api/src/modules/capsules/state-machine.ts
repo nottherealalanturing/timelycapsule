@@ -102,6 +102,13 @@ export function assertCanRestore(capsule: CapsuleRow): void {
   }
 }
 
+/** "Delete forever" (§5.10) — only ever offered on an already-trashed capsule, same precondition as restore. */
+export function assertCanPurge(capsule: CapsuleRow): void {
+  if (!capsule.trashedAt) {
+    throw ApiError.forbidden('Only trashed capsules can be permanently deleted');
+  }
+}
+
 // --- Archive: a side-flag on the owner's own view; never blocked by recipient state ---
 
 export function assertCanArchive(capsule: CapsuleRow): void {

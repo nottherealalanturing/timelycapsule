@@ -14,6 +14,7 @@ import { requireAuth } from '../auth/index.js';
 import {
   extendCapsule,
   getCapsuleActivity,
+  purgeCapsule,
   restoreCapsule,
   sealCapsule,
   trashCapsule,
@@ -186,6 +187,20 @@ export function capsulesRouter(db: Database): Router {
       try {
         const capsule = await extendCapsule(db, req.user!.id, req.params.id as string, req.body);
         res.status(200).json({ capsule });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/capsules/:id/purge',
+    idempotency(db),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        await purgeCapsule(db, req.user!.id, req.params.id as string);
+        res.status(204).end();
       } catch (err) {
         next(err);
       }
