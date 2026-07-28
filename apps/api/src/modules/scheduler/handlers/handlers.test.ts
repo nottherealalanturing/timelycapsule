@@ -149,7 +149,7 @@ describe('scheduler action handlers (T-13)', () => {
 
   it('reminder: disambiguates a capsule subjectId as the owner\'s own T-1d reminder', async () => {
     const capsule = await seedSealedCapsule({ unlockAt: new Date(Date.now() + 24 * 60 * 60 * 1000) });
-    const [owner] = await db.select().from(users).where(eq(users.id, capsule.ownerId));
+    const [owner] = await db.select().from(users).where(eq(users.id, capsule.ownerId!));
     await reminderHandler({ db, clock: new VirtualClock(new Date()), subjectId: capsule.id });
     const sent = await db.select().from(outboundMessages).where(eq(outboundMessages.toRef, owner!.email));
     expect(sent.some((m) => m.template === 'pre-unlock-reminder' && m.state === 'sent')).toBe(true);

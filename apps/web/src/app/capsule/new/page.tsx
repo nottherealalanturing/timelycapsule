@@ -1,7 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useRef } from 'react';
 import { capsulesApi } from '../../../lib/api-client';
 
 /**
@@ -9,9 +9,12 @@ import { capsulesApi } from '../../../lib/api-client';
  * full composer) keeps the window where a refresh could double-create a
  * capsule as small as possible: once redirected to /capsule/:id/edit, a
  * refresh re-fetches the existing draft instead of creating another one.
+ * Forwards along the optional `recipientEmail`/`recipientPhone`/`recipientName`
+ * params set by /people's birthday-upcoming "Start a capsule" CTA (T-16).
  */
-export default function NewCapsulePage() {
+function NewCapsuleInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const createdRef = useRef(false);
 
   useEffect(() => {
@@ -19,9 +22,18 @@ export default function NewCapsulePage() {
     createdRef.current = true;
     (async () => {
       const { capsule } = await capsulesApi.create({ type: 'personal' });
-      router.replace(`/capsule/${capsule.id}/edit`);
+      const qs = searchParams.toString();
+      router.replace(`/capsule/${capsule.id}/edit${qs ? `?${qs}` : ''}`);
     })();
-  }, [router]);
+  }, [router, searchParams]);
 
   return null;
+}
+
+export default function NewCapsulePage() {
+  return (
+    <Suspense fallback={null}>
+      <NewCapsuleInner />
+    </Suspense>
+  );
 }

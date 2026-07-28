@@ -6,11 +6,18 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { useAuth } from '../../lib/auth-context';
 
+const NAV_ITEMS = [
+  { href: '/home', label: 'Home' },
+  { href: '/received', label: 'Received' },
+  { href: '/people', label: 'People' },
+];
+
 /**
- * Left-sidebar shell per 02-UX-DESIGN.md §5.4's web layout. Only "Home" is
- * a real nav item — Received/People/Collections/Notifications/Settings
- * arrive with their own tickets (T-16/17/18); adding dead links for pages
- * that don't exist yet would violate "don't build ahead of the ticket."
+ * Left-sidebar shell per 02-UX-DESIGN.md §5.4's web layout. Home/Received/
+ * People are real nav items now that T-16 built both pages —
+ * Collections/Notifications/Settings still arrive with their own tickets
+ * (T-17/18); adding dead links for pages that don't exist yet would
+ * violate "don't build ahead of the ticket."
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -41,14 +48,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav className="flex flex-col gap-1">
-          <Link
-            href="/home"
-            className={`rounded-[var(--radius-input)] px-3 py-2 text-sm ${
-              pathname === '/home' ? 'bg-[var(--color-bg-raised)] font-medium text-foreground' : 'text-secondary hover:text-foreground'
-            }`}
-          >
-            Home
-          </Link>
+          {NAV_ITEMS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`rounded-[var(--radius-input)] px-3 py-2 text-sm ${
+                pathname === item.href ? 'bg-[var(--color-bg-raised)] font-medium text-foreground' : 'text-secondary hover:text-foreground'
+              }`}
+            >
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">

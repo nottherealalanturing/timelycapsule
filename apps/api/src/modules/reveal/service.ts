@@ -124,7 +124,9 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
   if (capsule.state === 'withdrawn') return { status: 'withdrawn' };
   if (capsule.state === 'expired') return { status: 'expired' };
 
-  const [owner] = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, capsule.ownerId)).limit(1);
+  const [owner] = capsule.ownerId
+    ? await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, capsule.ownerId)).limit(1)
+    : [];
   const senderName = owner?.displayName ?? 'Someone';
 
   if (capsule.state !== 'unlocked') {
@@ -180,7 +182,9 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
     await audit(db, { actorType: 'recipient', actorId: recipient.id, action: 'recipient.opened', subjectType: 'capsule', subjectId: capsule.id });
 
     // Best-effort: the recipient's own reveal must never fail because the owner's notification email did.
+    // Guest capsules (capsule.ownerId still null pre-claim) have no owner to notify — skip entirely.
     try {
+      if (capsule.ownerId) {
       await writeNotification(db, {
         userId: capsule.ownerId,
         category: 'social',
@@ -196,6 +200,7 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
             dashboardUrl: await ownerDashboardUrl(capsule.id),
           });
         }
+      }
       }
     } catch {
       // logged inside sendOpenedNotice's own ledger row; nothing further to do here.
@@ -302,21 +307,23 @@ export async function react(db: Database, rawToken: string, input: ReactRequest)
   await db.insert(reactions).values({ capsuleId: capsule.id, recipientId: recipient.id, emoji: input.emoji, note: input.note });
 
   try {
-    await writeNotification(db, {
-      userId: capsule.ownerId,
-      category: 'social',
-      title: `${recipient.displayName ?? 'Someone'} reacted ${input.emoji}`,
-      body: input.note ?? undefined,
-      data: { capsuleId: capsule.id, recipientId: recipient.id },
-    });
-    const [ownerUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, capsule.ownerId)).limit(1);
-    if (ownerUser) {
-      await sendReactionReceived(db, ownerUser.email, {
-        recipientName: recipient.displayName ?? recipient.email ?? 'Someone',
-        emoji: input.emoji,
-        note: input.note ?? null,
-        dashboardUrl: await ownerDashboardUrl(capsule.id),
+    if (capsule.ownerId) {
+      await writeNotification(db, {
+        userId: capsule.ownerId,
+        category: 'social',
+        title: `${recipient.displayName ?? 'Someone'} reacted ${input.emoji}`,
+        body: input.note ?? undefined,
+        data: { capsuleId: capsule.id, recipientId: recipient.id },
       });
+      const [ownerUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, capsule.ownerId)).limit(1);
+      if (ownerUser) {
+        await sendReactionReceived(db, ownerUser.email, {
+          recipientName: recipient.displayName ?? recipient.email ?? 'Someone',
+          emoji: input.emoji,
+          note: input.note ?? null,
+          dashboardUrl: await ownerDashboardUrl(capsule.id),
+        });
+      }
     }
   } catch {
     // Best-effort — the recipient's reaction is already saved regardless of whether the owner's notice sends.

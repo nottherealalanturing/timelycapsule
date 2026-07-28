@@ -111,4 +111,20 @@ export class ApiError extends Error {
   static alreadySaved(): ApiError {
     return new ApiError('already_saved', 'This capsule has already been saved to a different account', 409);
   }
+
+  static guestSessionInvalid(message = 'Guest session not found or already claimed'): ApiError {
+    return new ApiError('guest_session_invalid', message, 401);
+  }
+
+  static guestCapsuleLimit(message = 'One capsule per guest session — sign up free for more'): ApiError {
+    return new ApiError('guest_capsule_limit', message, 409);
+  }
+
+  static guestCapsuleLocked(message = 'This capsule can no longer be edited'): ApiError {
+    return new ApiError('guest_capsule_locked', message, 409);
+  }
+
+  static ownerKeyWrapAlreadySet(): ApiError {
+    return new ApiError('owner_key_wrap_already_set', 'This capsule already has an owner key wrap', 409);
+  }
 }

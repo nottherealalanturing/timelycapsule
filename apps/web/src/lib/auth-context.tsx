@@ -20,9 +20,9 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   /** Resolves with the one-time formatted recovery kit — the caller MUST show it to the user before navigating away (06 §A "mandatory nag"). */
-  signup: (input: { email: string; password: string; displayName: string }) => Promise<{ user: User; recoveryKit: string }>;
+  signup: (input: { email: string; password: string; displayName: string; guestToken?: string }) => Promise<{ user: User; recoveryKit: string }>;
   login: (input: { email: string; password: string }) => Promise<User>;
-  googleOAuth: (idToken: string) => Promise<User>;
+  googleOAuth: (idToken: string, guestToken?: string) => Promise<User>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   setUser: (user: User | null) => void;
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const recoveryKeyWrap = await wrapMasterKeyWithRecoveryCode(masterKey, recoveryCodeBytes);
       const recoveryKit = formatRecoveryCode(recoveryCodeBytes);
 
-      const { user: newUser, tokens } = await authApi.signup({ ...input, masterKeyWrap, recoveryKeyWrap });
+      const { user: newUser, tokens } = await authApi.signup({ ...input, masterKeyWrap, recoveryKeyWrap, guestToken: input.guestToken });
       setTokens(tokens);
       setUser(newUser);
       // Already unwrapped in memory from generation above — no need to
@@ -107,8 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const googleOAuth: AuthContextValue['googleOAuth'] = useCallback(
-    async (idToken) => {
-      const { user: oauthUser, tokens } = await authApi.googleOAuth({ idToken });
+    async (idToken, guestToken) => {
+      const { user: oauthUser, tokens } = await authApi.googleOAuth({ idToken, guestToken });
       setTokens(tokens);
       setUser(oauthUser);
       return oauthUser;

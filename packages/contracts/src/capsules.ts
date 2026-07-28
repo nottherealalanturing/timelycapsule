@@ -104,6 +104,20 @@ export const ExtendCapsuleRequestSchema = z.object({
 });
 export type ExtendCapsuleRequest = z.infer<typeof ExtendCapsuleRequestSchema>;
 
+/**
+ * One-time post-claim key attach (T-15b) — a claimed guest capsule has no
+ * `ownerKeyWrap` (no master key existed at creation); if the new owner's
+ * browser still holds the raw capsule key on-device, it re-wraps it under
+ * their master key and attaches it here. Deliberately narrower than
+ * `PatchCapsuleRequestSchema`: allowed regardless of capsule state (sealed
+ * content immutability governs the *ciphertext*, not who can decrypt it)
+ * but only succeeds once — `ownerKeyWrap` must currently be null.
+ */
+export const SetOwnerKeyWrapRequestSchema = z.object({
+  ownerKeyWrap: z.string().min(1),
+});
+export type SetOwnerKeyWrapRequest = z.infer<typeof SetOwnerKeyWrapRequestSchema>;
+
 export const ListCapsulesQuerySchema = z.object({
   state: CapsuleStateSchema.optional(),
   type: CapsuleTypeSchema.optional(),
@@ -172,7 +186,7 @@ export type CapsuleListResponse = z.infer<typeof CapsuleListResponseSchema>;
 
 export const ActivityEntrySchema = z.object({
   action: z.string(),
-  actorType: z.enum(['user', 'recipient', 'admin', 'system']),
+  actorType: z.enum(['user', 'recipient', 'admin', 'system', 'guest']),
   metadata: z.unknown().nullable(),
   createdAt: z.string(),
 });

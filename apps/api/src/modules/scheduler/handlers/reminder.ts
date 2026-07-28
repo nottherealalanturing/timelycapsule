@@ -26,7 +26,9 @@ export const reminderHandler: ActionHandler = async ({ db, clock, subjectId }) =
 
     const [capsule] = await db.select({ ownerId: capsules.ownerId, unlockAt: capsules.unlockAt }).from(capsules).where(eq(capsules.id, recipient.capsuleId)).limit(1);
     if (!capsule?.unlockAt) return;
-    const [owner] = await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, capsule.ownerId)).limit(1);
+    const [owner] = capsule.ownerId
+      ? await db.select({ displayName: users.displayName }).from(users).where(eq(users.id, capsule.ownerId)).limit(1)
+      : [];
 
     await sendPreUnlockReminder(db, recipient.email, {
       audience: 'recipient',
@@ -37,7 +39,7 @@ export const reminderHandler: ActionHandler = async ({ db, clock, subjectId }) =
   }
 
   const [capsule] = await db.select().from(capsules).where(eq(capsules.id, subjectId)).limit(1);
-  if (!capsule?.unlockAt) return; // capsule was withdrawn/deleted, or this is neither a live recipient nor capsule — nothing to remind.
+  if (!capsule?.unlockAt || !capsule.ownerId) return; // capsule was withdrawn/deleted, is an unclaimed guest capsule, or neither a live recipient nor capsule — nothing to remind.
 
   const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, capsule.ownerId)).limit(1);
   if (!owner) return;

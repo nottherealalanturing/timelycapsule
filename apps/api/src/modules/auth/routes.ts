@@ -67,7 +67,7 @@ export function authRouter(db: Database): Router {
     validate({ body: GoogleOAuthRequestSchema }),
     async (req, res, next) => {
       try {
-        const { created, user, tokens } = await service.googleOAuth(db, req.body.idToken, deviceMeta(req));
+        const { created, user, tokens } = await service.googleOAuth(db, req.body.idToken, deviceMeta(req), undefined, req.body.guestToken);
         res.status(created ? 201 : 200).json({ user, tokens });
       } catch (err) {
         next(err);

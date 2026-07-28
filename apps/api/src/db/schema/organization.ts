@@ -82,3 +82,29 @@ export const contacts = pgTable(
   },
   (t) => [index('contacts_owner_id_idx').on(t.ownerId)],
 );
+
+export const contactGroups = pgTable(
+  'contact_groups',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    ownerId: uuid('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('contact_groups_owner_id_name_unique').on(t.ownerId, t.name)],
+);
+
+export const contactGroupMembers = pgTable(
+  'contact_group_members',
+  {
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => contactGroups.id, { onDelete: 'cascade' }),
+    contactId: uuid('contact_id')
+      .notNull()
+      .references(() => contacts.id, { onDelete: 'cascade' }),
+  },
+  (t) => [primaryKey({ columns: [t.groupId, t.contactId] }), index('contact_group_members_contact_id_idx').on(t.contactId)],
+);

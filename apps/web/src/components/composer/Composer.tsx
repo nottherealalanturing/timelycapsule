@@ -30,7 +30,13 @@ function statusText(status: AutosaveStatus): string {
   }
 }
 
-export function Composer({ capsuleId }: { capsuleId: string }) {
+export interface InitialRecipient {
+  email?: string;
+  phone?: string;
+  displayName?: string;
+}
+
+export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; initialRecipient?: InitialRecipient }) {
   const router = useRouter();
   const { show } = useToast();
   const draft = useCapsuleDraft(capsuleId);
@@ -119,7 +125,7 @@ export function Composer({ capsuleId }: { capsuleId: string }) {
         <CoverBlock draft={draft} />
         <LetterBlock draft={draft} />
         <MediaBlock capsuleId={capsuleId} draft={draft} />
-        <RecipientsBlock capsuleId={capsuleId} capsuleType={draft.capsule.type} draft={draft} />
+        <RecipientsBlock capsuleId={capsuleId} capsuleType={draft.capsule.type} draft={draft} initialRecipient={initialRecipient} />
         <ScheduleBlock draft={draft} />
         <SealsBlock draft={draft} />
       </main>

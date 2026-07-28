@@ -47,6 +47,7 @@ async function escalateBouncedAddress(db: Database, email: string): Promise<void
     );
 
   for (const row of affected) {
+    if (!row.ownerId) continue; // guest capsules have no email recipient to match this loop against anyway
     const [owner] = await db.select({ email: users.email }).from(users).where(eq(users.id, row.ownerId)).limit(1);
     if (!owner) continue;
 

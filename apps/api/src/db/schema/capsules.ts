@@ -14,6 +14,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { citext } from './custom-types';
+import { guestSessions } from './guest';
 import { users } from './identity';
 import {
   breakGlassEnum,
@@ -46,9 +47,11 @@ export const capsules = pgTable(
     expiresAfter: pgInterval('expires_after'),
     expiryStrict: boolean('expiry_strict').default(false),
     expiredAt: timestamp('expired_at', { withTimezone: true }),
-    ownerId: uuid('owner_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    // NULL only for an unclaimed guest capsule (01 §4.1b / T-15b) — exactly
+    // one of ownerId/guestSessionId is set pre-claim; claim transfers
+    // ownerId and leaves guestSessionId as historical provenance.
+    ownerId: uuid('owner_id').references(() => users.id, { onDelete: 'cascade' }),
+    guestSessionId: uuid('guest_session_id').references(() => guestSessions.id, { onDelete: 'set null' }),
     orgId: uuid('org_id'), // orgs table not yet created (Phase 3, T-42) — FK added then
     type: capsuleTypeEnum('type').notNull(),
     state: capsuleStateEnum('state').notNull().default('draft'),
@@ -89,6 +92,7 @@ export const capsules = pgTable(
   (t) => [
     uniqueIndex('capsules_public_id_unique').on(t.publicId),
     index('capsules_owner_state_idx').on(t.ownerId, t.state),
+    index('capsules_guest_session_id_idx').on(t.guestSessionId),
     index('capsules_state_unlock_at_idx').on(t.state, t.unlockAt), // the scheduler's hot index
     index('capsules_org_id_idx').on(t.orgId),
     index('capsules_series_id_idx').on(t.seriesId),
