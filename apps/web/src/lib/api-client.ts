@@ -6,10 +6,15 @@ import {
   CapsuleResponseSchema,
   SystemTimeResponseSchema,
   AddCollectionItemRequestSchema,
+  AvatarUploadRequestSchema,
+  AvatarUploadResponseSchema,
   BlocksListResponseSchema,
+  ChangeEmailRequestSchema,
+  ChangePasswordRequestSchema,
   CollectionResponseSchema,
   CollectionsListResponseSchema,
   CompleteMediaRequestSchema,
+  ConfirmEmailChangeRequestSchema,
   ContactGroupResponseSchema,
   ContactGroupsListResponseSchema,
   ContactResponseSchema,
@@ -24,6 +29,9 @@ import {
   CreateRecipientRequestSchema,
   CreateRecipientResponseSchema,
   CreateTagRequestSchema,
+  DeleteAccountRequestSchema,
+  DeletionPreviewResponseSchema,
+  ExportResponseSchema,
   ExtendCapsuleRequestSchema,
   ForgotPasswordRequestSchema,
   GoogleOAuthRequestSchema,
@@ -36,6 +44,8 @@ import {
   MediaResponseSchema,
   MediaViewResponseSchema,
   MeResponseSchema,
+  NotificationPrefsResponseSchema,
+  NotificationPrefsSchema,
   PatchCapsuleRequestSchema,
   PatchCollectionRequestSchema,
   PatchContactGroupRequestSchema,
@@ -61,8 +71,10 @@ import {
   RevealResponseSchema,
   SearchResponseSchema,
   SendAnnounceRequestSchema,
+  SessionsResponseSchema,
   SetContactGroupMemberRequestSchema,
   SignupRequestSchema,
+  StorageResponseSchema,
   TagResponseSchema,
   TagsListResponseSchema,
   TzInferRequestSchema,
@@ -71,7 +83,11 @@ import {
   VerifyIdentityResponseSchema,
   type AddCollectionItemRequest,
   type AuthResponse,
+  type AvatarUploadRequest,
+  type ChangeEmailRequest,
+  type ChangePasswordRequest,
   type CompleteMediaRequest,
+  type ConfirmEmailChangeRequest,
   type CreateBlockRequest,
   type CreateCapsuleRequest,
   type CreateCollectionRequest,
@@ -80,6 +96,7 @@ import {
   type CreateMediaTicketRequest,
   type CreateRecipientRequest,
   type CreateTagRequest,
+  type DeleteAccountRequest,
   type ExtendCapsuleRequest,
   type ForgotPasswordRequest,
   type GoogleOAuthRequest,
@@ -88,6 +105,7 @@ import {
   type ListCapsulesQuery,
   type LoginRequest,
   type MeResponse,
+  type NotificationPrefs,
   type PatchCapsuleRequest,
   type PatchCollectionRequest,
   type PatchContactGroupRequest,
@@ -243,6 +261,19 @@ export const authApi = {
 
   patchMe: (input: PatchMeRequest) =>
     request('/me', MeResponseSchema, { method: 'PATCH', auth: true, body: PatchMeRequestSchema.parse(input) }),
+
+  changePassword: (input: ChangePasswordRequest) =>
+    request('/auth/password/change', z.void(), { method: 'POST', auth: true, body: ChangePasswordRequestSchema.parse(input) }),
+
+  requestEmailChange: (input: ChangeEmailRequest) =>
+    request('/me/email/change', z.unknown(), { method: 'POST', auth: true, body: ChangeEmailRequestSchema.parse(input) }),
+
+  confirmEmailChange: (input: ConfirmEmailChangeRequest) =>
+    request('/me/email/confirm', MeResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: ConfirmEmailChangeRequestSchema.parse(input),
+    }),
 };
 
 export const systemApi = {
@@ -549,6 +580,37 @@ export const collectionsApi = {
 
 export const searchApi = {
   query: (q: string) => request(`/search?q=${encodeURIComponent(q)}`, SearchResponseSchema, { auth: true }),
+};
+
+export const sessionsApi = {
+  list: () => request('/auth/sessions', SessionsResponseSchema, { auth: true }),
+
+  revoke: (id: string) => request(`/auth/sessions/${id}`, z.void(), { method: 'DELETE', auth: true }),
+};
+
+export const notificationPrefsApi = {
+  get: () => request('/me/notification-prefs', NotificationPrefsResponseSchema, { auth: true }),
+
+  put: (input: NotificationPrefs) =>
+    request('/me/notification-prefs', NotificationPrefsResponseSchema, {
+      method: 'PUT',
+      auth: true,
+      body: NotificationPrefsSchema.parse(input),
+    }),
+};
+
+export const settingsApi = {
+  getStorage: () => request('/me/storage', StorageResponseSchema, { auth: true }),
+
+  createAvatarUpload: (input: AvatarUploadRequest) =>
+    request('/me/avatar', AvatarUploadResponseSchema, { method: 'POST', auth: true, body: AvatarUploadRequestSchema.parse(input) }),
+
+  requestExport: () => request('/me/export', ExportResponseSchema, { method: 'POST', auth: true, body: {} }),
+
+  getDeletionPreview: () => request('/me/deletion-preview', DeletionPreviewResponseSchema, { auth: true }),
+
+  deleteAccount: (input: DeleteAccountRequest) =>
+    request('/me', z.unknown(), { method: 'DELETE', auth: true, body: DeleteAccountRequestSchema.parse(input) }),
 };
 
 export type { AuthResponse, MeResponse };

@@ -18,10 +18,8 @@ const NAV_ITEMS = [
 
 /**
  * Left-sidebar shell per 02-UX-DESIGN.md §5.4's web layout. Home/Received/
- * People/Collections/Archive/Trash are real nav items now that T-16/T-17
- * built them — Notifications/Settings still arrive with their own ticket
- * (T-18); adding dead links for pages that don't exist yet would violate
- * "don't build ahead of the ticket."
+ * People/Collections/Archive/Trash/Settings are real nav items now that
+ * T-16/T-17/T-18 built them.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -76,6 +74,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
 
         <div className="mt-auto flex flex-col gap-3">
+          <Link
+            href="/settings"
+            className={`rounded-[var(--radius-input)] px-3 py-2 text-sm ${
+              pathname.startsWith('/settings') ? 'bg-[var(--color-bg-raised)] font-medium text-foreground' : 'text-secondary hover:text-foreground'
+            }`}
+          >
+            Settings
+          </Link>
           <div className="flex items-center justify-between px-2">
             <span className="truncate text-sm text-secondary">{user.displayName}</span>
             <ThemeToggle />

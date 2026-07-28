@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   HeadObjectCommand,
   NotFound,
+  PutObjectCommand,
   S3Client,
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
@@ -82,6 +83,27 @@ export class R2StorageAdapter implements StorageAdapter {
       new GetObjectCommand({ Bucket: this.bucket, Key: key, ResponseContentDisposition: disposition }),
       { expiresIn: options.expiresInSeconds },
     );
+  }
+
+  async getSignedPutUrl(key: string, options: { expiresInSeconds: number; contentType: string }): Promise<string> {
+    return getSignedUrl(this.client, new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: options.contentType }), {
+      expiresIn: options.expiresInSeconds,
+    });
+  }
+
+  async putObject(key: string, body: Buffer, contentType: string): Promise<void> {
+    await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, ContentType: contentType }));
+  }
+
+  async getObject(key: string): Promise<Buffer | null> {
+    try {
+      const result = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+      const bytes = await result.Body?.transformToByteArray();
+      return bytes ? Buffer.from(bytes) : null;
+    } catch (err) {
+      if (err instanceof NotFound) return null;
+      throw err;
+    }
   }
 
   async deleteObject(key: string): Promise<void> {

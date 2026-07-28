@@ -3,6 +3,7 @@ export {
   sendPasswordReset,
   sendNewDeviceAlert,
   sendSomethingWaiting,
+  sendExportReady,
   sendCapsuleUnlocked,
   sendPreUnlockReminder,
   sendOpenedNotice,

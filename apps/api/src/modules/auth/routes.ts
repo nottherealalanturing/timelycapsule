@@ -1,4 +1,7 @@
 import {
+  ChangeEmailRequestSchema,
+  ChangePasswordRequestSchema,
+  ConfirmEmailChangeRequestSchema,
   ForgotPasswordRequestSchema,
   GoogleOAuthRequestSchema,
   LoginRequestSchema,
@@ -209,6 +212,50 @@ export function authRouter(db: Database): Router {
     async (req, res, next) => {
       try {
         const user = await service.patchMe(db, req.user!.id, req.body);
+        res.status(200).json({ user });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/auth/password/change',
+    requireAuth(),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: ChangePasswordRequestSchema }),
+    async (req, res, next) => {
+      try {
+        await service.changePassword(db, req.user!.id, req.user!.sessionId, req.body);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/me/email/change',
+    requireAuth(),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 5, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: ChangeEmailRequestSchema }),
+    async (req, res, next) => {
+      try {
+        await service.requestEmailChange(db, req.user!.id, req.body.newEmail, req.body.currentPassword);
+        res.status(202).json({});
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/me/email/confirm',
+    requireAuth(),
+    validate({ body: ConfirmEmailChangeRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const user = await service.confirmEmailChange(db, req.user!.id, req.body.code);
         res.status(200).json({ user });
       } catch (err) {
         next(err);

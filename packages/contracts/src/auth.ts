@@ -14,6 +14,8 @@ export const PasswordSchema = z
 export const UserSchema = z.object({
   id: z.string().uuid(),
   email: z.string().email(),
+  /** Staged new address awaiting the `change_email` OTP confirmation (T-18) — null unless an email change is in progress. */
+  pendingEmail: z.string().email().nullable(),
   displayName: z.string(),
   handle: z.string().nullable(),
   avatarKey: z.string().nullable(),
@@ -107,6 +109,32 @@ export const ResetPasswordRequestSchema = z.object({
   newPassword: PasswordSchema,
 });
 export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequestSchema>;
+
+/**
+ * Password change while logged in (Settings → Account, T-18) — distinct
+ * from forgot/reset (T-04): the caller already knows their current
+ * password, so the master key can be re-wrapped client-side (unwrap under
+ * the old password, re-wrap under the new one) and sent up alongside the
+ * new password hash, exactly like signup's masterKeyWrap. Forgot/reset has
+ * no such thing to send since the user *doesn't* have the old password.
+ */
+export const ChangePasswordRequestSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: PasswordSchema,
+  masterKeyWrap: z.string().min(1),
+});
+export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
+
+export const ChangeEmailRequestSchema = z.object({
+  newEmail: z.string().email(),
+  currentPassword: z.string().min(1),
+});
+export type ChangeEmailRequest = z.infer<typeof ChangeEmailRequestSchema>;
+
+export const ConfirmEmailChangeRequestSchema = z.object({
+  code: z.string().min(1),
+});
+export type ConfirmEmailChangeRequest = z.infer<typeof ConfirmEmailChangeRequestSchema>;
 
 export const SessionSchema = z.object({
   id: z.string().uuid(),

@@ -20,6 +20,7 @@ import { blocksRouter, recipientsRouter } from './modules/recipients/index.js';
 import { revealRouter } from './modules/reveal/index.js';
 import { guestRouter } from './modules/guest/index.js';
 import { searchRouter } from './modules/search/index.js';
+import { settingsRouter } from './modules/settings/index.js';
 import { tagsRouter } from './modules/tags/index.js';
 
 export function createApp(db: Database): express.Express {
@@ -57,6 +58,7 @@ export function createApp(db: Database): express.Express {
   app.use('/v1', favoritesRouter(db));
   app.use('/v1', collectionsRouter(db));
   app.use('/v1', searchRouter(db));
+  app.use('/v1', settingsRouter(db));
   app.use('/v1', emailWebhookRouter(db));
 
   app.get('/health', (_req, res) => {

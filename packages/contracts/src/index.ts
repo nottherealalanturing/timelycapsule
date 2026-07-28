@@ -10,3 +10,4 @@ export * from './contacts';
 export * from './received';
 export * from './organization';
 export * from './search';
+export * from './settings';

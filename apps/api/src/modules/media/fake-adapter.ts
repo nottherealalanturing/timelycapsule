@@ -19,6 +19,7 @@ const FAKE_PART_SIZE_BYTES = 8 * 1024 * 1024; // matches the 8 MB chunking in 03
 export class FakeStorageAdapter implements StorageAdapter {
   private readonly uploads = new Map<string, FakeUpload>();
   private readonly objects = new Map<string, number>();
+  private readonly bytes = new Map<string, Buffer>();
 
   async createMultipartUpload(key: string, partCount: number): Promise<CreatedUpload> {
     const uploadId = randomUUID();
@@ -63,8 +64,22 @@ export class FakeStorageAdapter implements StorageAdapter {
     return `https://fake-storage.test/${encodeURIComponent(key)}?expires=${options.expiresInSeconds}&disposition=${encodeURIComponent(disposition)}`;
   }
 
+  async getSignedPutUrl(key: string, options: { expiresInSeconds: number; contentType: string }): Promise<string> {
+    return `https://fake-storage.test/${encodeURIComponent(key)}?expires=${options.expiresInSeconds}&contentType=${encodeURIComponent(options.contentType)}`;
+  }
+
+  async putObject(key: string, body: Buffer, _contentType: string): Promise<void> {
+    this.bytes.set(key, body);
+    this.objects.set(key, body.byteLength);
+  }
+
+  async getObject(key: string): Promise<Buffer | null> {
+    return this.bytes.get(key) ?? null;
+  }
+
   async deleteObject(key: string): Promise<void> {
     this.objects.delete(key);
+    this.bytes.delete(key);
   }
 
   /** Test-only escape hatch: lets a test declare the real byte size for a part before completion. */

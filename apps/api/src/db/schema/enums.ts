@@ -92,6 +92,8 @@ export const actionKindEnum = pgEnum('action_kind', [
   'announce',
   'capsule_expire',
   'expire_purge',
+  'data_export',
+  'account_purge',
 ]);
 
 export const actionStateEnum = pgEnum('action_state', [
@@ -143,4 +145,7 @@ export const actorTypeEnum = pgEnum('actor_type', ['user', 'recipient', 'admin',
 
 export const idempotencyStatusEnum = pgEnum('idempotency_status', ['in_progress', 'completed']);
 
-export const otpPurposeEnum = pgEnum('otp_purpose', ['verify_email', 'password_reset']);
+export const otpPurposeEnum = pgEnum('otp_purpose', ['verify_email', 'password_reset', 'change_email']);
+
+/** Owner's choice for a sealed capsule with real (non-suppressed) recipients when they request account deletion (F8) — 02-UX-DESIGN.md §7. */
+export const deletionDecisionEnum = pgEnum('deletion_decision', ['deliver', 'withdraw']);

@@ -17,6 +17,8 @@ export const QUEUE_NAMES = [
   'reminder',
   'breakglass_open',
   'trash_purge',
+  'data_export',
+  'account_purge',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];

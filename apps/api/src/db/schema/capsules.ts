@@ -20,6 +20,7 @@ import {
   breakGlassEnum,
   capsuleStateEnum,
   capsuleTypeEnum,
+  deletionDecisionEnum,
   mediaKindEnum,
   mediaStatusEnum,
   recipientStatusEnum,
@@ -86,6 +87,12 @@ export const capsules = pgTable(
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
     withdrawnAt: timestamp('withdrawn_at', { withTimezone: true }),
     legacyConfig: jsonb('legacy_config'), // {trigger:"date"|"trustee"|"first_of"|"last_of"}
+    // Set when the owner requests account deletion (F8) and this sealed
+    // capsule has real recipients — read by the `account_purge` scheduled
+    // action 30 days later. Cleared (along with the whole deletion) if the
+    // owner logs back in first; a 'withdraw' decision is applied
+    // immediately though, same as any other withdraw (irreversible).
+    deletionDecision: deletionDecisionEnum('deletion_decision'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   },

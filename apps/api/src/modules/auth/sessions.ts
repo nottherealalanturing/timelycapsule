@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, desc, eq, gt, isNull, ne, or } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { sessions } from '../../db/schema/index.js';
 import { ApiError } from '../../lib/errors.js';
@@ -121,6 +121,14 @@ export async function revokeAllSessions(db: Database, userId: string): Promise<v
     .update(sessions)
     .set({ revokedAt: new Date() })
     .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt)));
+}
+
+/** T-18's in-session password change: the caller already re-proved their identity with the current password, so their own session stays alive — every *other* device still gets signed out (plan §17, threat #3). */
+export async function revokeOtherSessions(db: Database, userId: string, keepSessionId: string): Promise<void> {
+  await db
+    .update(sessions)
+    .set({ revokedAt: new Date() })
+    .where(and(eq(sessions.userId, userId), isNull(sessions.revokedAt), ne(sessions.id, keepSessionId)));
 }
 
 export async function listActiveSessions(db: Database, userId: string): Promise<Session[]> {

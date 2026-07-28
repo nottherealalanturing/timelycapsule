@@ -8,8 +8,10 @@ import { claimGhostRecipients } from './ghost-claim.js';
 import { claimGuestSession } from '../guest/index.js';
 import { verifyGoogleIdToken, type GoogleIdTokenPayload } from './google.js';
 import {
+  consumeChangeEmailCode,
   consumeEmailVerifyCode,
   consumePasswordResetToken,
+  issueChangeEmailCode,
   issueEmailVerifyCode,
   issuePasswordResetToken,
 } from './otp.js';
@@ -18,6 +20,7 @@ import {
   createSession,
   isNewDevice,
   revokeAllSessions,
+  revokeOtherSessions,
   revokeSession,
   rotateRefreshToken,
   type DeviceMeta,
@@ -30,6 +33,7 @@ function toUserResponse(user: UserRow): User {
   return {
     id: user.id,
     email: user.email,
+    pendingEmail: user.pendingEmail,
     displayName: user.displayName,
     handle: user.handle,
     avatarKey: user.avatarKey,
@@ -95,10 +99,22 @@ export async function login(
     await sendNewDeviceAlert(db, user.email, meta.ip);
   }
 
+  // F8: "30-day pending window (login cancels)" — a successful login is the
+  // cancellation trigger. Dynamic import to avoid a static circular
+  // dependency (modules/settings imports back from modules/auth for
+  // verifyPassword) — same reasoning as T-17's purgeCapsuleNow.
+  let effectiveUser = user;
+  if (user.status === 'pending_deletion') {
+    const { cancelAccountDeletion } = await import('../settings/index.js');
+    await cancelAccountDeletion(db, user.id);
+    const [refreshed] = await db.select().from(users).where(eq(users.id, user.id)).limit(1);
+    effectiveUser = refreshed!;
+  }
+
   const { tokens } = await createSession(db, user.id, meta);
   await db.update(users).set({ lastActiveAt: new Date() }).where(eq(users.id, user.id));
 
-  return { user: toUserResponse(user), tokens };
+  return { user: toUserResponse(effectiveUser), tokens };
 }
 
 /**
@@ -249,4 +265,62 @@ export async function patchMe(db: Database, userId: string, patch: PatchMeReques
     throw ApiError.notFound('User not found');
   }
   return toUserResponse(user);
+}
+
+/**
+ * Settings → Account password change (T-18) — distinct from forgot/reset:
+ * the caller already knows the current password, so `masterKeyWrap` is a
+ * client-computed re-wrap (unwrap under the old password, re-wrap under
+ * the new one) rather than something only a recovery code could restore.
+ * The current session stays alive; every other device is signed out.
+ */
+export async function changePassword(
+  db: Database,
+  userId: string,
+  sessionId: string,
+  input: { currentPassword: string; newPassword: string; masterKeyWrap: string },
+): Promise<void> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || !user.passwordHash || !(await verifyPassword(user.passwordHash, input.currentPassword))) {
+    throw ApiError.invalidCredentials();
+  }
+
+  const passwordHash = await hashPassword(input.newPassword);
+  await db
+    .update(users)
+    .set({ passwordHash, masterKeyWrap: Buffer.from(input.masterKeyWrap, 'base64'), updatedAt: new Date() })
+    .where(eq(users.id, userId));
+
+  await revokeOtherSessions(db, userId, sessionId);
+}
+
+export async function requestEmailChange(db: Database, userId: string, newEmail: string, currentPassword: string): Promise<void> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || !user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {
+    throw ApiError.invalidCredentials();
+  }
+
+  const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, newEmail)).limit(1);
+  if (existing) {
+    throw ApiError.emailAlreadyRegistered();
+  }
+
+  await db.update(users).set({ pendingEmail: newEmail, updatedAt: new Date() }).where(eq(users.id, userId));
+  await issueChangeEmailCode(db, userId, newEmail);
+}
+
+export async function confirmEmailChange(db: Database, userId: string, code: string): Promise<User> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || !user.pendingEmail) {
+    throw ApiError.invalidOrExpiredCode();
+  }
+
+  await consumeChangeEmailCode(db, userId, code);
+
+  const [updated] = await db
+    .update(users)
+    .set({ email: user.pendingEmail, pendingEmail: null, emailVerifiedAt: new Date(), updatedAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning();
+  return toUserResponse(updated!);
 }

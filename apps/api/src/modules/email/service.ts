@@ -6,6 +6,7 @@ import { getEmailAdapter } from './get-adapter.js';
 import { markFailed, markSent, recordQueued } from './ledger.js';
 import { BounceAlert } from './templates/BounceAlert.js';
 import { CapsuleUnlocked } from './templates/CapsuleUnlocked.js';
+import { ExportReady } from './templates/ExportReady.js';
 import { NewDeviceAlert } from './templates/NewDeviceAlert.js';
 import { OpenedNotice } from './templates/OpenedNotice.js';
 import { PasswordReset } from './templates/PasswordReset.js';
@@ -92,6 +93,15 @@ export async function sendSomethingWaiting(
     subject: `${input.senderName} sealed something for you`,
     node: SomethingWaiting(input),
     payload: input,
+  });
+}
+
+export async function sendExportReady(db: Database, to: string, downloadUrl: string): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'export-ready',
+    subject: 'Your data export is ready',
+    node: ExportReady({ downloadUrl }),
   });
 }
 

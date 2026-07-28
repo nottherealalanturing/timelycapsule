@@ -24,6 +24,11 @@ export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
   email: citext('email').notNull(),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+  // Staged new address for T-18's "email change w/ re-verify" (Settings →
+  // Account) — a `change_email`-purpose email_otp_codes row is sent here;
+  // confirming swaps it into `email` and clears this column. Null the rest
+  // of the time.
+  pendingEmail: citext('pending_email'),
   passwordHash: text('password_hash'), // null for oauth-only accounts
   displayName: text('display_name').notNull(),
   handle: citext('handle'), // nullable until public features are used

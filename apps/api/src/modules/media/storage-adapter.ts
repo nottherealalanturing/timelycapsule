@@ -32,6 +32,12 @@ export interface StorageAdapter {
   abortMultipartUpload(key: string, uploadId: string): Promise<void>;
   /** Returns null if the object doesn't exist. */
   headObject(key: string): Promise<HeadResult | null>;
+  /** Direct server-side read — T-18's data-export handler embeds each media object's raw (still-encrypted) bytes into the export zip. */
+  getObject(key: string): Promise<Buffer | null>;
   getSignedGetUrl(key: string, options: { expiresInSeconds: number; asAttachment: boolean; filename?: string }): Promise<string>;
+  /** Single-shot presigned PUT for a client to upload directly — T-18's avatar upload (small, unencrypted, doesn't need T-10's multipart-chunking machinery). */
+  getSignedPutUrl(key: string, options: { expiresInSeconds: number; contentType: string }): Promise<string>;
+  /** Direct server-side write — T-18's data-export handler builds a zip in memory and writes it itself, no client involved. */
+  putObject(key: string, body: Buffer, contentType: string): Promise<void>;
   deleteObject(key: string): Promise<void>;
 }
