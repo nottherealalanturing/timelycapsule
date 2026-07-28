@@ -34,6 +34,11 @@ export function CapsuleCard({ capsule, className }: { capsule: CapsuleListItem; 
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-center justify-between gap-2">
           <StateChip state={capsule.state} />
+          {capsule.isFavorite ? (
+            <span aria-label="Favorite" className="text-[var(--color-accent-gold)]">
+              ★
+            </span>
+          ) : null}
         </div>
         <h3 className="truncate font-[var(--font-display)] text-base text-foreground">{capsule.title || 'Untitled capsule'}</h3>
         {capsule.state === 'sealed' && unlockDate ? (

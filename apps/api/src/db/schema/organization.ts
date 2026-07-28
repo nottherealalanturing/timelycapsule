@@ -1,4 +1,4 @@
-import { date, index, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { date, index, integer, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { citext } from './custom-types';
 import { users } from './identity';
 import { capsules } from './capsules';
@@ -107,4 +107,36 @@ export const contactGroupMembers = pgTable(
       .references(() => contacts.id, { onDelete: 'cascade' }),
   },
   (t) => [primaryKey({ columns: [t.groupId, t.contactId] }), index('contact_group_members_contact_id_idx').on(t.contactId)],
+);
+
+export const collections = pgTable(
+  'collections',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    cover: jsonb('cover'), // {kind:"gradient"|"image", value, theme} — same shape as capsules.cover
+    position: integer('position').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('collections_user_id_position_idx').on(t.userId, t.position)],
+);
+
+export const collectionItems = pgTable(
+  'collection_items',
+  {
+    collectionId: uuid('collection_id')
+      .notNull()
+      .references(() => collections.id, { onDelete: 'cascade' }),
+    capsuleId: uuid('capsule_id')
+      .notNull()
+      .references(() => capsules.id, { onDelete: 'cascade' }),
+    position: integer('position').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.collectionId, t.capsuleId] }),
+    index('collection_items_capsule_id_idx').on(t.capsuleId),
+  ],
 );

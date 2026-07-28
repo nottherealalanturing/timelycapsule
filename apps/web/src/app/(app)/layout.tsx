@@ -3,26 +3,31 @@
 import { Button, ThemeToggle } from '@tc/ui-web';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { CommandPalette } from '../../components/CommandPalette';
 import { useAuth } from '../../lib/auth-context';
 
 const NAV_ITEMS = [
   { href: '/home', label: 'Home' },
   { href: '/received', label: 'Received' },
   { href: '/people', label: 'People' },
+  { href: '/collections', label: 'Collections' },
+  { href: '/archive', label: 'Archive' },
+  { href: '/trash', label: 'Trash' },
 ];
 
 /**
  * Left-sidebar shell per 02-UX-DESIGN.md §5.4's web layout. Home/Received/
- * People are real nav items now that T-16 built both pages —
- * Collections/Notifications/Settings still arrive with their own tickets
- * (T-17/18); adding dead links for pages that don't exist yet would
- * violate "don't build ahead of the ticket."
+ * People/Collections/Archive/Trash are real nav items now that T-16/T-17
+ * built them — Notifications/Settings still arrive with their own ticket
+ * (T-18); adding dead links for pages that don't exist yet would violate
+ * "don't build ahead of the ticket."
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { user, loading, logout } = useAuth();
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -46,6 +51,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Link href="/capsule/new">
           <Button fullWidth>New Capsule</Button>
         </Link>
+
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 px-3 py-2 text-sm text-secondary hover:text-foreground"
+        >
+          Search
+          <span className="text-xs">⌘K</span>
+        </button>
 
         <nav className="flex flex-col gap-1">
           {NAV_ITEMS.map((item) => (
@@ -73,6 +87,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="min-w-0 flex-1">{children}</main>
+
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

@@ -433,6 +433,44 @@ describe('capsules module (T-08)', () => {
     });
   });
 
+  describe('view filter (T-17): active excludes archived/trashed by default', () => {
+    it('default (active) view excludes archived and trashed capsules; view=archived/trashed scope to just those', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const activeId = (await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' })).body.capsule.id;
+      const archivedId = (await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' })).body.capsule.id;
+      const trashedId = (await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' })).body.capsule.id;
+      await authed(app, accessToken).post(`/v1/capsules/${archivedId}/archive`).send({});
+      await authed(app, accessToken).post(`/v1/capsules/${trashedId}/trash`).send({});
+
+      const activeList = await authed(app, accessToken).get('/v1/capsules');
+      const activeIds = activeList.body.data.map((c: { id: string }) => c.id);
+      expect(activeIds).toContain(activeId);
+      expect(activeIds).not.toContain(archivedId);
+      expect(activeIds).not.toContain(trashedId);
+
+      const archivedList = await authed(app, accessToken).get('/v1/capsules?view=archived');
+      expect(archivedList.body.data.map((c: { id: string }) => c.id)).toEqual([archivedId]);
+
+      const trashedList = await authed(app, accessToken).get('/v1/capsules?view=trashed');
+      expect(trashedList.body.data.map((c: { id: string }) => c.id)).toEqual([trashedId]);
+    });
+
+    it('POST /capsules/:id/purge permanently deletes a trashed capsule, but 403s a non-trashed one', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const id = (await authed(app, accessToken).post('/v1/capsules').send({ type: 'personal' })).body.capsule.id;
+
+      const tooEarly = await authed(app, accessToken).post(`/v1/capsules/${id}/purge`).send({});
+      expect(tooEarly.status).toBe(403);
+
+      await authed(app, accessToken).post(`/v1/capsules/${id}/trash`).send({});
+      const purge = await authed(app, accessToken).post(`/v1/capsules/${id}/purge`).send({});
+      expect(purge.status).toBe(204);
+
+      const getAfter = await authed(app, accessToken).get(`/v1/capsules/${id}`);
+      expect(getAfter.status).toBe(404);
+    });
+  });
+
   describe('seals validation', () => {
     it('rejects a legacy capsule with a place seal', async () => {
       const { app, accessToken } = await createVerifiedUser();

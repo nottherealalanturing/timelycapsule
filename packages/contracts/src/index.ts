@@ -8,3 +8,5 @@ export * from './reveal';
 export * from './guest';
 export * from './contacts';
 export * from './received';
+export * from './organization';
+export * from './search';

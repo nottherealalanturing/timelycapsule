@@ -11,7 +11,12 @@ function base64OrNull(buf: Buffer | null): string | null {
   return buf ? buf.toString('base64') : null;
 }
 
-export function toCapsule(row: CapsuleRow): Capsule {
+export interface CapsuleOrgExtra {
+  isFavorite?: boolean;
+  tagIds?: string[];
+}
+
+export function toCapsule(row: CapsuleRow, extra: CapsuleOrgExtra = {}): Capsule {
   return {
     id: row.id,
     publicId: row.publicId,
@@ -47,12 +52,14 @@ export function toCapsule(row: CapsuleRow): Capsule {
     legacyConfig: row.legacyConfig as Capsule['legacyConfig'],
     recurrence: row.recurrence as Capsule['recurrence'],
     breakGlass: row.breakGlass ?? 'disabled',
+    isFavorite: extra.isFavorite ?? false,
+    tagIds: extra.tagIds ?? [],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
 }
 
-export function toCapsuleListItem(row: CapsuleRow): CapsuleListItem {
-  const { contentDocEnc: _contentDocEnc, ownerKeyWrap: _ownerKeyWrap, ...rest } = toCapsule(row);
+export function toCapsuleListItem(row: CapsuleRow, extra: CapsuleOrgExtra = {}): CapsuleListItem {
+  const { contentDocEnc: _contentDocEnc, ownerKeyWrap: _ownerKeyWrap, ...rest } = toCapsule(row, extra);
   return rest;
 }

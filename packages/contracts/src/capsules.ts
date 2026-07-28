@@ -118,11 +118,23 @@ export const SetOwnerKeyWrapRequestSchema = z.object({
 });
 export type SetOwnerKeyWrapRequest = z.infer<typeof SetOwnerKeyWrapRequestSchema>;
 
+/**
+ * `view` scopes the timeline the way §5.10's Archive/Trash pages need
+ * (T-17) — `active` is the default main timeline and excludes both
+ * archived and trashed capsules, matching the fact that `archivedAt`/
+ * `trashedAt` are independent side-flags, not part of `CapsuleStateSchema`.
+ */
+export const CapsuleViewSchema = z.enum(['active', 'archived', 'trashed']);
+export type CapsuleView = z.infer<typeof CapsuleViewSchema>;
+
 export const ListCapsulesQuerySchema = z.object({
   state: CapsuleStateSchema.optional(),
   type: CapsuleTypeSchema.optional(),
   tag: z.string().optional(),
   q: z.string().optional(),
+  view: CapsuleViewSchema.default('active'),
+  favorite: z.coerce.boolean().optional(),
+  collectionId: z.string().uuid().optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
@@ -166,6 +178,8 @@ export const CapsuleSchema = z.object({
   legacyConfig: z.record(z.string(), z.unknown()).nullable(),
   recurrence: z.record(z.string(), z.unknown()).nullable(),
   breakGlass: z.enum(['disabled', 'allowed']),
+  isFavorite: z.boolean(),
+  tagIds: z.array(z.string().uuid()),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

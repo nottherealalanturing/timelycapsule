@@ -9,6 +9,7 @@ import { validateSeals } from './seals.js';
 import { getPlanLimits } from './entitlements.js';
 import {
   assertCanExtend,
+  assertCanPurge,
   assertCanRestore,
   assertCanSeal,
   assertCanTrash,
@@ -263,6 +264,31 @@ export async function restoreCapsule(db: Database, ownerId: string, capsuleId: s
 
   await audit(db, { actorType: 'user', actorId: ownerId, action: 'capsule.restored', subjectType: 'capsule', subjectId: capsuleId });
   return toCapsule(updated);
+}
+
+/**
+ * Deletes R2 objects then the capsule row (cascades the rest) — shared by
+ * the scheduler's automatic 30-day `trash_purge` handler and the owner's
+ * immediate "Delete forever" action (§5.10). No-ops if the capsule is
+ * already gone (redelivered scheduler job racing an immediate purge).
+ */
+export async function purgeCapsuleNow(db: Database, capsuleId: string): Promise<void> {
+  const media = await db.select({ storageKey: mediaItems.storageKey }).from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+  const { getStorageAdapter } = await import('../media/index.js');
+  const adapter = getStorageAdapter();
+  for (const item of media) {
+    if (item.storageKey) {
+      await adapter.deleteObject(item.storageKey);
+    }
+  }
+  await db.delete(capsules).where(eq(capsules.id, capsuleId));
+}
+
+export async function purgeCapsule(db: Database, ownerId: string, capsuleId: string): Promise<void> {
+  const row = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
+  assertCanPurge(row);
+  await purgeCapsuleNow(db, capsuleId);
+  await audit(db, { actorType: 'user', actorId: ownerId, action: 'capsule.purged', subjectType: 'capsule', subjectId: capsuleId });
 }
 
 export async function getCapsuleActivity(db: Database, ownerId: string, capsuleId: string): Promise<CapsuleActivityResponse> {

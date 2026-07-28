@@ -1,16 +1,16 @@
 import type { Capsule, CreateCapsuleRequest, ListCapsulesQuery, PatchCapsuleRequest } from '@tc/contracts';
-import { and, desc, eq, ilike, inArray, lt } from 'drizzle-orm';
+import { and, desc, eq, ilike, inArray, isNotNull, isNull, lt } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { buildPage, decodeCursor, type PageResult } from '../../lib/pagination.js';
 import { ApiError } from '../../lib/errors.js';
-import { capsuleTags, capsules, tags } from '../../db/schema/index.js';
+import { capsuleTags, capsules, collectionItems, favorites, tags } from '../../db/schema/index.js';
 import { generateUniquePublicId } from './public-id.js';
 import { getPlanLimits } from './entitlements.js';
 import { validateSeals, extractPassphraseHint } from './seals.js';
 import { assertCanArchive, assertCanDuplicate, assertCanPatch, assertCanUnarchive, assertUnlockAtWithinBounds } from './state-machine.js';
 import { recordVersionSnapshot } from './versions.js';
-import { toCapsule, toCapsuleListItem } from './mappers.js';
+import { toCapsule, toCapsuleListItem, type CapsuleOrgExtra } from './mappers.js';
 
 type CapsuleRow = typeof capsules.$inferSelect;
 
@@ -64,6 +64,22 @@ export async function createCapsule(db: Database, ownerId: string, input: Create
   return toCapsule(row);
 }
 
+/** Favorite-set + tagIds-per-capsule for a batch of capsules — shared by listCapsules (batch) and getCapsule (single). */
+async function loadOrgExtras(db: Database, ownerId: string, capsuleIds: string[]): Promise<Map<string, CapsuleOrgExtra>> {
+  const extras = new Map<string, CapsuleOrgExtra>();
+  if (capsuleIds.length === 0) return extras;
+
+  const [favoriteRows, tagRows] = await Promise.all([
+    db.select({ capsuleId: favorites.capsuleId }).from(favorites).where(and(eq(favorites.userId, ownerId), inArray(favorites.capsuleId, capsuleIds))),
+    db.select({ capsuleId: capsuleTags.capsuleId, tagId: capsuleTags.tagId }).from(capsuleTags).where(inArray(capsuleTags.capsuleId, capsuleIds)),
+  ]);
+
+  for (const id of capsuleIds) extras.set(id, { isFavorite: false, tagIds: [] });
+  for (const row of favoriteRows) extras.get(row.capsuleId)!.isFavorite = true;
+  for (const row of tagRows) extras.get(row.capsuleId)!.tagIds!.push(row.tagId);
+  return extras;
+}
+
 export async function listCapsules(
   db: Database,
   ownerId: string,
@@ -74,6 +90,22 @@ export async function listCapsules(
   if (query.type) conditions.push(eq(capsules.type, query.type));
   if (query.q) conditions.push(ilike(capsules.title, `%${query.q}%`));
   if (query.cursor) conditions.push(lt(capsules.createdAt, new Date(decodeCursor(query.cursor))));
+
+  // `view` scopes the timeline the way §5.10's Archive/Trash pages need
+  // (archivedAt/trashedAt are independent side-flags, not part of `state`).
+  // A collection is its own filtering dimension — it should show archived
+  // members too (only trashed/deleted capsules are excluded everywhere),
+  // so the default "active" exclusion only applies to the plain timeline.
+  if (query.view === 'archived') {
+    conditions.push(isNotNull(capsules.archivedAt));
+  } else if (query.view === 'trashed') {
+    conditions.push(isNotNull(capsules.trashedAt));
+  } else if (query.collectionId) {
+    conditions.push(isNull(capsules.trashedAt));
+  } else {
+    conditions.push(isNull(capsules.archivedAt));
+    conditions.push(isNull(capsules.trashedAt));
+  }
 
   if (query.tag) {
     const tagRows = await db
@@ -88,6 +120,40 @@ export async function listCapsules(
     conditions.push(inArray(capsules.id, ids));
   }
 
+  if (query.favorite) {
+    const favRows = await db.select({ capsuleId: favorites.capsuleId }).from(favorites).where(eq(favorites.userId, ownerId));
+    const ids = favRows.map((r) => r.capsuleId);
+    if (ids.length === 0) {
+      return { data: [], nextCursor: null };
+    }
+    conditions.push(inArray(capsules.id, ids));
+  }
+
+  if (query.collectionId) {
+    // A collection's own manual order (drag/up-down reorder) takes priority
+    // over the usual createdAt timeline ordering — small, unpaginated lists,
+    // matching 02-UX-DESIGN.md §5.10's "collection detail = filtered timeline".
+    const itemRows = await db
+      .select({ capsuleId: collectionItems.capsuleId, position: collectionItems.position })
+      .from(collectionItems)
+      .where(eq(collectionItems.collectionId, query.collectionId))
+      .orderBy(collectionItems.position);
+    const orderedIds = itemRows.map((r) => r.capsuleId);
+    if (orderedIds.length === 0) {
+      return { data: [], nextCursor: null };
+    }
+
+    const rows = await db
+      .select()
+      .from(capsules)
+      .where(and(...conditions, inArray(capsules.id, orderedIds)));
+    const rowsById = new Map(rows.map((row) => [row.id, row]));
+    const ordered = orderedIds.map((id) => rowsById.get(id)).filter((row): row is CapsuleRow => Boolean(row));
+
+    const extras = await loadOrgExtras(db, ownerId, ordered.map((row) => row.id));
+    return { data: ordered.map((row) => toCapsuleListItem(row, extras.get(row.id))), nextCursor: null };
+  }
+
   const rows = await db
     .select()
     .from(capsules)
@@ -96,12 +162,14 @@ export async function listCapsules(
     .limit(query.limit + 1);
 
   const page = buildPage(rows, query.limit, (row) => row.createdAt.toISOString());
-  return { data: page.data.map(toCapsuleListItem), nextCursor: page.nextCursor };
+  const extras = await loadOrgExtras(db, ownerId, page.data.map((row) => row.id));
+  return { data: page.data.map((row) => toCapsuleListItem(row, extras.get(row.id))), nextCursor: page.nextCursor };
 }
 
 export async function getCapsule(db: Database, ownerId: string, capsuleId: string): Promise<Capsule> {
   const row = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
-  return toCapsule(row);
+  const extras = await loadOrgExtras(db, ownerId, [capsuleId]);
+  return toCapsule(row, extras.get(capsuleId));
 }
 
 /**

@@ -48,6 +48,8 @@ export const ERROR_CODES = [
   'guest_capsule_limit',
   'guest_capsule_locked',
   'owner_key_wrap_already_set',
+  // T-17 organization
+  'tag_already_exists',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
