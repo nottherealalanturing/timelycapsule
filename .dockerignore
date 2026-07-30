@@ -1,0 +1,31 @@
+# Keeps the Docker build context (sent to the daemon before `turbo prune`
+# even runs) small and free of stale local artifacts that shouldn't leak
+# into the image.
+node_modules
+**/node_modules
+dist
+**/dist
+.next
+**/.next
+.expo
+**/.expo
+.turbo
+**/.turbo
+*.log
+
+.git
+.github
+
+.env
+.env.*
+!.env.*.example
+
+timely-capsule-api
+timelycapsule
+timelycapsule-mobile
+
+# Note: apps/web and apps/mobile are deliberately NOT excluded here even
+# though @tc/api's Dockerfile doesn't need their code — `turbo prune`
+# resolves the full workspace graph from pnpm-workspace.yaml and needs every
+# workspace package's directory to actually exist to do that; it discards
+# what @tc/api doesn't depend on itself once pruning completes.
