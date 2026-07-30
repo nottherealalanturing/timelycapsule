@@ -15,6 +15,23 @@ import { getQueue, stopQueue, promoteDueActions, sweep, reresolveWallClockAction
 const TICK_MS = Number(process.env.SCHEDULER_TICK_MS ?? 30_000);
 const DAILY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * T-19 dead-man's-switch: pings healthchecks.io on every successful tick, or
+ * its `/fail` variant on a tick that threw — this is what lets an external
+ * service notice "the scheduler stopped running" (crash/hang/OOM) even
+ * though nothing about that failure mode is visible to the API's own
+ * `/health` endpoint or to UptimeRobot. No-ops when unset (local dev/test).
+ */
+async function pingHealthcheck(ok: boolean): Promise<void> {
+  const url = process.env.HEALTHCHECKS_PING_URL;
+  if (!url) return;
+  try {
+    await fetch(ok ? url : `${url}/fail`, { method: 'GET' });
+  } catch (err) {
+    logger.warn({ event: 'healthcheck_ping_failed', err }, 'Failed to ping healthchecks.io');
+  }
+}
+
 async function main(): Promise<void> {
   const queue = await getQueue();
   logger.info({ event: 'scheduler_started', tickMs: TICK_MS }, 'Scheduler started');
@@ -43,8 +60,10 @@ async function main(): Promise<void> {
         await reresolveWallClockActions(db, systemClock);
         lastResolveAt = now;
       }
+      await pingHealthcheck(true);
     } catch (err) {
       logger.error({ event: 'scheduler_tick_failed', err }, 'Scheduler tick failed');
+      await pingHealthcheck(false);
     }
     await new Promise((resolve) => setTimeout(resolve, TICK_MS));
   }

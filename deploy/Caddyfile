@@ -1,0 +1,22 @@
+# Caddy automatically requests and renews a real TLS certificate (via Let's
+# Encrypt) for this domain the first time it starts — no manual cert
+# handling needed. This is the origin cert that Cloudflare's "Full (strict)"
+# SSL mode (see plan/PROGRESS.md) verifies against, so Cloudflare<->origin
+# traffic is real HTTPS end-to-end, not just client<->Cloudflare.
+{$API_DOMAIN} {
+	reverse_proxy api:4001
+
+	encode gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
