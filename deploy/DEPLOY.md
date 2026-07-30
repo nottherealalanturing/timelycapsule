@@ -1,6 +1,6 @@
 # T-19 production deploy — server setup runbook
 
-One-time manual setup on the EC2 VM (`55.59.102.62`), then all future
+One-time manual setup on the EC2 VM (`52.59.102.62`), then all future
 deploys are automatic via `.github/workflows/deploy.yml` on every push to
 `main` that passes CI.
 
@@ -8,7 +8,7 @@ deploys are automatic via `.github/workflows/deploy.yml` on every push to
 
 SSH in first:
 ```bash
-ssh -i ~/.ssh/timelycapsule-key.pem ubuntu@55.59.102.62
+ssh -i ~/.ssh/timelycapsule-key.pem ubuntu@52.59.102.62
 ```
 
 Then, on the server:
@@ -133,7 +133,7 @@ In the GitHub repo → **Settings → Secrets and variables → Actions**, add:
 
 | Secret | Value |
 |---|---|
-| `DEPLOY_HOST` | `55.59.102.62` |
+| `DEPLOY_HOST` | `52.59.102.62` |
 | `DEPLOY_USER` | `ubuntu` |
 | `DEPLOY_SSH_KEY` | contents of the **private** key (`timelycapsule-key.pem`) used to SSH in — paste the whole file including the `BEGIN`/`END` lines |
 | `DEPLOY_PATH` | `/opt/timelycapsule` |
