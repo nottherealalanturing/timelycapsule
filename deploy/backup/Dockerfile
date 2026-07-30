@@ -4,12 +4,17 @@
 # running any app code.
 FROM postgres:16-alpine
 
-RUN apk add --no-cache rclone bash gzip dcron
+RUN apk add --no-cache rclone bash gzip coreutils
 
 COPY backup.sh /scripts/backup.sh
-COPY crontab /etc/crontabs/root
-RUN chmod +x /scripts/backup.sh
+COPY run.sh /scripts/run.sh
+RUN chmod +x /scripts/backup.sh /scripts/run.sh
 
-# Foreground cron daemon so the container has a real PID 1 process and
-# `docker logs` / `restart: unless-stopped` work as expected.
-ENTRYPOINT ["crond", "-f", "-l", "2"]
+# A plain sleep-loop instead of Alpine's dcron: dcron calls setpgid on
+# itself when starting a job, which the kernel refuses once dcron is the
+# container's PID 1 (no parent process to hand pgid control to) — it
+# crash-looped on every container start with "setpgid: Operation not
+# permitted" before this was caught by actually running the container, not
+# just building the image. A sleep-until-next-3am loop needs no init
+# wrapper and has no such PID-1-specific behavior to trip over.
+ENTRYPOINT ["/scripts/run.sh"]

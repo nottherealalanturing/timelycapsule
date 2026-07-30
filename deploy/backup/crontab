@@ -1,4 +1,0 @@
-# Runs the backup at 03:00 UTC daily. Output redirected to the container's
-# own stdout (PID 1) so `docker logs backup` shows real job output instead
-# of it vanishing into cron's default syslog behavior.
-0 3 * * * /scripts/backup.sh >> /proc/1/fd/1 2>/proc/1/fd/2
