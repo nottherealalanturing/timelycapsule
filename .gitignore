@@ -15,6 +15,10 @@ build/
 .turbo/
 *.log
 
+# Cloudflare (T-20)
+.open-next/
+.wrangler/
+
 # Env
 .env
 .env.local

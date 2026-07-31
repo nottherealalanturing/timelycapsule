@@ -11,6 +11,7 @@ import {
   wrapCapsuleKeyWithPassphrase,
 } from '@tc/crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { track } from './analytics';
 import { capsulesApi, recipientsApi } from './api-client';
 import { decodeIvCiphertext, encodeIvCiphertext } from './capsule-crypto';
 import { useMasterKey } from './master-key-context';
@@ -118,6 +119,8 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
   // into a ref, updated synchronously alongside the state, sidesteps this —
   // those callbacks read contentDocRef.current instead of the state value.
   const contentDocRef = useRef<unknown>(EMPTY_DOC);
+  const contentAddedFiredRef = useRef(false);
+  const scheduleSetFiredRef = useRef(false);
 
   // --- Load + capsule-key bootstrap ---
   useEffect(() => {
@@ -207,6 +210,10 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
 
   const patch = useCallback(
     (fields: PatchCapsuleRequest) => {
+      if (!scheduleSetFiredRef.current && ('unlockAt' in fields || 'unlockLocal' in fields)) {
+        scheduleSetFiredRef.current = true;
+        track('schedule_set');
+      }
       pendingPatchRef.current = { ...pendingPatchRef.current, ...fields };
       setCapsule((prev) => (prev ? ({ ...prev, ...fields } as Capsule) : prev));
       cacheLocally();
@@ -217,6 +224,10 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
 
   const setContentDoc = useCallback(
     (doc: unknown) => {
+      if (!contentAddedFiredRef.current && JSON.stringify(doc) !== JSON.stringify(EMPTY_DOC)) {
+        contentAddedFiredRef.current = true;
+        track('content_added');
+      }
       contentDocRef.current = doc;
       setContentDocState(doc);
       cacheLocally();
