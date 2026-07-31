@@ -8,7 +8,7 @@ import '../../env.js';
 import { db, pool } from '../../db/client.js';
 import { errorHandler } from '../../middleware/error-handler.js';
 import { capsuleRecipients, capsules, notifications, outboundMessages, users } from '../../db/schema/index.js';
-import { emailWebhookRouter } from './webhook.js';
+import { emailWebhookRouter, TEST_WEBHOOK_SECRET } from './webhook.js';
 
 function buildTestApp() {
   const app = express();
@@ -40,7 +40,7 @@ function signedPost(app: express.Express, secret: string, body: unknown) {
 }
 
 describe('POST /webhooks/resend', () => {
-  const secret = process.env.RESEND_WEBHOOK_SECRET!;
+  const secret = process.env.RESEND_WEBHOOK_SECRET ?? TEST_WEBHOOK_SECRET;
   const createdIds: string[] = [];
   const createdUserIds: string[] = [];
 

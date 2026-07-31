@@ -14,6 +14,14 @@ interface ResendWebhookEvent {
   data: { email_id?: string; to?: string[] };
 }
 
+/**
+ * NODE_ENV=test fallback for RESEND_WEBHOOK_SECRET (see below) — exported so
+ * webhook.test.ts signs against this exact same value rather than each side
+ * independently reading process.env (which is what silently broke in real
+ * CI, where no apps/api/.env file exists to supply a real value).
+ */
+export const TEST_WEBHOOK_SECRET = 'whsec_dGVzdC1vbmx5LXBsYWNlaG9sZGVyLXNlY3JldA==';
+
 const HARD_BOUNCE_THRESHOLD = 2;
 
 /**
@@ -76,7 +84,11 @@ export function emailWebhookRouter(db: Database): Router {
 
   router.post('/webhooks/resend', async (req, res, next) => {
     try {
-      const secret = process.env.RESEND_WEBHOOK_SECRET;
+      // Ephemeral value under NODE_ENV=test — same pattern as T-04's JWT keys —
+      // so CI/local test runs need zero real config; webhook.test.ts signs
+      // against this exact same constant (TEST_WEBHOOK_SECRET).
+      const secret =
+        process.env.RESEND_WEBHOOK_SECRET ?? (process.env.NODE_ENV === 'test' ? TEST_WEBHOOK_SECRET : undefined);
       const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
       if (!secret || !rawBody) {
         throw ApiError.unauthorized('Webhook not configured');

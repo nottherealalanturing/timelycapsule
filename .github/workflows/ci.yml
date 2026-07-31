@@ -28,15 +28,6 @@ jobs:
           --health-retries 10
     env:
       DATABASE_URL: postgres://timelycapsule:timelycapsule@localhost:5433/timelycapsule
-      # Test-only placeholders — google-oauth.test.ts and webhook.test.ts sign/verify
-      # entirely locally (fake idTokens / svix's own Webhook.sign()), never calling the
-      # real Google or Resend APIs, so any correctly-shaped value works. These aren't
-      # real secrets and don't need to be GitHub Actions secrets. Real CI was failing on
-      # every run without them — this only ever passed locally because apps/api/.env
-      # (gitignored, real values) got auto-loaded there via process.loadEnvFile(),
-      # masking the gap; CI has no such file.
-      GOOGLE_OAUTH_WEB_CLIENT_ID: test-client-id.apps.googleusercontent.com
-      RESEND_WEBHOOK_SECRET: whsec_dGVzdC1vbmx5LXBsYWNlaG9sZGVyLXNlY3JldA==
     steps:
       - uses: actions/checkout@v4
 
