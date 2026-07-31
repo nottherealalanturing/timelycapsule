@@ -294,6 +294,41 @@ export async function changePassword(
   await revokeOtherSessions(db, userId, sessionId);
 }
 
+/**
+ * Sets a first encryption password for an OAuth-only account — the account
+ * has no passwordHash/masterKeyWrap yet (Google signup never generates one,
+ * since there's no password to derive it from), so unlike changePassword
+ * there's no existing password to verify and no old key to re-wrap from.
+ * Rejects if a password is already set — that account must use
+ * changePassword or forgot/reset instead.
+ */
+export async function setInitialPassword(
+  db: Database,
+  userId: string,
+  input: { newPassword: string; masterKeyWrap: string; recoveryKeyWrap: string },
+): Promise<User> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) {
+    throw ApiError.notFound('User not found');
+  }
+  if (user.passwordHash) {
+    throw ApiError.passwordAlreadySet();
+  }
+
+  const passwordHash = await hashPassword(input.newPassword);
+  const [updated] = await db
+    .update(users)
+    .set({
+      passwordHash,
+      masterKeyWrap: Buffer.from(input.masterKeyWrap, 'base64'),
+      recoveryKeyWrap: Buffer.from(input.recoveryKeyWrap, 'base64'),
+      updatedAt: new Date(),
+    })
+    .where(eq(users.id, userId))
+    .returning();
+  return toUserResponse(updated!);
+}
+
 export async function requestEmailChange(db: Database, userId: string, newEmail: string, currentPassword: string): Promise<void> {
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
   if (!user || !user.passwordHash || !(await verifyPassword(user.passwordHash, currentPassword))) {

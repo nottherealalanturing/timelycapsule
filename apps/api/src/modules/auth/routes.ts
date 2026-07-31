@@ -1,6 +1,7 @@
 import {
   ChangeEmailRequestSchema,
   ChangePasswordRequestSchema,
+  SetInitialPasswordRequestSchema,
   ConfirmEmailChangeRequestSchema,
   ForgotPasswordRequestSchema,
   GoogleOAuthRequestSchema,
@@ -228,6 +229,21 @@ export function authRouter(db: Database): Router {
       try {
         await service.changePassword(db, req.user!.id, req.user!.sessionId, req.body);
         res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/auth/password/set-initial',
+    requireAuth(),
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: SetInitialPasswordRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const user = await service.setInitialPassword(db, req.user!.id, req.body);
+        res.status(200).json({ user });
       } catch (err) {
         next(err);
       }

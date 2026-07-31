@@ -131,4 +131,8 @@ export class ApiError extends Error {
   static tagAlreadyExists(): ApiError {
     return new ApiError('tag_already_exists', 'A tag with this name already exists', 409);
   }
+
+  static passwordAlreadySet(): ApiError {
+    return new ApiError('password_already_set', 'This account already has a password — use change password instead', 409);
+  }
 }
