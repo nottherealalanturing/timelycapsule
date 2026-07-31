@@ -28,6 +28,15 @@ export function MasterKeyGate({ children }: { children: ReactNode }) {
   const [recoveryKit, setRecoveryKit] = useState<string | null>(null);
   const [savedConfirmed, setSavedConfirmed] = useState(false);
 
+  // Checked before `masterKey` deliberately: handleSetPassword below sets
+  // both masterKey and recoveryKit together, so if masterKey were checked
+  // first this dialog would never actually show — it'd short-circuit
+  // straight through to `children` the instant the key was set, silently
+  // skipping the mandatory recovery-kit nag entirely.
+  if (recoveryKit) {
+    return renderRecoveryKit(recoveryKit);
+  }
+
   if (masterKey) {
     return <>{children}</>;
   }
@@ -36,7 +45,7 @@ export function MasterKeyGate({ children }: { children: ReactNode }) {
     return null;
   }
 
-  if (recoveryKit) {
+  function renderRecoveryKit(kit: string) {
     return (
       <Dialog open onOpenChange={() => {}} title="Save your recovery code">
         <div className="flex flex-col gap-4">
@@ -46,9 +55,9 @@ export function MasterKeyGate({ children }: { children: ReactNode }) {
             time it will be shown.
           </p>
           <div className="rounded-lg border border-[var(--color-text-secondary)]/20 bg-[var(--color-surface-raised)] p-4 text-center font-mono text-lg tracking-wider text-foreground">
-            {recoveryKit}
+            {kit}
           </div>
-          <Button type="button" variant="ghost" onClick={() => navigator.clipboard.writeText(recoveryKit)}>
+          <Button type="button" variant="ghost" onClick={() => navigator.clipboard.writeText(kit)}>
             Copy to clipboard
           </Button>
           <label className="flex items-start gap-2 text-sm text-secondary">
