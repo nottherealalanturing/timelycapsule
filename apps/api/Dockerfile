@@ -33,6 +33,20 @@ WORKDIR /app
 COPY --from=pruner /app/out/json/ .
 RUN pnpm install --frozen-lockfile
 COPY --from=pruner /app/out/full/ .
+# `turbo prune` only copies root-level files it already knows about
+# (package.json, the lockfile, pnpm-workspace.yaml, turbo.json) plus each
+# pruned package's own directory — it does NOT copy other repo-root files
+# like tsconfig.base.json, since it isn't part of any single package.
+# apps/api/tsconfig.json `extends` this file; without it, tsx/esbuild
+# silently fails to resolve the "jsx": "react-jsx" setting at runtime and
+# falls back to the classic transform, which needs `React` in scope — the
+# email templates (T-07) don't import React (correct, for the automatic
+# runtime), so every email send crashed with "ReferenceError: React is not
+# defined" in production despite passing locally and in tests, where the
+# real tsconfig.base.json is always present on disk. Caught only by
+# actually triggering a real signup/OAuth email send against the deployed
+# container, not by any build or test step.
+COPY tsconfig.base.json ./tsconfig.base.json
 
 FROM base AS runner
 WORKDIR /app
