@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import '../../env.js';
 import { db, pool } from '../../db/client.js';
 import { capsuleRecipients, capsules, oauthAccounts, users } from '../../db/schema/index.js';
+import { TEST_GOOGLE_CLIENT_ID } from './google.js';
 import { googleOAuth } from './service.js';
 
 const createdUserIds: string[] = [];
@@ -24,7 +25,7 @@ beforeAll(async () => {
     new SignJWT(payload)
       .setProtectedHeader({ alg: 'RS256', kid: 'test-key' })
       .setIssuer('https://accounts.google.com')
-      .setAudience(process.env.GOOGLE_OAUTH_WEB_CLIENT_ID!)
+      .setAudience(process.env.GOOGLE_OAUTH_WEB_CLIENT_ID ?? TEST_GOOGLE_CLIENT_ID)
       .setIssuedAt()
       .setExpirationTime('5m')
       .sign(privateKey);

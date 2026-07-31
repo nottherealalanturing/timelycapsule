@@ -25,11 +25,23 @@ export interface GoogleIdTokenPayload {
  * expiry — all via `jose`). `jwks` is injectable so tests can verify against
  * a locally-generated keypair instead of hitting Google's real endpoint.
  */
+/**
+ * NODE_ENV=test fallback for GOOGLE_OAUTH_WEB_CLIENT_ID — exported so
+ * google-oauth.test.ts signs fake idTokens against this exact same audience
+ * value rather than each side independently reading process.env (which is
+ * what silently broke in real CI, where no apps/api/.env file exists).
+ */
+export const TEST_GOOGLE_CLIENT_ID = 'test-client-id.apps.googleusercontent.com';
+
 export async function verifyGoogleIdToken(
   idToken: string,
   jwks: JWTVerifyGetKey = googleJwks(),
 ): Promise<GoogleIdTokenPayload> {
-  const clientId = process.env.GOOGLE_OAUTH_WEB_CLIENT_ID;
+  // Ephemeral value under NODE_ENV=test — same pattern as T-04's JWT keys —
+  // so CI/local test runs need zero real config; tests inject their own
+  // `jwks` above and sign fake idTokens against this same audience value.
+  const clientId =
+    process.env.GOOGLE_OAUTH_WEB_CLIENT_ID ?? (process.env.NODE_ENV === 'test' ? TEST_GOOGLE_CLIENT_ID : undefined);
   if (!clientId) {
     throw new Error('GOOGLE_OAUTH_WEB_CLIENT_ID is not set');
   }
