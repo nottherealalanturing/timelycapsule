@@ -125,6 +125,22 @@ export const ChangePasswordRequestSchema = z.object({
 });
 export type ChangePasswordRequest = z.infer<typeof ChangePasswordRequestSchema>;
 
+/**
+ * Sets a first encryption password for an OAuth-only account (no prior
+ * passwordHash/masterKeyWrap) — distinct from ChangePassword, which
+ * requires knowing an existing password to re-wrap the master key under.
+ * A Google-only signup never generates a master key at all (no password to
+ * derive it from), so this is the only path such an account has to
+ * establish one; both the new masterKeyWrap and a fresh recoveryKeyWrap
+ * are generated client-side, exactly like password signup.
+ */
+export const SetInitialPasswordRequestSchema = z.object({
+  newPassword: PasswordSchema,
+  masterKeyWrap: z.string().min(1),
+  recoveryKeyWrap: z.string().min(1),
+});
+export type SetInitialPasswordRequest = z.infer<typeof SetInitialPasswordRequestSchema>;
+
 export const ChangeEmailRequestSchema = z.object({
   newEmail: z.string().email(),
   currentPassword: z.string().min(1),

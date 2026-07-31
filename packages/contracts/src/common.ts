@@ -50,6 +50,8 @@ export const ERROR_CODES = [
   'owner_key_wrap_already_set',
   // T-17 organization
   'tag_already_exists',
+  // T-20 (production bug fix) OAuth-only accounts setting a first password
+  'password_already_set',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

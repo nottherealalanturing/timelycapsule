@@ -73,6 +73,7 @@ import {
   SendAnnounceRequestSchema,
   SessionsResponseSchema,
   SetContactGroupMemberRequestSchema,
+  SetInitialPasswordRequestSchema,
   SignupRequestSchema,
   StorageResponseSchema,
   TagResponseSchema,
@@ -119,6 +120,7 @@ import {
   type ReorderCollectionItemsRequest,
   type ReportRequest,
   type ResetPasswordRequest,
+  type SetInitialPasswordRequest,
   type SignupRequest,
   type VerifyEmailRequest,
 } from '@tc/contracts';
@@ -264,6 +266,13 @@ export const authApi = {
 
   changePassword: (input: ChangePasswordRequest) =>
     request('/auth/password/change', z.void(), { method: 'POST', auth: true, body: ChangePasswordRequestSchema.parse(input) }),
+
+  setInitialPassword: (input: SetInitialPasswordRequest) =>
+    request('/auth/password/set-initial', MeResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: SetInitialPasswordRequestSchema.parse(input),
+    }),
 
   requestEmailChange: (input: ChangeEmailRequest) =>
     request('/me/email/change', z.unknown(), { method: 'POST', auth: true, body: ChangeEmailRequestSchema.parse(input) }),

@@ -1,6 +1,13 @@
 'use client';
 
-import { unwrapMasterKeyWithPassword, wrapMasterKeyWithPassword } from '@tc/crypto';
+import {
+  formatRecoveryCode,
+  generateMasterKey,
+  generateRecoveryCode,
+  unwrapMasterKeyWithPassword,
+  wrapMasterKeyWithPassword,
+  wrapMasterKeyWithRecoveryCode,
+} from '@tc/crypto';
 import { Button, Input, OtpInput, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -78,6 +85,81 @@ function PasswordChangeForm() {
       {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
       <Button type="submit" loading={mutation.isPending} disabled={!currentPassword || !newPassword}>
         Change password
+      </Button>
+    </form>
+  );
+}
+
+/**
+ * Google-only accounts have no passwordHash/masterKeyWrap yet (nothing to
+ * derive a key from at signup) — PasswordChangeForm below requires an
+ * existing password to re-wrap from, which doesn't apply here. This is the
+ * Settings-page counterpart to MasterKeyGate's same first-password flow.
+ */
+function SetInitialPasswordForm() {
+  const { setUser } = useAuth();
+  const [password, setPassword] = useState('');
+  const [recoveryKit, setRecoveryKit] = useState<string | null>(null);
+  const [savedConfirmed, setSavedConfirmed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const key = generateMasterKey();
+      const masterKeyWrap = await wrapMasterKeyWithPassword(key, password);
+      const recoveryCodeBytes = generateRecoveryCode();
+      const recoveryKeyWrap = await wrapMasterKeyWithRecoveryCode(key, recoveryCodeBytes);
+      const { user: updated } = await authApi.setInitialPassword({ newPassword: password, masterKeyWrap, recoveryKeyWrap });
+      return { updated, recoveryKit: formatRecoveryCode(recoveryCodeBytes) };
+    },
+    onSuccess: ({ updated, recoveryKit: kit }) => {
+      setUser(updated);
+      setPassword('');
+      setError(null);
+      setRecoveryKit(kit);
+    },
+    onError: (err) => setError(err instanceof ApiClientError ? err.message : 'Something went wrong'),
+  });
+
+  if (recoveryKit) {
+    return (
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-secondary">
+          Save this recovery code somewhere safe — it&apos;s the only time it will be shown.
+        </p>
+        <div className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-surface-raised)] p-3 text-center font-mono text-sm tracking-wider text-foreground">
+          {recoveryKit}
+        </div>
+        <Button type="button" variant="ghost" onClick={() => navigator.clipboard.writeText(recoveryKit)}>
+          Copy to clipboard
+        </Button>
+        <label className="flex items-start gap-2 text-sm text-secondary">
+          <input type="checkbox" checked={savedConfirmed} onChange={(e) => setSavedConfirmed(e.target.checked)} className="mt-0.5" />
+          I&apos;ve saved this recovery code somewhere safe.
+        </label>
+        <Button type="button" disabled={!savedConfirmed} onClick={() => setRecoveryKit(null)}>
+          Done
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        mutation.mutate();
+      }}
+    >
+      <p className="text-sm text-secondary">
+        You signed up with Google, so there&apos;s no password yet — capsule content is end-to-end encrypted and
+        needs one to unlock.
+      </p>
+      <Input label="Password" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      <Button type="submit" loading={mutation.isPending} disabled={password.length < 8}>
+        Set password
       </Button>
     </form>
   );
@@ -163,7 +245,7 @@ export default function AccountSettingsPage() {
 
       <section className="flex flex-col gap-3">
         <h2 className="font-[var(--font-display)] text-lg text-foreground">Password</h2>
-        <PasswordChangeForm />
+        {user?.masterKeyWrap ? <PasswordChangeForm /> : <SetInitialPasswordForm />}
       </section>
 
       <section className="flex flex-col gap-3">
