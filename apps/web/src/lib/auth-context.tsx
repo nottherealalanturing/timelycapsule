@@ -10,6 +10,7 @@ import {
 } from '@tc/crypto';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { track } from './analytics';
 import { authApi } from './api-client';
 import { useMasterKey } from './master-key-context';
 import { clearTokens, getTokens, setTokens } from './token-store';
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Already unwrapped in memory from generation above — no need to
       // round-trip through unlockWithPassword.
       setMasterKey(masterKey);
+      track('signup_completed');
       return { user: newUser, recoveryKit };
     },
     [setUser, setMasterKey],

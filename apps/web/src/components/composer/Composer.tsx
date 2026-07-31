@@ -2,7 +2,8 @@
 
 import { Button, Skeleton, useToast } from '@tc/ui-web';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { track } from '../../lib/analytics';
 import { capsulesApi } from '../../lib/api-client';
 import { type AutosaveStatus, useCapsuleDraft } from '../../lib/use-capsule-draft';
 import { CoverBlock } from './CoverBlock';
@@ -44,6 +45,13 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
   const [ceremonyOpen, setCeremonyOpen] = useState(false);
   const [sealing, setSealing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const openedFiredRef = useRef(false);
+
+  useEffect(() => {
+    if (openedFiredRef.current) return;
+    openedFiredRef.current = true;
+    track('composer_opened');
+  }, []);
 
   async function handleClose() {
     await draft.flush();
@@ -62,6 +70,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
     try {
       await draft.flush();
       await capsulesApi.seal(capsuleId);
+      track('capsule_sealed', { type: draft.capsule?.type });
       // Only now — right after seal succeeds — does "something is waiting" become true.
       // The link is built from the capsule key still held in this session's memory; the
       // server never sees it (T-14 decisions log).
