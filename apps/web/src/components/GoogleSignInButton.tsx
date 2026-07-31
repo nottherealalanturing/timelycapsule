@@ -22,6 +22,18 @@ export interface GoogleSignInButtonProps {
 /** Google Identity Services button — 02-UX-DESIGN.md §5.2 ("Apple + Google buttons first"). */
 export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Mirrors the latest callback into a ref so the init effect below can stay
+  // mount-only ([] deps) without going stale — callers pass a plain inline
+  // function (a fresh reference every render), which previously sat in the
+  // effect's dependency array and caused initialize()/renderButton() to
+  // re-run on every parent re-render, stacking a new Google-rendered
+  // button/iframe into the same container each time rather than replacing
+  // it. That's what made clicks flaky in practice: a stale, already-
+  // superseded button could still be the one actually receiving the click.
+  const onCredentialRef = useRef(onCredential);
+  useEffect(() => {
+    onCredentialRef.current = onCredential;
+  }, [onCredential]);
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_OAUTH_WEB_CLIENT_ID;
@@ -29,9 +41,12 @@ export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
 
     function render() {
       if (!window.google || !containerRef.current) return;
+      // Defensive clear in case this ever runs more than once for any
+      // other reason — renderButton() only appends, it never replaces.
+      containerRef.current.innerHTML = '';
       window.google.accounts.id.initialize({
         client_id: clientId!,
-        callback: (response) => onCredential(response.credential),
+        callback: (response) => onCredentialRef.current(response.credential),
       });
       window.google.accounts.id.renderButton(containerRef.current, {
         theme: 'outline',
@@ -53,7 +68,7 @@ export function GoogleSignInButton({ onCredential }: GoogleSignInButtonProps) {
     return () => {
       script.remove();
     };
-  }, [onCredential]);
+  }, []);
 
   if (!process.env.NEXT_PUBLIC_GOOGLE_OAUTH_WEB_CLIENT_ID) {
     return null;
