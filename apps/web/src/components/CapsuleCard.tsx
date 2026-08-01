@@ -26,7 +26,7 @@ export function CapsuleCard({ capsule, className }: { capsule: CapsuleListItem; 
     <Link
       href={`/capsule/${capsule.id}`}
       className={cn(
-        'flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 transition hover:shadow-[var(--shadow-md)]',
+        'flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 transition hover:shadow-md',
         className,
       )}
     >

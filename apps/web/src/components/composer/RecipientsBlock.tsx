@@ -135,7 +135,7 @@ export function RecipientsBlock({
             }}
           />
           {suggestions.length > 0 ? (
-            <ul className="absolute z-10 mt-1 w-full rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] py-1 shadow-[var(--shadow-md)]">
+            <ul className="absolute z-10 mt-1 w-full rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] py-1 shadow-md">
               {suggestions.map((contact) => (
                 <li key={contact.id}>
                   <button

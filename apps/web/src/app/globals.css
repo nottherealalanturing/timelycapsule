@@ -12,55 +12,46 @@
 @source "../../../../packages/ui-web/src";
 
 /*
- * Tailwind v4 theme mapping onto Meridian tokens (packages/ui-web/src/tokens.css).
- * Semantic Tailwind utilities (bg-accent, text-secondary, rounded-card, ...)
- * read from these — never hardcode a hex value in a component.
+ * ── THEMED tokens: @theme, NOT @theme inline ───────────────────────────
+ *
+ * `inline` substitutes a token's value at BUILD time, so the utility is
+ * frozen to whatever `:root` held. That silently breaks every themed
+ * utility: `text-foreground` compiled to the dark ink and kept it in the
+ * light theme, and `--color-foreground` did not exist at runtime at all.
+ * The bug predates Meridian V2 — it has been in place since T-06 — and was
+ * invisible because V1's `:root` was the light theme, so only dark mode was
+ * wrong, and only for text.
+ *
+ * Plain `@theme` emits a real custom property holding a live `var()`
+ * reference, which re-resolves under `[data-theme]` and inside `.tc-record`.
+ *
+ * Keys here must NOT collide with a token name in tokens.css: `--x: var(--x)`
+ * is a cycle without `inline`. Where a collision exists, the token is
+ * consumed directly as `var(--color-danger)`, which is live anyway — that is
+ * why only the aliases actually used as utilities are declared.
  */
-@theme inline {
+@theme {
   --color-background: var(--color-bg-primary);
   --color-raised: var(--color-bg-raised);
   --color-foreground: var(--color-text-primary);
   --color-secondary: var(--color-text-secondary);
   --color-accent: var(--color-accent-gold);
-  --color-accent-violet: var(--color-accent-violet);
-  --color-success: var(--color-success);
-  --color-warning: var(--color-warning);
-  --color-danger: var(--color-danger);
-  --color-info: var(--color-info);
-
-  /* One per real CapsuleStateSchema value. V1 mapped `opened`/`legacy`,
-     which are not capsule states (one is a per-recipient status, the other
-     a capsule type) and were dropped from tokens.css at T-12 — these two
-     utilities have resolved to nothing ever since. `sealing`/`expired` were
-     missing entirely. Corrected here. */
-  --color-state-draft: var(--color-state-draft);
-  --color-state-sealing: var(--color-state-sealing);
-  --color-state-sealed: var(--color-state-sealed);
-  --color-state-unlocked: var(--color-state-unlocked);
-  --color-state-expired: var(--color-state-expired);
-  --color-state-withdrawn: var(--color-state-withdrawn);
-
-  /* Register surfaces. A record paints on --color-record-surface, never on
-     the page background — design/06 §Constraint 1. */
-  --color-record-surface: var(--r-surface);
-  --color-record-ink: var(--r-ink);
-  --color-record-muted: var(--r-muted);
-  --color-record-rule: var(--r-rule);
-  --color-record-accent: var(--r-verdigris);
-
   --color-overlay: var(--color-bg-overlay);
-  --color-rule: var(--color-rule);
-  --color-rule-strong: var(--color-rule-strong);
-  --color-interactive: var(--color-interactive);
 
-  /* Temperature ramp — markers, rules and glyphs only. Never text. */
-  --color-temp-1: var(--i-temp-1);
-  --color-temp-2: var(--i-temp-2);
-  --color-temp-3: var(--i-temp-3);
-  --color-temp-4: var(--i-temp-4);
-  --color-temp-5: var(--i-temp-5);
-  --color-temp-6: var(--i-temp-6);
+  /* Elevation is themed too — the instrument barely lifts, the record always
+     casts. Sourced from --elev-* so these names do not cycle. */
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
+  --shadow-record: var(--elev-record);
+}
 
+/*
+ * ── NON-THEMED tokens: safe to inline ──────────────────────────────────
+ * Type, radius and motion are identical in both themes and both registers,
+ * so build-time substitution costs nothing here.
+ */
+@theme inline {
   /* Pairing C. Loaded and self-hosted by next/font in layout.tsx; tokens.css
      already resolves the generated family names, so these just expose them
      as Tailwind utilities.
@@ -79,13 +70,7 @@
   --radius-card: var(--radius-card);
   --radius-modal: var(--radius-modal);
   --radius-pill: var(--radius-pill);
-
   --radius-record: var(--radius-record);
-
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
-  --shadow-record: var(--shadow-record);
 
   /* Motion — three tiers decided by consequence (design/07 §VI).
      duration-instant / duration-considered / ease-instant / ... */

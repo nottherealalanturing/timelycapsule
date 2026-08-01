@@ -18,7 +18,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <Link href="/" className="font-[var(--font-display)] text-2xl text-foreground">
         TimelyCapsule
       </Link>
-      <div className="w-full max-w-[400px] rounded-[var(--radius-card)] bg-[var(--color-bg-raised)] p-8 shadow-[var(--shadow-md)]">
+      <div className="w-full max-w-[400px] rounded-[var(--radius-card)] bg-[var(--color-bg-raised)] p-8 shadow-md">
         {children}
       </div>
     </div>

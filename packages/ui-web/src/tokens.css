@@ -111,6 +111,11 @@
      so this inverts. */
   --color-on-accent: var(--i-ground);
 
+  /* Same discipline for the destructive fill. Danger is a mid-tone in both
+     registers, so neither pure white nor pure ink is safe by default —
+     both values below are measured, not assumed. */
+  --color-on-danger: var(--i-ground);
+
   --color-success: var(--i-success);
   --color-warning: var(--i-warning);
   --color-danger: var(--i-danger);
@@ -205,10 +210,10 @@
      value, not by drop shadows. The RECORD always casts, in both themes:
      that shadow is what makes it read as an object lying in a dark room
      rather than a panel of background (design/06 §Constraint 1). */
-  --shadow-sm: none;
-  --shadow-md: 0 1px 0 rgba(0, 0, 0, 0.22);
-  --shadow-lg: 0 2px 0 rgba(0, 0, 0, 0.24), 0 18px 44px rgba(0, 0, 0, 0.3);
-  --shadow-record: 0 1px 0 rgba(0, 0, 0, 0.2), 0 16px 40px rgba(0, 0, 0, 0.26);
+  --elev-sm: none;
+  --elev-md: 0 1px 0 rgba(0, 0, 0, 0.22);
+  --elev-lg: 0 2px 0 rgba(0, 0, 0, 0.24), 0 18px 44px rgba(0, 0, 0, 0.3);
+  --elev-record: 0 1px 0 rgba(0, 0, 0, 0.2), 0 16px 40px rgba(0, 0, 0, 0.26);
 
   /* ══ MOTION ═══════════════════════════════════════════════════════════
      Three tiers, decided by consequence, never by aesthetics
@@ -254,6 +259,7 @@
   --i-brass: #6e5a0e; /* 5.55 AA — still WAITING, still nothing else */
   --i-steel: #2c3a4a; /* 9.59 AAA */
   --color-on-accent: var(--r-raised); /* brass is dark here — invert */
+  --color-on-danger: var(--r-raised);
   --i-rule: rgba(22, 24, 26, 0.14);
   --i-rule-strong: rgba(22, 24, 26, 0.28);
 
@@ -272,10 +278,10 @@
      reading as an object. It lifts. */
   --r-surface: var(--r-raised);
 
-  --shadow-sm: none;
-  --shadow-md: 0 1px 2px rgba(22, 24, 26, 0.07);
-  --shadow-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
-  --shadow-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
+  --elev-sm: none;
+  --elev-md: 0 1px 2px rgba(22, 24, 26, 0.07);
+  --elev-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
+  --elev-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
 }
 
 @media (prefers-color-scheme: light) {
@@ -288,6 +294,7 @@
     --i-brass: #6e5a0e;
     --i-steel: #2c3a4a;
     --color-on-accent: var(--r-raised);
+    --color-on-danger: var(--r-raised);
     --i-rule: rgba(22, 24, 26, 0.14);
     --i-rule-strong: rgba(22, 24, 26, 0.28);
 
@@ -304,11 +311,87 @@
 
     --r-surface: var(--r-raised);
 
-    --shadow-sm: none;
-    --shadow-md: 0 1px 2px rgba(22, 24, 26, 0.07);
-    --shadow-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
-    --shadow-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
+    --elev-sm: none;
+    --elev-md: 0 1px 2px rgba(22, 24, 26, 0.07);
+    --elev-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
+    --elev-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
   }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   THE REGISTER SWITCH
+
+   `.tc-record` re-points the SEMANTIC layer at the record palette for its
+   whole subtree. That is the entire mechanism — any primitive rendered
+   inside a Record (a Button, an Input, a StateChip) re-registers on its own,
+   because every component reads semantic names rather than raw ones.
+
+   It sets a surface and a boundary, never a page background. A record is an
+   object lying in a dark room; the moment it becomes the ground, Gate 1's
+   ceremony dies (design/06 §Constraint 1).
+   ══════════════════════════════════════════════════════════════════════ */
+.tc-record {
+  --color-bg-primary: var(--r-surface);
+  --color-bg-raised: var(--r-raised);
+  --color-bg-overlay: var(--r-raised);
+  --color-text-primary: var(--r-ink);
+  --color-text-secondary: var(--r-muted);
+  --color-rule: var(--r-rule);
+  --color-rule-strong: var(--r-rule-strong);
+  --color-accent-gold: var(--r-temp-6);
+  --color-on-accent: var(--r-raised);
+  --color-interactive: var(--r-iron);
+  --color-accent-violet: var(--r-iron);
+  --color-success: var(--r-success);
+  --color-warning: var(--r-warning);
+  --color-danger: var(--r-danger);
+  --color-on-danger: var(--r-raised);
+  --color-info: var(--r-iron);
+
+  --color-state-draft: var(--r-muted);
+  --color-state-sealing: var(--r-iron);
+  --color-state-sealed: var(--r-temp-6);
+  --color-state-unlocked: var(--r-success);
+  --color-state-expired: color-mix(in srgb, var(--r-ink) 38%, transparent);
+  --color-state-withdrawn: var(--r-muted);
+
+  /*
+   * The Tailwind alias layer must be re-declared here too, not just the
+   * tokens above.
+   *
+   * A custom property is resolved on the element that DECLARES it. Tailwind
+   * emits `--color-foreground: var(--color-text-primary)` on `:root`, so it
+   * resolves once against the root's values and descendants inherit that
+   * finished colour — re-pointing `--color-text-primary` inside this scope
+   * has no effect on it. Re-declaring the alias here makes it resolve
+   * against the record's values instead.
+   *
+   * Rule: any scope that re-points a token must re-point its alias. Missing
+   * this put instrument-muted text on paper at 2.56:1.
+   */
+  --color-background: var(--color-bg-primary);
+  --color-raised: var(--color-bg-raised);
+  --color-foreground: var(--color-text-primary);
+  --color-secondary: var(--color-text-secondary);
+  --color-accent: var(--color-accent-gold);
+  --color-overlay: var(--color-bg-overlay);
+
+  background: var(--r-surface);
+  color: var(--r-ink);
+  font-family: var(--font-record);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   FOCUS
+
+   Keyboard focus is never invisible. design/07 §XIII treats accessibility
+   as the trust argument rather than a compliance exercise: a product whose
+   premise is *this will reach the person you intend* cannot ship a path
+   that fails for someone not using a mouse.
+   ══════════════════════════════════════════════════════════════════════ */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-interactive);
+  outline-offset: 2px;
 }
 
 /* ══════════════════════════════════════════════════════════════════════

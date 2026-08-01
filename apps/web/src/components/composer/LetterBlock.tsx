@@ -112,7 +112,7 @@ export function LetterBlock({ draft }: { draft: CapsuleDraft }) {
           )}
         />
         {commands.length > 0 ? (
-          <div className="absolute left-4 top-full z-20 mt-1 w-48 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-1 shadow-[var(--shadow-md)]">
+          <div className="absolute left-4 top-full z-20 mt-1 w-48 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-1 shadow-md">
             {commands.map((cmd) => (
               <button
                 key={cmd.label}

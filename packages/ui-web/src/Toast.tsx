@@ -41,10 +41,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {current ? (
           <RadixToast.Root
             className={cn(
-              'rounded-[var(--radius-input)] px-4 py-3 shadow-[var(--shadow-md)] text-sm',
+              'rounded-[var(--radius-input)] px-4 py-3 shadow-md text-sm',
               current.variant === 'danger'
-                ? 'bg-[var(--color-danger)] text-white'
-                : 'bg-[var(--color-bg-raised)] text-foreground border border-[var(--color-text-secondary)]/20',
+                ? 'bg-[var(--color-danger)] text-[var(--color-on-danger)]'
+                : 'bg-[var(--color-bg-raised)] text-foreground border border-[var(--color-rule)]',
             )}
             onOpenChange={(open) => {
               if (!open) setCurrent(null);

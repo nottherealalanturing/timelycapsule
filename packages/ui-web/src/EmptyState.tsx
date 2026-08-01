@@ -11,7 +11,7 @@ export function EmptyState({ icon, title, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
       {icon ? <div aria-hidden>{icon}</div> : null}
-      <p className="font-[var(--font-display)] text-lg text-foreground">{title}</p>
+      <p className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">{title}</p>
       {action}
     </div>
   );

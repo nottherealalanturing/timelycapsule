@@ -24,19 +24,22 @@ export function Dialog({ open, onOpenChange, title, description, children, width
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       <RadixDialog.Portal>
-        <RadixDialog.Overlay className="fixed inset-0 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in" />
+        {/* A scrim, not a spectacle. No entrance animation: opening a dialog is
+            reversible, so it belongs to the instant tier (design/07 §VI). */}
+        <RadixDialog.Overlay className="fixed inset-0 bg-[color-mix(in_srgb,var(--color-bg-primary)_72%,transparent)]" />
         <RadixDialog.Content
           className={cn(
             'fixed left-1/2 top-1/2 w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2',
-            'rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] p-6 shadow-[var(--shadow-lg)]',
+            'rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] p-6 shadow-lg',
+            'border border-[var(--color-rule)]',
             WIDTH_CLASSES[width],
           )}
         >
-          <RadixDialog.Title className="font-[var(--font-display)] text-lg text-foreground">
+          <RadixDialog.Title className="text-[length:var(--text-title-s)] font-semibold leading-[var(--lh-heading)] text-foreground">
             {title}
           </RadixDialog.Title>
           {description ? (
-            <RadixDialog.Description className="mt-1 text-sm text-secondary">
+            <RadixDialog.Description className="mt-1.5 text-[length:var(--text-body-s)] text-secondary">
               {description}
             </RadixDialog.Description>
           ) : null}

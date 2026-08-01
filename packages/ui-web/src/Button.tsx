@@ -14,11 +14,18 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
 }
 
+/*
+ * Fills carry their own foreground token. V1 used `text-foreground` on the
+ * brass fill and `text-white` on danger — 1.54:1 and 2.94:1 respectively,
+ * both well under AA. Brass and danger are mid-to-light tones, so the safe
+ * foreground flips with the theme; `--color-on-accent`/`--color-on-danger`
+ * hold the measured value for each register (design/07 §XIII).
+ */
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-foreground hover:brightness-95',
-  secondary: 'border border-[var(--color-text-secondary)]/40 text-foreground hover:bg-[var(--color-bg-raised)]',
+  primary: 'bg-[var(--color-accent-gold)] text-[var(--color-on-accent)] hover:brightness-95',
+  secondary: 'border border-[var(--color-rule-strong)] text-foreground hover:bg-[var(--color-bg-raised)]',
   ghost: 'text-foreground hover:bg-[var(--color-bg-raised)]',
-  destructive: 'bg-[var(--color-danger)] text-white hover:brightness-95',
+  destructive: 'bg-[var(--color-danger)] text-[var(--color-on-danger)] hover:brightness-95',
 };
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {
@@ -37,23 +44,27 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       ref={ref}
       disabled={disabled || loading}
       className={cn(
-        'inline-flex items-center justify-center rounded-[var(--radius-input)] font-medium transition',
+        'motion-instant inline-flex items-center justify-center rounded-[var(--radius-input)] font-medium',
         'disabled:opacity-40 disabled:pointer-events-none',
         VARIANT_CLASSES[variant],
         SIZE_CLASSES[size],
         fullWidth && 'w-full',
         className,
       )}
+      aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? (
-        <span
-          className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-current border-t-transparent"
-          aria-hidden
-        />
-      ) : (
-        children
-      )}
+      {/*
+       * V1 swapped the label for a spinning ring. Two things wrong with that:
+       * spinners are banned outright (design/07 §VI.3, §XVI), and replacing
+       * the children stripped the button of its accessible name for exactly
+       * as long as the user most needed to know what was happening.
+       *
+       * V2 keeps the label, disables the control, and marks it aria-busy.
+       * The state is carried in text and semantics, never in motion
+       * (design/07 §V.4).
+       */}
+      {children}
     </button>
   );
 });

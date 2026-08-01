@@ -1,0 +1,45 @@
+{
+  "out": "design/14-layer-4-primitives.html",
+  "layer": "4",
+  "title": "Primitive components, and the bug that had frozen every themed utility since T-06",
+  "subtitle": "Eleven primitives audited, two new ones added, and a pre-existing Tailwind misconfiguration found that had been silently freezing every themed colour to its :root value for months.",
+  "shots": ["specimen", "login", "landing", "guest"],
+  "shotsNote": "<div class=\"note\"><p>The specimen is the new living component gallery at <code>/specimen</code> — every primitive in both registers, dev-only. Note the record near the bottom: paper and serif, bounded on all four sides with the instrument surround visible, exactly as Gate 1 requires. The chip and button inside it are the <em>same components</em> used everywhere else; they re-registered on their own.</p></div>",
+  "summary": [
+    "<b>Two new primitives.</b> <code>Record</code> — the second register as a bounded paper object, never a background. <code>Hallmark</code> — the mono/uppercase/tracked metadata role, the third face in Pairing C.",
+    "<b>The register switch is one CSS class.</b> <code>.tc-record</code> re-points the semantic tokens for its whole subtree, so any primitive nested inside re-registers with no props and no context.",
+    "<b>Measured foreground tokens.</b> <code>--color-on-accent</code> and <code>--color-on-danger</code>. Brass and danger are mid-to-light tones whose safe foreground flips with the theme; the values are computed per register rather than assumed.",
+    "<b>The violet focus ring is retired.</b> <code>Input</code> and <code>OtpInput</code> now use <code>--color-interactive</code> via <code>focus-visible</code>, so focus shows for keyboard users without firing on every mouse click. A global <code>:focus-visible</code> rule covers everything else.",
+    "<b>OTP digits are mono and tabular</b>, and each box now has an accessible name (<code>Digit 3 of 6</code>) instead of being an unlabelled field.",
+    "<b>Dialog</b> lost its entrance animation (opening is reversible → instant tier), gained a token-based scrim and a hairline border, and its title moved from serif to the instrument face — a dialog is an instrument, not a record.",
+    "<b>PasswordStrengthMeter</b> segments are square rather than pill-shaped so they read as a gauge instead of a progress bar, and the label is <code>aria-live</code>."
+  ],
+  "decisions": [
+    "<b>Themed tokens moved out of <code>@theme inline</code>.</b> <code>inline</code> substitutes values at build time, which is correct for radius, type and easing but silently freezes anything themed. Colours and elevation now use plain <code>@theme</code> so the utility holds a live <code>var()</code> reference.",
+    "<b>Only the six aliases actually in use are declared.</b> Tailwind keys cannot collide with a token name without <code>inline</code> (<code>--x: var(--x)</code> is a cycle). Rather than invent parallel names, the colliding ones were dropped — components already consume <code>var(--color-danger)</code> directly, which is live anyway.",
+    "<b>Elevation tokens renamed to <code>--elev-*</code></b> so <code>--shadow-*</code> can belong to Tailwind's theme layer. The twelve <code>shadow-[var(--shadow-md)]</code> call sites were converted to plain <code>shadow-md</code>.",
+    "<b>The specimen route is dev-only</b>, calling <code>notFound()</code> in production. It exists so contrast can be measured against real rendered components rather than replicas — which is exactly how both bugs below were found.",
+    "<b>`destructive` keeps a filled treatment</b> rather than becoming a bordered button. A quieter delete button tests better on aesthetics and worse on comprehension; the fix was a correct foreground token, not less affordance."
+  ],
+  "issues": [
+    "<b>Every themed Tailwind colour utility had been frozen since T-06.</b> <code>@theme inline</code> compiled <code>text-foreground</code> to a literal hex from <code>:root</code>, so it never responded to the theme and <code>--color-foreground</code> did not exist at runtime at all. It was invisible in V1 because V1's <code>:root</code> was the light theme — so only dark mode was wrong, and only for text. Meridian V2 inverted the default and made it obvious.",
+    "<b>The same class of bug hit the record register.</b> A custom property resolves on the element that <em>declares</em> it, so Tailwind's aliases resolved once at <code>:root</code> and descendants inherited the finished colour — re-pointing tokens inside <code>.tc-record</code> did nothing for them. Instrument-muted text was landing on paper at <b>2.56:1</b>. Fixed by re-declaring the aliases inside the scope. <b>Rule: any scope that re-points a token must re-point its alias.</b>",
+    "<b>Two of my own measurement bugs, worth recording.</b> The first contrast audit had an operator-precedence error that treated <code>rgba(0,0,0,0)</code> as an opaque background, producing three false failures. The second was a stale-computed-style artifact: mutating <code>data-theme</code> and reading <code>getComputedStyle</code> in the same script turn returns pre-mutation values, which made a working fix look broken. Both were resolved by auditing each theme in a separate page load — the values reported below come from that method.",
+    "<b>Carried from layer 3 and now fixed:</b> the primary button measured 1.54:1 and the destructive button 2.94:1. Both now use measured foreground tokens."
+  ],
+  "inherited": [
+    "Every button, input, dialog, toast and chip across all 20+ routes picked up the corrected foregrounds, focus rings and radii with no call-site changes.",
+    "<b>Light mode text became correct for the first time</b> — the frozen-utility fix repaired every <code>text-foreground</code> and <code>text-secondary</code> in the app at once, ~408 usages.",
+    "Anything rendered inside a <code>Record</code> re-registers automatically: colours, muted tones, rules, state chips and the serif face.",
+    "The global <code>:focus-visible</code> rule gives keyboard focus to every interactive element, including ones nobody has styled yet."
+  ],
+  "remaining": [
+    "<b>Gate 2 (serif at density) is still unanswered.</b> The specimen proves the record reads well as prose, but a real timeline and settings screen at density is the actual test. That belongs to the screen rebuild.",
+    "<b>Gate 3 (ramp on real hardware)</b> — the six steps clear AA by computation, but have not been checked on a cheap Android LCD.",
+    "<b>Gate 4 (the Dual Clock)</b> — not built. It is a composite, not a primitive, and it carries more brand than the logo.",
+    "<b>No composite components yet</b> — CapsuleCard, Composer, timeline and the reveal are still on V1 structure with V2 tokens. That is layer 5.",
+    "<b>The specimen route costs ~10 KiB in the production bundle</b> despite 404ing there. Worth excluding from the production build if headroom gets tight."
+  ],
+  "extraHtml": "<h2>Verification</h2><div class=\"tw\"><table><thead><tr><th>Check</th><th>Result</th><th>Detail</th></tr></thead><tbody><tr><td>Contrast · dark</td><td class=\"ok\">PASS</td><td>43 text nodes, 0 failures, lowest <b>5.09:1</b></td></tr><tr><td>Contrast · light</td><td class=\"ok\">PASS</td><td>43 text nodes, 0 failures, lowest <b>5.09:1</b></td></tr><tr><td>Register separation</td><td class=\"ok\">PASS</td><td>Record #F3F4F0 vs page #E9EAE6 in light; #E9EAE6 vs #0B0E14 in dark — bounded in both</td></tr><tr><td>Keyboard focus</td><td class=\"ok\">PASS</td><td>Global <code>:focus-visible</code>, 2px interactive outline, 2px offset</td></tr><tr><td>Lint (monorepo)</td><td class=\"ok\">PASS</td><td>0 errors, motion constitution enforced</td></tr><tr><td>Typecheck</td><td class=\"ok\">PASS</td><td>0 errors</td></tr><tr><td>Build</td><td class=\"ok\">PASS</td><td>Compiled in 5.0s</td></tr><tr><td>API regression</td><td class=\"ok\">PASS</td><td>228/228 tests — backend untouched</td></tr><tr><td>Worker bundle</td><td class=\"ok\">PASS</td><td>gzip <b>2333.68 KiB</b> / 3072 KiB cap · <b>738 KiB headroom</b> (+17.6 KiB this layer)</td></tr><tr><td>Font weight</td><td class=\"warn\">NOTE</td><td>612 KB of woff2 total, served as <b>static assets, not in the worker script</b> (verified: 0 references in worker.js). Browsers fetch only the subsets a page uses.</td></tr></tbody></table></div>",
+  "css": ".tw{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;margin:0 0 18px} table{border-collapse:collapse;width:100%;font-size:.85rem;min-width:520px} th,td{text-align:left;padding:9px 13px;border-bottom:1px solid var(--rule);vertical-align:top} th{font-family:var(--mono);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500;background:var(--raised)} tbody tr:last-child td{border-bottom:0} td.ok{color:var(--hold);font-family:var(--mono);font-size:.74rem;font-weight:600} td.warn{color:var(--brass);font-family:var(--mono);font-size:.74rem;font-weight:600}"
+}

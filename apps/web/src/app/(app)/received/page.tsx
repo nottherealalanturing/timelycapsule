@@ -63,7 +63,7 @@ function ReceivedRow({ item, onReport }: { item: ReceivedCapsule; onReport: (ite
           ⋯
         </Button>
         {menuOpen ? (
-          <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/15 bg-[var(--color-bg-raised)] py-1 shadow-[var(--shadow-md)]">
+          <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/15 bg-[var(--color-bg-raised)] py-1 shadow-md">
             <button
               type="button"
               disabled={!item.senderEmail || blockMutation.isPending}
@@ -165,7 +165,7 @@ export default function ReceivedPage() {
       {reporting ? (
         <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setReporting(null)}>
           <div
-            className="w-full max-w-sm rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] p-6 shadow-[var(--shadow-lg)]"
+            className="w-full max-w-sm rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] p-6 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="font-[var(--font-display)] text-lg text-foreground">Report this capsule</h2>

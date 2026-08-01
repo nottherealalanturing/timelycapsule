@@ -117,7 +117,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             •••
           </Button>
           {menuOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-1 shadow-[var(--shadow-md)]">
+            <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-1 shadow-md">
               <button
                 type="button"
                 onClick={handleDeleteDraft}
