@@ -12,6 +12,12 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["--filter", "@tc/web", "run", "dev"],
       "port": 3001
+    },
+    {
+      "name": "design-preview",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["design/.preview-server.mjs"],
+      "port": 4317
     }
   ]
 }

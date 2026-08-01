@@ -1,0 +1,630 @@
+<title>The TimelyCapsule Product Bible</title>
+<style>
+/* Same register system as 08 — these are a series. Instrument ground for the
+   document, paper records for the findings. Tokens verified in 05. */
+:root{
+  --ground:#0B0E14; --raised:#141922; --overlay:#1C2230;
+  --ink:#E6E8EC; --muted:#8B93A3; --brass:#E0B84A; --steel:#7A8AB0;
+  --rule:rgba(230,232,236,.13); --rule-hi:rgba(230,232,236,.26);
+  --paper-ink:#16181A; --paper-muted:#5E635C; --verdigris:#3F6154;
+  --hold:#6E9E8A; --record-bg:#E9EAE6; --alarm:#D2694E;
+  --sans:"Helvetica Neue",Helvetica,Inter,system-ui,sans-serif;
+  --serif:Charter,"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --measure:64ch;
+}
+@media (prefers-color-scheme:light){:root{
+  --ground:#E9EAE6; --raised:#F3F4F0; --overlay:#FFF;
+  --ink:#16181A; --muted:#5E635C; --brass:#6E5A0E; --steel:#2C3A4A;
+  --rule:rgba(22,24,26,.15); --rule-hi:rgba(22,24,26,.3);
+  --hold:#3F6154; --record-bg:#F3F4F0; --alarm:#A33F28;
+}}
+:root[data-theme=light]{
+  --ground:#E9EAE6; --raised:#F3F4F0; --overlay:#FFF;
+  --ink:#16181A; --muted:#5E635C; --brass:#6E5A0E; --steel:#2C3A4A;
+  --rule:rgba(22,24,26,.15); --rule-hi:rgba(22,24,26,.3);
+  --hold:#3F6154; --record-bg:#F3F4F0; --alarm:#A33F28;
+}
+:root[data-theme=dark]{
+  --ground:#0B0E14; --raised:#141922; --overlay:#1C2230;
+  --ink:#E6E8EC; --muted:#8B93A3; --brass:#E0B84A; --steel:#7A8AB0;
+  --rule:rgba(230,232,236,.13); --rule-hi:rgba(230,232,236,.26);
+  --hold:#6E9E8A; --record-bg:#E9EAE6; --alarm:#D2694E;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:1.62;
+  -webkit-font-smoothing:antialiased}
+
+.shell{display:grid;grid-template-columns:196px minmax(0,1fr);
+  max-width:1180px;margin:0 auto}
+@media(max-width:900px){.shell{grid-template-columns:minmax(0,1fr)}}
+
+.rail{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:38px 20px 38px 26px;border-right:1px solid var(--rule);
+  font-family:var(--mono);font-size:.66rem;line-height:1.9;letter-spacing:.04em}
+@media(max-width:900px){.rail{display:none}}
+.rail a{display:block;color:var(--muted);text-decoration:none;
+  text-transform:uppercase;padding:1px 0;transition:color .12s}
+.rail a:hover,.rail a:focus-visible{color:var(--brass)}
+.rail .rn{color:var(--rule-hi);display:inline-block;width:3.1em}
+.rail h6{font-size:.66rem;letter-spacing:.16em;color:var(--ink);
+  margin:22px 0 6px;font-weight:600;text-transform:uppercase}
+.rail h6:first-child{margin-top:0}
+
+main{padding:38px 44px 120px;max-width:900px}
+@media(max-width:700px){main{padding:30px 22px 80px}}
+
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+h1{font-family:var(--serif);font-size:clamp(2.1rem,5.2vw,3.15rem);
+  line-height:1.08;font-weight:600;letter-spacing:-.017em;margin:0 0 18px;
+  text-wrap:balance}
+h2{font-family:var(--serif);font-size:clamp(1.45rem,3vw,1.85rem);
+  line-height:1.2;font-weight:600;letter-spacing:-.012em;margin:0 0 16px;
+  text-wrap:balance}
+h3{font-family:var(--sans);font-size:.95rem;font-weight:650;margin:0 0 10px}
+p{margin:0 0 15px;max-width:var(--measure)}
+ul,ol{margin:0 0 15px;padding-left:1.15em;max-width:var(--measure)}
+li{margin-bottom:7px}
+b,strong{font-weight:650;color:var(--ink)}
+a{color:var(--brass)}
+code{font-family:var(--mono);font-size:.86em;background:var(--overlay);
+  padding:1px 5px;border-radius:2px}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+section{padding:44px 0;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0;padding-top:8px}
+.snum{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;
+  color:var(--brass);text-transform:uppercase;display:block;margin-bottom:9px}
+.lede{font-family:var(--serif);font-size:1.16rem;line-height:1.56;
+  color:var(--muted);max-width:58ch}
+
+.record{background:var(--record-bg);color:var(--paper-ink);
+  font-family:var(--serif);border-left:2px solid var(--verdigris);
+  border-radius:3px;padding:26px 30px;margin:0 0 22px;
+  box-shadow:0 1px 0 rgba(0,0,0,.2),0 16px 40px rgba(0,0,0,.26)}
+.record p{color:var(--paper-ink);max-width:56ch}
+.record p:last-child{margin-bottom:0}
+.record .rlbl{font-family:var(--mono);font-size:.63rem;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--paper-muted);margin:0 0 12px;display:block}
+.record .big{font-size:clamp(1.3rem,3vw,1.72rem);line-height:1.28;
+  font-weight:600;letter-spacing:-.012em;margin:0 0 10px}
+.record .sub{color:var(--paper-muted);font-size:.93rem;margin:0}
+.record.alarm{border-left-color:var(--alarm)}
+
+/* the statistic — the document's thesis, given the weight of a finding */
+.stat{display:flex;gap:26px;align-items:baseline;flex-wrap:wrap;
+  margin:0 0 10px}
+.stat .fig{font-family:var(--serif);font-size:clamp(3.2rem,11vw,5.2rem);
+  line-height:.9;font-weight:600;letter-spacing:-.03em;color:var(--paper-ink);
+  font-variant-numeric:tabular-nums}
+.stat .cap{font-family:var(--sans);font-size:.9rem;line-height:1.45;
+  color:var(--paper-muted);max-width:30ch}
+
+.tw{overflow-x:auto;margin:0 0 20px;border:1px solid var(--rule);border-radius:3px}
+table{border-collapse:collapse;width:100%;font-size:.855rem;min-width:520px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+th{font-family:var(--mono);font-size:.63rem;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--muted);font-weight:500;
+  background:var(--raised)}
+tbody tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--muted);white-space:nowrap}
+td.no{color:var(--alarm);font-family:var(--mono);font-size:.8rem;white-space:nowrap}
+td.warn{color:var(--brass);font-family:var(--mono);font-size:.8rem;white-space:nowrap}
+
+.note{border:1px solid var(--rule);border-left:2px solid var(--steel);
+  border-radius:3px;padding:16px 20px;margin:0 0 20px;background:var(--raised);
+  font-size:.9rem}
+.note p{max-width:58ch}
+.note p:last-child{margin-bottom:0}
+.note.warn{border-left-color:var(--brass)}
+.note.kill{border-left-color:var(--alarm)}
+
+.arts{list-style:none;padding:0;margin:0 0 20px;display:flex;
+  flex-direction:column;gap:13px;max-width:var(--measure)}
+.arts li{display:grid;grid-template-columns:2.1rem 1fr;gap:12px;margin:0}
+.arts .a{font-family:var(--mono);font-size:.78rem;color:var(--brass);
+  font-variant-numeric:tabular-nums;padding-top:.16rem}
+
+/* ── duration chart: the eight moments, by how long they wait ──
+   Static by construction. A chart of durations is the one place in this
+   product where a bar is legitimate — it encodes span, not progress. */
+.chart{border:1px solid var(--rule);border-radius:3px;padding:20px 22px;
+  margin:0 0 12px;background:var(--raised)}
+.crow{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(0,2.4fr);
+  gap:14px;align-items:center;padding:5px 0;font-size:.82rem}
+@media(max-width:560px){.crow{grid-template-columns:1fr;gap:2px;padding:8px 0}}
+.crow .lab{color:var(--ink)}
+.crow .track{position:relative;height:15px;background:linear-gradient(
+  to right,var(--rule) 0 1px,transparent 1px) repeat-x;background-size:10% 100%}
+.crow .bar{position:absolute;top:4px;height:7px;border-radius:1px;
+  background:var(--steel)}
+.crow.rite .bar{background:var(--brass)}
+.crow.rite .lab{color:var(--brass);font-weight:650}
+.caxis{display:grid;grid-template-columns:minmax(120px,1.1fr) minmax(0,2.4fr);
+  gap:14px;margin-top:8px;font-family:var(--mono);font-size:.6rem;
+  letter-spacing:.1em;color:var(--muted);text-transform:uppercase}
+@media(max-width:560px){.caxis{grid-template-columns:1fr}}
+.caxis .marks{display:flex;justify-content:space-between}
+
+.chal{border-top:1px solid var(--rule);padding:20px 0 0;margin:0 0 20px}
+.chal h3{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.tag{font-family:var(--mono);font-size:.6rem;letter-spacing:.16em;
+  text-transform:uppercase;padding:2px 7px;border-radius:2px;font-weight:500}
+.tag.chg{background:var(--brass);color:var(--ground)}
+.tag.new{background:var(--alarm);color:#fff}
+.tag.open{border:1px solid var(--rule-hi);color:var(--muted)}
+.tag.gap{border:1px solid var(--alarm);color:var(--alarm)}
+
+footer{border-top:1px solid var(--rule);padding:26px 0 0;margin-top:20px;
+  font-size:.83rem;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.001ms !important;animation-duration:.001ms !important}
+}
+</style>
+
+<div class="shell">
+<nav class="rail" aria-label="Contents">
+  <h6>Finding</h6>
+  <a href="#oblivion"><span class="rn">I</span>The 90%</a>
+  <a href="#whatweare"><span class="rn">II</span>What we are</a>
+  <a href="#audit"><span class="rn">III</span>Tradition audit</a>
+  <h6>Behaviour</h6>
+  <a href="#frequency"><span class="rn">IV</span>Frequency</a>
+  <a href="#return"><span class="rn">V</span>Return / stop</a>
+  <a href="#archetypes"><span class="rn">VI</span>Archetypes</a>
+  <a href="#sacred"><span class="rn">VII</span>Sacred</a>
+  <a href="#growth"><span class="rn">VIII</span>Growth</a>
+  <a href="#institutions"><span class="rn">IX</span>Institutions</a>
+  <h6>Risk</h6>
+  <a href="#barriers"><span class="rn">X–XI</span>Barriers</a>
+  <a href="#risks"><span class="rn">XII</span>Behavioural</a>
+  <a href="#thirty"><span class="rn">XIII</span>30 years</a>
+  <h6>Decisions</h6>
+  <a href="#challenges"><span class="rn">XIV</span>Challenges</a>
+  <a href="#sentence"><span class="rn">XV</span>One sentence</a>
+  <a href="#inherit"><span class="rn">XVI</span>Inherits</a>
+</nav>
+
+<main>
+<section>
+  <p class="eyebrow">Meridian · Strategic Foundation · Phase 09</p>
+  <h1>The Product Bible</h1>
+  <p class="lede">Behaviour, not features. What role this plays in a human life
+  over thirty years — and the historical evidence that we are currently building
+  toward the wrong failure.</p>
+</section>
+
+<section id="oblivion">
+  <span class="snum">Part I · The finding</span>
+  <h2>Our competitor is oblivion, and it wins nine times in ten</h2>
+
+  <div class="record alarm">
+    <span class="rlbl">International Time Capsule Society</span>
+    <div class="stat">
+      <span class="fig">80–90<span style="font-size:.5em">%</span></span>
+      <span class="cap">of physical time capsules are <b>never recovered</b>.
+      An estimated <b>95% are lost track of within five years</b> of being
+      sealed.</span>
+    </div>
+    <p class="sub" style="margin-top:14px">The containers do not fail. The
+    concrete holds, the documents survive. What fails is that <b>nobody remembers
+    the capsule exists</b> — the people move away, the building is replaced, the
+    institution forgets.</p>
+  </div>
+
+  <p>We have been engineering trust against the wrong threat. Institutional
+  survival — backups, escrow, restore drills, "will the company exist" — is a
+  real risk and that work was correct. But it is not the likeliest failure.</p>
+
+  <div class="note kill">
+    <p><b>The likeliest failure:</b> in 2041 the capsule is intact, the servers
+    are running, the encryption is sound, the delivery job fires exactly on
+    schedule — <b>and the email address died in 2033.</b></p>
+    <p>We deliver perfectly, into a void, and never know. A recipient address
+    captured once in 2026 and never touched again is a fifteen-year bet on an
+    email account. Nobody should take that bet.</p>
+  </div>
+
+  <h3>The consequence: proof of life becomes load-bearing</h3>
+  <p><code>07</code> specified proof of life as a trust gesture — <em>still here,
+  still counting, nothing for you to do.</em> That was right for the wrong
+  reason. Its real job is <b>address validation</b>, and it detects a dead route
+  <b>ten years before it matters</b>, while there is still a living person to ask
+  for a new one.</p>
+  <p>The gesture and the infrastructure turn out to be the same object. That
+  upgrades proof of life from <em>nice</em> to <b>mandatory</b>.</p>
+</section>
+
+<section id="whatweare">
+  <span class="snum">Part II · What we are</span>
+  <h2>A correspondent, not a destination</h2>
+  <p>Not an app someone uses. <b>A standing arrangement someone has made</b>,
+  touched perhaps twenty times in three decades. The true analogues are not
+  software.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Analogue</th><th>Touched</th><th>Survives because</th></tr></thead>
+    <tbody>
+      <tr><td>Safe deposit box</td><td class="n">rarely</td><td>The bank sends an annual notice</td></tr>
+      <tr><td>A will</td><td class="n">2–4 times a life</td><td>A solicitor holds it and writes to you</td></tr>
+      <tr><td>Life insurance</td><td class="n">almost never</td><td>A premium leaves the account monthly</td></tr>
+      <tr><td>Vaccination record</td><td class="n">at transitions</td><td>An institution requests it</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every durable thirty-year arrangement in a human life is kept alive by
+  <b>a third party who periodically makes contact</b> — never by the person
+  remembering.</p>
+</section>
+
+<section id="audit">
+  <span class="snum">Part III · Tradition audit</span>
+  <h2>We score zero out of five</h2>
+  <p>Journals, photo albums, annual letters, ornaments, baby books, memory boxes.
+  Five properties recur, and family-ritual research supports all five. Scored
+  honestly against what we have designed so far:</p>
+  <div class="tw"><table>
+    <thead><tr><th>Property</th><th>Why it matters</th><th>Us today</th></tr></thead>
+    <tbody>
+      <tr><td><b>Calendar anchor</b></td><td>Ornaments happen at Christmas. Without a recurring date external to the product, no tradition forms</td><td class="no">✕ none</td></tr>
+      <tr><td><b>Visible accumulation</b></td><td>The box fills. The album thickens. Growth must be <em>seen</em></td><td class="no">✕ a list is not accumulation</td></tr>
+      <tr><td><b>Low per-instance cost</b></td><td>Traditions survive because each instance is cheap</td><td class="no">✕ ceremony makes every capsule heavy</td></tr>
+      <tr><td><b>Inheritance</b></td><td>Someone receives the box when you die</td><td class="no">✕ no one can inherit an account</td></tr>
+      <tr><td><b>Collective sign-on</b></td><td>Others know you do it; they participate</td><td class="warn">△ deliberately suppressed</td></tr>
+    </tbody>
+  </table></div>
+  <div class="record">
+    <p class="big">We have designed a beautiful utility and called it a ritual.</p>
+    <p class="sub">Every recommendation below is an attempt to move one of these
+    rows.</p>
+  </div>
+</section>
+
+<section id="frequency">
+  <span class="snum">Part IV · Frequency</span>
+  <h2>The thing we cannot fake</h2>
+  <p>A normal person encounters a natural reason to seal a capsule <b>one to
+  three times per decade</b>. Habit products require frequency. We have none —
+  and every standard remedy for low frequency is a pattern we permanently banned
+  in <code>07</code>.</p>
+  <p>So we stop pursuing retention, which is impossible, and pursue
+  <b>recurrence</b>: being present, and remembered, at the moments that occur
+  anyway.</p>
+
+  <div class="chart">
+    <div class="crow"><span class="lab">Birth of a child</span><span class="track"><span class="bar" style="left:0;width:84%"></span></span></div>
+    <div class="crow"><span class="lab">Retirement</span><span class="track"><span class="bar" style="left:0;width:80%"></span></span></div>
+    <div class="crow"><span class="lab">Wedding / union</span><span class="track"><span class="bar" style="left:0;width:100%"></span></span></div>
+    <div class="crow"><span class="lab">Graduation</span><span class="track"><span class="bar" style="left:0;width:40%"></span></span></div>
+    <div class="crow"><span class="lab">Milestone birthday</span><span class="track"><span class="bar" style="left:0;width:40%"></span></span></div>
+    <div class="crow"><span class="lab">Emigration / move</span><span class="track"><span class="bar" style="left:0;width:40%"></span></span></div>
+    <div class="crow"><span class="lab">Loss / divorce / recovery</span><span class="track"><span class="bar" style="left:0;width:8%"></span></span></div>
+    <div class="crow"><span class="lab">Diagnosis / end of life</span><span class="track"><span class="bar" style="left:0;width:96%"></span></span></div>
+    <div class="crow rite"><span class="lab">The annual rite</span><span class="track"><span class="bar" style="left:0;width:4%"></span></span></div>
+    <div class="caxis"><span>duration</span><span class="marks"><span>0</span><span>5y</span><span>10y</span><span>15y</span><span>20y</span><span>25y</span></span></div>
+  </div>
+  <p style="font-size:.83rem;color:var(--muted)">Eight of the nine are external
+  and outside our control. The ninth is the only one we can build.</p>
+
+  <h3>The annual rite — the highest-leverage item in this document</h3>
+  <p>One deliberate occasion a year, on a date the household chooses, where the
+  family writes to itself twelve months out. <b>Last year's arrives as this
+  year's is written.</b></p>
+  <p>It is the only mechanism that fixes four of the five audit rows at once —
+  calendar anchor, accumulation, low cost, collective sign-on. It is culturally
+  precedented (the annual Christmas letter, New Year resolutions, the school
+  "letter to your future self"). And it requires no nagging, because
+  <b>the arrival is the reminder</b>. The product does not prompt; last year's
+  capsule does.</p>
+  <div class="note warn"><p><b>This should be built before the marketing
+  site.</b></p></div>
+</section>
+
+<section id="return">
+  <span class="snum">Part V · Return and stop</span>
+  <h2>Four of six churn reasons are invisible to us</h2>
+  <div class="tw"><table>
+    <thead><tr><th></th><th>Why they return</th><th>Why they stop</th><th>Visible?</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td><b>A capsule arrived.</b> Overwhelmingly the strongest, and automatic</td><td><b>They forgot we exist.</b> The 90% problem</td><td class="no">✕ no</td></tr>
+      <tr><td class="n">2</td><td>A life event occurred</td><td><b>They lost the master key.</b> Unrecoverable — and our fault</td><td class="warn">△ partly</td></tr>
+      <tr><td class="n">3</td><td><b>The annual rite</b> — the only honest engine we can build</td><td>The first arrival disappointed. The letter was thin, because writing is hard and we did not help</td><td class="no">✕ no</td></tr>
+      <tr><td class="n">4</td><td>They witnessed someone else's arrival, at a kitchen table</td><td>The relationship ended; the capsule became a liability</td><td class="no">✕ no</td></tr>
+      <tr><td class="n">5</td><td>Address maintenance — boring, and legitimate</td><td>The life stage passed. Natural, and fine</td><td class="warn">△ partly</td></tr>
+      <tr><td class="n">6</td><td>—</td><td>Doubt crept in; they stopped believing we would last</td><td class="no">✕ no</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note kill"><p><b>Our instrumentation will systematically
+  over-report health.</b> Deliveries succeeded is not deliveries received.</p></div>
+</section>
+
+<section id="archetypes">
+  <span class="snum">Part VI · Archetypes</span>
+  <h2>Creators</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Archetype</th><th>Duration</th><th>Stakes</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><b>The Parent</b></td><td class="n">15–21 yrs</td><td class="n">highest</td><td>The core. Most emotional load, most likely to become a tradition</td></tr>
+      <tr><td><b>The Future Self</b></td><td class="n">6 mo–5 yrs</td><td class="n">low</td><td>The on-ramp. High frequency, forgiving. <b>The product must not be too solemn for them</b></td></tr>
+      <tr><td><b>The Terminal</b></td><td class="n">weeks–decades</td><td class="n">absolute</td><td>Time-poor, often unwell. Every friction is cruelty</td></tr>
+      <tr><td><b>The Couple</b></td><td class="n">1–25 yrs</td><td class="n">high</td><td>Two-sided, ritual-friendly, exposed to relationship change</td></tr>
+      <tr><td><b>The Archivist</b></td><td class="n">any</td><td class="n">medium</td><td>Small in number, disproportionately evangelistic</td></tr>
+      <tr><td><b>The Institution</b></td><td class="n">10–50 yrs</td><td class="n">medium</td><td>Genuinely a different product — Part IX</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note"><p><b>The Future Self is the acquisition archetype; the
+  Parent is the retention archetype.</b> A product tuned only for the Parent has
+  no on-ramp. One tuned only for the Future Self never becomes a tradition. We
+  need both, and they want opposite tones.</p></div>
+
+  <h2 style="margin-top:34px">The fact we can never know</h2>
+  <div class="record alarm">
+    <p class="big">We do not know whether the sender is alive when the capsule
+    arrives.</p>
+    <p class="sub">We cannot know, we must not ask, and the two cases are
+    emotionally opposite. <em>"Your father has a message for you"</em> delivered
+    to someone whose father died last year is a catastrophic failure — and we
+    would never find out we had done it.</p>
+  </div>
+  <p><b>Absolute rule, joining the copy constitution:</b> all delivery language is
+  past tense and refers only to the act of sealing, never to the sender's present
+  state.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Always</th><th>Never</th></tr></thead>
+    <tbody>
+      <tr><td>"Sealed by Michael Adeyemi on 14 March 2026."</td><td class="no">"Michael has sent you a capsule."</td></tr>
+      <tr><td>"This was written for you in 2026."</td><td class="no">"A message is waiting from Michael."</td></tr>
+    </tbody>
+  </table></div>
+  <p>It costs nothing and prevents the worst thing the product could do.</p>
+</section>
+
+<section id="sacred">
+  <span class="snum">Part VII · Sacred and ordinary</span>
+  <h2>Sanctity is spent only at the boundary between private and permanent</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Sacred — five things only</th><th>Ordinary — everything else</th></tr></thead>
+    <tbody>
+      <tr><td>The moment of sealing</td><td class="n">Browsing the archive</td></tr>
+      <tr><td>The arrival</td><td class="n">Editing a draft</td></tr>
+      <tr><td>The recovery kit</td><td class="n">Settings, billing, export</td></tr>
+      <tr><td>The delivery promise itself</td><td class="n">Updating an address</td></tr>
+      <tr><td>The record as an object</td><td class="n">Short, low-stakes capsules</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note warn"><p><b>If everything is sacred, nothing is.</b> A solemn
+  interface around a note to yourself in six months is absurd — and worse, it
+  makes the trivial capsule too expensive to write, removing the on-ramp that
+  produces the Parent five years later.</p>
+  <p>The rare, devastating capsule lands <em>because</em> it sits among ordinary
+  ones. Gravity requires contrast.</p></div>
+</section>
+
+<section id="growth">
+  <span class="snum">Part VIII · Growth</span>
+  <h2>The guarantee we could not break if we wanted to</h2>
+  <div class="record">
+    <p class="big">Zero-access encryption means we cannot read capsule contents —
+    therefore we can never build a feed.</p>
+    <p class="sub">Not a policy we might reverse under investor pressure.
+    Arithmetic. It is the most credible commitment in the product, because it is
+    the only one we are incapable of breaking.</p>
+  </div>
+  <ol class="arts">
+    <li><span class="a">01</span><span><b>Arrival → new creator.</b> Every delivered capsule produces a candidate creator who has just experienced the product at full strength. Slow, measured in years, compounding.</span></li>
+    <li><span class="a">02</span><span><b>The witnessed arrival.</b> Someone opens a letter at a table with others present. Invisible to us; probably our largest channel.</span></li>
+    <li><span class="a">03</span><span>The duration-only share artifact. Content-blind by construction.</span></li>
+    <li><span class="a">04</span><span>Institutions. A school seals 200 capsules in an afternoon.</span></li>
+  </ol>
+  <div class="note"><p><b>This reframes <code>P8</code>.</b> The recipient path
+  was justified on decency grounds. It is also <b>the acquisition funnel</b>, and
+  deserves the most engineering rather than the least — the opposite of how a
+  normal product resources an unauthenticated read-only page.</p></div>
+  <p><b>Never:</b> profiles, followers, feeds, likes, public galleries, capsule
+  counts, leaderboards, or any surface where users encounter strangers.</p>
+</section>
+
+<section id="institutions">
+  <span class="snum">Part IX · Institutions</span>
+  <h2>They solve our hardest problem for free</h2>
+  <p>A school holds alumni records and has a permanent address. The institution
+  is the custodian, and institutional memory outlives every individual in it.
+  <b>A school cohort capsule is more likely to be delivered than a private
+  one.</b></p>
+  <div class="tw"><table>
+    <thead><tr><th>Context</th><th>Pattern</th><th>Note</th></tr></thead>
+    <tbody>
+      <tr><td><b>Schools</b></td><td>Cohort seals on entry, opens at graduation or +10 yrs</td><td>Best institutional fit</td></tr>
+      <tr><td><b>Weddings</b></td><td>Couple + guests seal; opens at 1st, 10th, 25th</td><td>Gift-shaped; exposed to divorce</td></tr>
+      <tr><td><b>Funerals / memorial</b></td><td>Capsules from the deceased, released after death</td><td class="no">see warning</td></tr>
+      <tr><td><b>Companies</b></td><td>Founding, milestones, anniversaries</td><td>Low emotional value, real archival value</td></tr>
+      <tr><td><b>Communities</b></td><td>Civic, religious, neighbourhood</td><td>Closest to the historical form</td></tr>
+      <tr><td><b>Historical</b></td><td>Public archival deposit</td><td class="no">a different product</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note kill">
+    <p><b>1 · Death-triggered release is the most requested and most dangerous
+    feature we will ever be asked for.</b> A false positive delivers a dead
+    person's final letters to their living family. Automated death detection is
+    not acceptable at any confidence level. If built at all it must be
+    <b>custodian-confirmed</b> — a named human asserting the death — never
+    inferred from inactivity, a data broker, or a missed check-in.</p>
+    <p><b>2 · Public capsules break our cryptography.</b> A capsule for future
+    historians is not addressed to a person and is not zero-access — anyone may
+    open it. Different threat model, different key architecture, different
+    product. <b>Do not quietly blend it into the private one.</b></p>
+  </div>
+</section>
+
+<section id="barriers">
+  <span class="snum">Parts X–XI · Barriers</span>
+  <h2>Psychological</h2>
+  <ol class="arts">
+    <li><span class="a">01</span><span><b>The blank page.</b> Already the largest gap in <code>07</code>. Top of this list too.</span></li>
+    <li><span class="a">02</span><span><b>Superstition about the future.</b> Writing to your child at eighteen means contemplating not being there. Many will start and close the tab. No interface fixes this — only tone. <b>Never make mortality explicit; let the person bring it.</b></span></li>
+    <li><span class="a">03</span><span><b>"Who am I to think this matters?"</b> People badly underestimate what a letter from a dead parent will mean. The only persuasive answer is testimony from someone who received one — which we will not have for years, and must not fake.</span></li>
+    <li><span class="a">04</span><span>Fear of being embarrassed by your past self. Mitigated by making short, low-stakes capsules normal.</span></li>
+    <li><span class="a">05</span><span>Choice paralysis on the date. Offer anchored answers — <em>when she turns eighteen</em> — not a date picker alone.</span></li>
+  </ol>
+  <h2 style="margin-top:30px">Trust</h2>
+  <ol class="arts">
+    <li><span class="a">01</span><span>"Will you exist?" — already the centre of the marketing plan.</span></li>
+    <li><span class="a">02</span><span><b>"Will you be able to find them?" — unaddressed, and likelier to bite than the first.</b></span></li>
+    <li><span class="a">03</span><span>"What if I lose the key?" Our most self-inflicted risk. The person who loses it will reasonably experience this as us having destroyed their letters.</span></li>
+    <li><span class="a">04</span><span>"Can you read it?" Answerable with architecture. Our strongest answer.</span></li>
+    <li><span class="a">05</span><span>"What happens when I die?" Nobody can inherit an account today. For a product about outliving people, a conspicuous hole.</span></li>
+    <li><span class="a">06</span><span>"What if I change my mind?" — Part XIV.4.</span></li>
+  </ol>
+</section>
+
+<section id="risks">
+  <span class="snum">Part XII · Behavioural risks</span>
+  <h2>How we will go wrong</h2>
+  <ul>
+    <li><b>We will over-report our own health.</b> Four of six churn reasons are invisible.</li>
+    <li><b>We will optimise for the creator</b>, because the creator is who we can see. The recipient generates almost no telemetry and is the more important person.</li>
+    <li><b>We will manufacture frequency</b> the moment growth flattens. Every remedy that is not the annual rite is a banned pattern wearing a hat.</li>
+    <li><b>The archive will silently become a to-do list.</b> A list of pending items with dates is a task manager — the opposite of the intended feeling. It must read as a shelf, not a queue.</li>
+    <li><b>The product will drift solemn.</b> Every decision in <code>01</code>–<code>08</code> pushes toward gravity; nothing pushes back. The Future Self is our only counterweight and is currently unserved.</li>
+  </ul>
+</section>
+
+<section id="thirty">
+  <span class="snum">Part XIII · Thirty years</span>
+  <h2>Success</h2>
+  <ul>
+    <li>Someone opens a letter from a parent who died fifteen years earlier, and it is the most valuable object they own.</li>
+    <li><b>A family has a date.</b> Every year, the same evening, everyone writes. Children who grew up with it start doing it in their own households.</li>
+    <li><b>An account has been inherited</b> — a custodian named, a transfer executed, the arrangement continuing past the death of the person who made it.</li>
+    <li>A school opens the capsules its 2027 intake sealed, and it is on the calendar as an institution, not a project someone champions.</li>
+    <li><b>We are boring.</b> Nobody discusses our design. The letters are discussed.</li>
+  </ul>
+  <h2 style="margin-top:30px">Failure — and it is not bankruptcy</h2>
+  <div class="record alarm">
+    <span class="rlbl">The silent failure</span>
+    <p class="big">We deliver flawlessly for thirty years into addresses that died
+    in the 2030s. Every job succeeds. Every dashboard is green. Nobody receives
+    anything.</p>
+    <p class="sub">We become the 90%, with better uptime.</p>
+  </div>
+  <div class="note kill"><p><b>The second failure is likelier to be
+  self-inflicted.</b> We solve low frequency the way software always solves low
+  frequency — a nudge here, a streak there, an anniversary email, a feed of
+  public capsules. Each defensible alone. Collectively they convert a thirty-year
+  arrangement into an app people churn out of in eight weeks.</p></div>
+</section>
+
+<section id="challenges">
+  <span class="snum">Part XIV · Challenges to 01–08</span>
+  <h2>Seven</h2>
+
+  <div class="chal">
+    <h3>1 · Trust engineering aims at the wrong threat <span class="tag new">new · biggest</span></h3>
+    <p>Institutional survival is centred everywhere; deliverability appears
+    nowhere. Proof of life is promoted from gesture to infrastructure. Multiple
+    contact routes and periodic re-verification become requirements.</p>
+  </div>
+
+  <div class="chal">
+    <h3>2 · Uniform ceremony is wrong <span class="tag chg">refines 07</span></h3>
+    <p>I wrote that the held beat applies to everything irreversible. Applied
+    uniformly it makes a six-month note as solemn as a deathbed letter — which
+    cheapens the serious capsule <em>and</em> taxes the trivial one out of
+    existence.</p>
+    <p><b>Refinement, not reversal:</b> consequence is not binary. Ceremony scales
+    with duration × relationship. The principle — <em>duration is a function of
+    consequence</em> — is unchanged; I had been treating a continuous variable as
+    a switch.</p>
+  </div>
+
+  <div class="chal">
+    <h3>3 · The product is too solemn, and has no on-ramp <span class="tag chg">challenges 01–08</span></h3>
+    <p>Every foundational document pushes toward gravity. Right for the Parent
+    and the Terminal; wrong for the Future Self, where nearly everyone starts.
+    <b>Nothing in the identity currently makes room for a light capsule.</b>
+    Resolve before component design — it is a tone and hierarchy question, not a
+    screen question.</p>
+  </div>
+
+  <div class="chal">
+    <h3>4 · Immutability and irrevocability are being conflated <span class="tag open">founder decision</span></h3>
+    <p>Sealed content must remain immutable. Nothing here proposes changing that.
+    But immutability of <em>content</em> is a different property from
+    irrevocability of <em>delivery</em>, and we have treated them as one.</p>
+    <p>Someone seals a letter to their spouse for their twenty-fifth anniversary.
+    They divorce in year eight. <b>The letter will be delivered.</b> We become a
+    machine that reliably delivers letters from marriages that ended.</p>
+    <p><b>Proposed resolution — a right of withdrawal:</b> a creator may
+    <b>destroy</b> a sealed capsule before delivery; they may never <b>alter</b>
+    it. Stricter than most archival practice, and it preserves the cryptographic
+    guarantee exactly: <em>records may be destroyed; they may never be forged.</em>
+    It does not weaken the promise, which is made to the creator — the recipient
+    does not know the capsule exists.</p>
+  </div>
+
+  <div class="chal">
+    <h3>5 · <code>P8</code> is the funnel, not a courtesy <span class="tag chg">reframes 01 / 07</span></h3>
+    <p>The recipient path should be resourced as the most important surface in
+    the product, not the most constrained.</p>
+  </div>
+
+  <div class="chal">
+    <h3>6 · There is no inheritance model <span class="tag gap">gap</span></h3>
+    <p>For a product about outliving people, nobody can inherit an account. Needs
+    a named custodian at minimum — also the honest answer to trust barrier 5, and
+    a precondition for the memorial use cases.</p>
+  </div>
+
+  <div class="chal">
+    <h3>7 · The annual rite precedes the marketing site <span class="tag chg">changes 07</span></h3>
+    <p>It is the only calendar anchor available to us and the only honest answer
+    to our frequency problem — and it changes what the marketing site is selling.</p>
+    <p><b>Revised order:</b> cold-recipient gate → composition experience →
+    <b>annual rite</b> → logo → design system → T-21 → web → mobile.</p>
+  </div>
+</section>
+
+<section id="sentence">
+  <span class="snum">Part XV · The one sentence</span>
+  <div class="record">
+    <span class="rlbl">Everything above, reduced</span>
+    <p class="big">We are not a place people go. We are a correspondent who keeps
+    writing to them, so that in thirty years the letter is not lost.</p>
+    <p class="sub">The central job is not storage, encryption, or ceremony —
+    those are solved. The central job is <b>to still be able to find the
+    person.</b></p>
+  </div>
+  <p>The four filters, final:</p>
+  <ol class="arts">
+    <li><span class="a">01</span><span>Does this make the promise more believable? <code>02</code></span></li>
+    <li><span class="a">02</span><span>Does the waiting state look like something valuable is happening? <code>03</code></span></li>
+    <li><span class="a">03</span><span>Does this make the letter matter more than us? <code>07</code></span></li>
+    <li><span class="a">04</span><span><b>Does this make it more likely we can still find them in 2041?</b> <code>09</code></span></li>
+  </ol>
+</section>
+
+<section id="inherit">
+  <span class="snum">Part XVI · What implementation inherits</span>
+  <h2>Eight product requirements</h2>
+  <ol class="arts">
+    <li><span class="a">01</span><span>Multiple contact routes per recipient, captured at creation.</span></li>
+    <li><span class="a">02</span><span>Periodic address re-verification, doubling as proof of life.</span></li>
+    <li><span class="a">03</span><span>Escalation to the creator when a route goes dark.</span></li>
+    <li><span class="a">04</span><span>A named custodian per account — inheritance, and the only acceptable basis for any post-death release.</span></li>
+    <li><span class="a">05</span><span>The annual rite.</span></li>
+    <li><span class="a">06</span><span>A right of withdrawal — destroy, never alter. <em>Pending founder decision.</em></span></li>
+    <li><span class="a">07</span><span>Short-form capsules as a first-class, deliberately un-ceremonious path.</span></li>
+    <li><span class="a">08</span><span>An archive that reads as a shelf, not a queue.</span></li>
+  </ol>
+  <p><b>Design work this creates:</b> ceremony that scales with duration ×
+  relationship · a tonal register for the ordinary capsule · past-tense-only
+  delivery language, absolutely · accumulation made visible.</p>
+  <footer>Meridian · Product Bible · phase 09. Extends <code>01</code>–<code>08</code>;
+  contradictions recorded in Part XIV. Time capsule statistics: International
+  Time Capsule Society.</footer>
+</section>
+</main>
+</div>

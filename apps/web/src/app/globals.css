@@ -28,30 +28,168 @@
   --color-danger: var(--color-danger);
   --color-info: var(--color-info);
 
+  /* One per real CapsuleStateSchema value. V1 mapped `opened`/`legacy`,
+     which are not capsule states (one is a per-recipient status, the other
+     a capsule type) and were dropped from tokens.css at T-12 — these two
+     utilities have resolved to nothing ever since. `sealing`/`expired` were
+     missing entirely. Corrected here. */
   --color-state-draft: var(--color-state-draft);
+  --color-state-sealing: var(--color-state-sealing);
   --color-state-sealed: var(--color-state-sealed);
   --color-state-unlocked: var(--color-state-unlocked);
-  --color-state-opened: var(--color-state-opened);
-  --color-state-legacy: var(--color-state-legacy);
+  --color-state-expired: var(--color-state-expired);
   --color-state-withdrawn: var(--color-state-withdrawn);
 
-  /* Self-hosted via next/font in layout.tsx — overrides tokens.css's plain
-     family-name strings, which only apply when a font is loaded via <link>. */
-  --font-sans: var(--font-inter), var(--font-ui), sans-serif;
-  --font-display: var(--font-fraunces), serif;
+  /* Register surfaces. A record paints on --color-record-surface, never on
+     the page background — design/06 §Constraint 1. */
+  --color-record-surface: var(--r-surface);
+  --color-record-ink: var(--r-ink);
+  --color-record-muted: var(--r-muted);
+  --color-record-rule: var(--r-rule);
+  --color-record-accent: var(--r-verdigris);
+
+  --color-overlay: var(--color-bg-overlay);
+  --color-rule: var(--color-rule);
+  --color-rule-strong: var(--color-rule-strong);
+  --color-interactive: var(--color-interactive);
+
+  /* Temperature ramp — markers, rules and glyphs only. Never text. */
+  --color-temp-1: var(--i-temp-1);
+  --color-temp-2: var(--i-temp-2);
+  --color-temp-3: var(--i-temp-3);
+  --color-temp-4: var(--i-temp-4);
+  --color-temp-5: var(--i-temp-5);
+  --color-temp-6: var(--i-temp-6);
+
+  /* Pairing C. Loaded and self-hosted by next/font in layout.tsx; tokens.css
+     already resolves the generated family names, so these just expose them
+     as Tailwind utilities.
+       font-instrument → chrome, dense data      (IBM Plex Sans)
+       font-record     → letters, reveals, print (Source Serif 4)
+       font-mono       → hallmarks, durations    (IBM Plex Mono)
+     `--font-sans` stays mapped to the instrument face because Tailwind's
+     default `font-sans` is what unstyled text inherits. */
+  --font-sans: var(--font-instrument);
+  --font-instrument: var(--font-instrument);
+  --font-record: var(--font-record);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-record); /* @deprecated → font-record */
 
   --radius-input: var(--radius-input);
   --radius-card: var(--radius-card);
   --radius-modal: var(--radius-modal);
   --radius-pill: var(--radius-pill);
 
+  --radius-record: var(--radius-record);
+
   --shadow-sm: var(--shadow-sm);
   --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
+  --shadow-record: var(--shadow-record);
+
+  /* Motion — three tiers decided by consequence (design/07 §VI).
+     duration-instant / duration-considered / ease-instant / ... */
+  --ease-instant: var(--ease-instant);
+  --ease-considered: var(--ease-considered);
+  --ease-approach: var(--ease-approach);
+  --ease-record: var(--ease-record);
+
+  /* Type scale — utilities text-hallmark … text-clock. */
+  --text-hallmark: var(--text-hallmark);
+  --text-caption: var(--text-caption);
+  --text-body-s: var(--text-body-s);
+  --text-body: var(--text-body);
+  --text-body-l: var(--text-body-l);
+  --text-title-s: var(--text-title-s);
+  --text-title: var(--text-title);
+  --text-display-s: var(--text-display-s);
+  --text-display: var(--text-display);
+  --text-clock: var(--text-clock);
+
+  --leading-tight: var(--lh-tight);
+  --leading-heading: var(--lh-heading);
+  --leading-body: var(--lh-body);
+  --leading-record: var(--lh-record);
+
+  --tracking-hallmark: var(--tracking-hallmark);
+  --tracking-tight: var(--tracking-tight);
 }
 
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+}
+
+/*
+ * ── MOTION UTILITIES ───────────────────────────────────────────────────
+ * design/07 §VI. Three tiers, decided by consequence, never by aesthetics:
+ * if you can undo it, it is instant; if you cannot, it is held.
+ *
+ * Components should reach for one of these three rather than composing
+ * `transition duration-X ease-Y` by hand — that is how a fourth, unowned
+ * tempo gets invented.
+ */
+@layer components {
+  /* Reversible. Navigation, settings, typing, toggles, hover. */
+  .motion-instant {
+    transition-property: color, background-color, border-color, opacity, box-shadow;
+    transition-duration: var(--motion-instant);
+    transition-timing-function: var(--ease-instant);
+  }
+
+  /* Changes what you are looking at. Entering the composer, opening a capsule. */
+  .motion-considered {
+    transition-property: opacity, transform, clip-path;
+    transition-duration: var(--motion-considered);
+    transition-timing-function: var(--ease-considered);
+  }
+
+  /* The approach half of a held beat. CONSTANT VELOCITY — never eases out,
+     because easing out anticipates arrival and the whole point is that
+     arrival is not yet. The stop and the state change are orchestrated in
+     JS, not here; a pure CSS transition cannot express a dead stop. */
+  .motion-approach {
+    transition-property: transform, opacity;
+    transition-duration: var(--motion-approach);
+    transition-timing-function: var(--ease-approach);
+  }
+
+  /* A record arriving into an emptied frame (design/06 §Final timeline). */
+  .motion-record-arrive {
+    transition-property: clip-path, transform, opacity;
+    transition-duration: var(--motion-record-arrive);
+    transition-timing-function: var(--ease-record);
+  }
+}
+
+/*
+ * The banned-motion backstop. `07 §XVI` forbids spinners, progress bars and
+ * skeleton pulse outright, and `07 §VI.1` bans spring/overshoot. The lint
+ * rule in packages/eslint-config catches these at author time; this catches
+ * anything that arrives through a dependency's own stylesheet.
+ */
+@media screen {
+  .animate-spin,
+  .animate-ping,
+  .animate-bounce {
+    animation: none !important;
+  }
+}
+
+/*
+ * Reduced motion. Movement collapses; the HELD BEATS DO NOT — they are
+ * timing rather than motion, and they carry the meaning (design/07 §VI.3).
+ * The token layer already zeroes the durations; this stops any hand-rolled
+ * transition or keyframe from surviving the preference.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

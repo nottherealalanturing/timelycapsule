@@ -25,3 +25,6 @@ build/
 .env.*.local
 .env.production
 !.env.production.example
+
+# Design-review capture scratch (regenerate with design/.shoot.mjs)
+design/shots/

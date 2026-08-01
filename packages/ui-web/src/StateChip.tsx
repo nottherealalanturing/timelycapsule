@@ -38,7 +38,9 @@ export function StateChip({ state, className }: StateChipProps) {
     <span
       className={cn(
         'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-xs font-medium',
-        state === 'unlocked' && 'animate-pulse',
+        // V1 pulsed on `unlocked`. Removed: it read as loading, and it
+        // animated a *terminal* state — the capsule has arrived, nothing is
+        // in progress (design/07 §VI.3). The label carries the state.
         className,
       )}
       style={{ color: `var(${colorVar})`, backgroundColor: `color-mix(in srgb, var(${colorVar}) 15%, transparent)` }}

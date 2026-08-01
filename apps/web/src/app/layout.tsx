@@ -1,19 +1,45 @@
 import type { Metadata } from 'next';
-import { Fraunces, Inter } from 'next/font/google';
+import { IBM_Plex_Mono, IBM_Plex_Sans, Source_Serif_4 } from 'next/font/google';
 import { Providers } from './providers';
 import './globals.css';
 
-const fraunces = Fraunces({
-  variable: '--font-fraunces',
+/**
+ * Meridian V2 · Pairing C — "The Almanac" (design/05 §Typography).
+ *
+ *   Records     → Source Serif 4   the letter, reveal, exports, print
+ *   Instruments → IBM Plex Sans    chrome, timeline, dense data
+ *   Hallmarks   → IBM Plex Mono    metadata, durations, public IDs
+ *
+ * All three are SIL OFL and variable, so they can be self-hosted permanently
+ * — the licence constraint that ruled out Pairing B. `next/font/google`
+ * self-hosts the files into the build output, so no request ever reaches
+ * Google at runtime; that matters here because a request to a third party
+ * on the recipient reveal path would leak that a capsule was opened.
+ *
+ * Serif is loaded with an italic axis because a record is read prose.
+ * The instrument faces are not: emphasis in an instrument is weight, never
+ * slant, and shipping unused axes costs bundle against a hard 3 MiB cap.
+ */
+const sourceSerif = Source_Serif_4({
+  variable: '--font-source-serif',
   subsets: ['latin'],
-  weight: ['400', '500', '600'],
+  weight: ['400', '600'],
   style: ['normal', 'italic'],
+  display: 'swap',
 });
 
-const inter = Inter({
-  variable: '--font-inter',
+const plexSans = IBM_Plex_Sans({
+  variable: '--font-plex-sans',
   subsets: ['latin'],
   weight: ['400', '500', '600'],
+  display: 'swap',
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: '--font-plex-mono',
+  subsets: ['latin'],
+  weight: ['400', '500'],
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -43,7 +69,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
+      className={`${sourceSerif.variable} ${plexSans.variable} ${plexMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <head>

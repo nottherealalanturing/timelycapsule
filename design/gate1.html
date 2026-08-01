@@ -1,0 +1,482 @@
+<title>Gate 1 — The Register Transition</title>
+
+<style>
+  /* The report is itself an instrument, so it is set in the instrument register.
+     Neutrals carry the same blue bias as the verified ground (#0B0E14) rather
+     than a default grey. Accent is brass, and brass only ever means "waiting". */
+  :root{
+    --p-bg:#0F131A;--p-raised:#171C26;--p-ink:#E6E8EC;--p-mute:#8B93A3;
+    --p-rule:rgba(230,232,236,.12);--p-acc:#E0B84A;--p-acc-ink:#12151C;
+  }
+  @media (prefers-color-scheme:light){:root{
+    --p-bg:#E9EAE6;--p-raised:#F3F4F0;--p-ink:#16181A;--p-mute:#5E635C;
+    --p-rule:rgba(22,24,26,.14);--p-acc:#6E5A0E;--p-acc-ink:#F3F4F0;}}
+  :root[data-theme=light]{--p-bg:#E9EAE6;--p-raised:#F3F4F0;--p-ink:#16181A;--p-mute:#5E635C;
+    --p-rule:rgba(22,24,26,.14);--p-acc:#6E5A0E;--p-acc-ink:#F3F4F0;}
+  :root[data-theme=dark]{--p-bg:#0F131A;--p-raised:#171C26;--p-ink:#E6E8EC;--p-mute:#8B93A3;
+    --p-rule:rgba(230,232,236,.12);--p-acc:#E0B84A;--p-acc-ink:#12151C;}
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--p-bg);color:var(--p-ink);
+    font-family:"Helvetica Neue",-apple-system,system-ui,sans-serif;line-height:1.6;
+    -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+  .wrap{max-width:1080px;margin:0 auto;padding:0 26px}
+  .lbl{font-family:Menlo,ui-monospace,monospace;font-size:.63rem;letter-spacing:.17em;
+    text-transform:uppercase;color:var(--p-mute)}
+  h1{font-family:Charter,Georgia,serif;font-weight:600;font-size:clamp(2rem,5vw,3.1rem);
+    line-height:1.05;letter-spacing:-.02em;margin:14px 0 0;text-wrap:balance}
+  h2{font-family:Charter,Georgia,serif;font-weight:600;font-size:1.6rem;margin:12px 0 10px}
+  h3{font-family:Charter,Georgia,serif;font-weight:600;font-size:1.1rem;margin:0 0 8px}
+  p{margin:0 0 13px}.lede{max-width:64ch;color:var(--p-mute)}
+  hr.rule{height:1px;background:var(--p-rule);border:0;margin:0}
+  section{padding:56px 0}
+  table{width:100%;border-collapse:collapse;font-size:.82rem;margin:12px 0}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--p-rule);vertical-align:top}
+  th{font-family:Menlo,monospace;font-size:.59rem;letter-spacing:.12em;text-transform:uppercase;color:var(--p-mute);font-weight:500}
+  .num{font-family:Menlo,monospace;font-size:.76rem}
+  .tbl-scroll{overflow-x:auto}
+  .note{border-left:2px solid var(--p-acc);padding:12px 16px;background:var(--p-raised);
+    font-size:.87rem;border-radius:0 3px 3px 0;margin:16px 0}
+  .warn{border-left-color:#D2694E}
+  .good{border-left-color:#4E9E76}
+  ul.t{margin:0 0 13px;padding-left:19px}ul.t li{margin-bottom:6px;font-size:.87rem}
+
+  /* ══════════ THE STAGE ══════════ */
+  .stage-shell{border:1px solid var(--p-rule);border-radius:6px;overflow:hidden;background:var(--p-raised)}
+  .stage{
+    /* the instrument surround — NEVER goes away */
+    background:#0B0E14; position:relative; height:430px;
+    display:grid; place-items:center; overflow:hidden;
+  }
+  @media(max-width:640px){.stage{height:390px}}
+
+  /* the capsule object — bounded, always inside the dark */
+  .capsule{
+    position:relative; width:min(430px,86%); min-height:250px;
+    border:1px solid rgba(230,232,236,.13);
+    display:flex; flex-direction:column;
+  }
+
+  /* meridian: the fixed reference. never moves, never fades. */
+  .meridian{position:absolute;top:-26px;bottom:-26px;left:30%;width:1px;
+    background:#E0B84A;opacity:.42;z-index:5}
+
+  /* instrument face */
+  .inst{padding:22px 24px;position:relative;z-index:3;color:#E6E8EC;
+    font-family:"Helvetica Neue",sans-serif}
+  .hall{font-family:Menlo,monospace;font-size:.58rem;letter-spacing:.15em;color:#8B93A3}
+  .cap-title{font-family:Charter,Georgia,serif;font-size:1.3rem;margin:8px 0 2px}
+  .cap-sub{font-size:.76rem;color:#8B93A3}
+  .clock{display:flex;border:1px solid rgba(230,232,236,.13);margin-top:18px}
+  .clock div{flex:1;padding:10px 12px}
+  .clock div+div{border-left:1px solid rgba(230,232,236,.13)}
+  .clock b{display:block;font-family:Menlo,monospace;font-size:.5rem;letter-spacing:.13em;
+    color:#8B93A3;margin-bottom:4px;font-weight:500}
+  .clock span{font-size:.95rem}
+  .cd{font-size:2.1rem;letter-spacing:-.03em;margin-top:16px;color:#E0B84A;line-height:1}
+
+  /* transit marker — approaches the meridian */
+  .marker{position:absolute;top:50%;margin-top:-5px;width:10px;height:10px;border-radius:50%;
+    border:2px solid #E0B84A;z-index:6;left:8%}
+  .marker.open{border-style:solid;clip-path:polygon(0 0,100% 0,100% 40%,0 40%,0 100%,100% 100%,100% 60%,0 60%)}
+
+  /* THE RECORD — a lit object withdrawn from the dark. bounded. never full-bleed. */
+  .record{
+    position:absolute; inset:0; z-index:4;
+    background:#E9EAE6; color:#16181A;
+    padding:24px 26px;
+    font-family:Charter,Georgia,serif;
+    clip-path:inset(0 70% 0 30%);
+    box-shadow:0 0 0 rgba(224,184,74,0);
+    display:flex;flex-direction:column;
+  }
+  .record .hall{color:#5E635C}
+  .rline{opacity:0}
+  .rstamp{
+    margin-top:auto;align-self:flex-end;border:1.5px solid #6E5A0E;color:#6E5A0E;
+    border-radius:50%;width:86px;height:86px;display:grid;place-items:center;text-align:center;
+    font-family:Menlo,monospace;transform:rotate(-8deg);opacity:0
+  }
+  .rstamp b{display:block;font-size:.42rem;letter-spacing:.14em}
+  .rstamp strong{display:block;font-size:.85rem;margin:2px 0}
+  .rstamp i{display:block;font-size:.38rem;letter-spacing:.08em;font-style:normal;opacity:.75}
+
+  /* controls */
+  .ctrl{display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    padding:14px 18px;border-top:1px solid var(--p-rule);background:var(--p-raised)}
+  .btn{font-family:inherit;font-size:.8rem;padding:8px 15px;border-radius:3px;cursor:pointer;
+    background:var(--p-acc);color:var(--p-acc-ink);border:0;font-weight:600}
+  .btn.sec{background:transparent;color:var(--p-ink);border:1px solid var(--p-rule);font-weight:400}
+  .btn:focus-visible,input:focus-visible{outline:2px solid var(--p-acc);outline-offset:2px}
+  input[type=range]{flex:1;min-width:150px;accent-color:var(--p-acc)}
+  .beat{font-family:Menlo,monospace;font-size:.62rem;letter-spacing:.1em;color:var(--p-mute);
+    min-width:190px;text-transform:uppercase}
+  label.sw{display:flex;gap:6px;align-items:center;font-size:.76rem;color:var(--p-mute);cursor:pointer}
+
+  /* storyboard */
+  .frames{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:11px;margin-top:18px}
+  .frame{border:1px solid var(--p-rule);border-radius:4px;overflow:hidden;background:var(--p-raised)}
+  .fvis{height:96px;background:#0B0E14;position:relative;overflow:hidden}
+  .fmer{position:absolute;top:0;bottom:0;left:30%;width:1px;background:#E0B84A;opacity:.42}
+  .fpap{position:absolute;inset:9px;background:#E9EAE6}
+  .fcap{padding:9px 11px}
+  .fcap b{display:block;font-family:Menlo,monospace;font-size:.52rem;letter-spacing:.1em;color:var(--p-acc)}
+  .fcap span{font-size:.72rem;color:var(--p-mute);line-height:1.45;display:block;margin-top:3px}
+
+  /* The verdict is a RECORD, not an instrument — so by the system's own rule it
+     is paper and serif in both themes, bounded, sitting on the report's ground. */
+  .verdict{border-radius:3px;padding:26px 28px;background:#E9EAE6;color:#16181A;
+    font-family:Charter,Georgia,"Times New Roman",serif;
+    box-shadow:0 1px 0 rgba(0,0,0,.18),0 18px 44px rgba(0,0,0,.28);
+    border-left:2px solid #6E5A0E}
+  .verdict h2{color:#16181A;margin-top:8px}
+  .verdict .lbl{color:#5E635C}
+  .verdict p{color:#16181A}
+  .verdict p[style*="--p-mute"]{color:#5E635C !important}
+  .q{border-bottom:1px solid var(--p-rule);padding:13px 0}
+  .q:last-child{border-bottom:0}
+  .q b{display:block;font-size:.92rem;margin-bottom:4px}
+  .q span{font-size:.86rem;color:var(--p-mute)}
+  .yes{color:#4E9E76;font-family:Menlo,monospace;font-size:.72rem;letter-spacing:.08em}
+  .qual{color:var(--p-acc);font-family:Menlo,monospace;font-size:.72rem;letter-spacing:.08em}
+</style>
+
+<div class="wrap">
+  <section style="padding-bottom:28px">
+    <div class="lbl">Meridian · Prototype Gate 1</div>
+    <h1>Does the record arriving feel like ceremony?</h1>
+    <p class="lede" style="margin-top:14px">The whole identity rests on one assumption: that crossing from the Instrument Register to the Record Register reads as a threshold, not a theme toggle. Scrub the timeline below to inspect any beat.</p>
+  </section>
+</div>
+
+<div class="wrap">
+  <div class="note"><b>The design decision that makes or breaks this.</b> A theme toggle changes the <em>background</em>. So the record must never be a background — it is <b>a lit object withdrawn from the dark</b>, bounded on all sides, with the instrument surround still visible around it. You are not moving to a light room; you are being handed a document in a dark one. If this is ever implemented as <span class="num">body{background:light}</span>, the ceremony dies instantly.</div>
+</div>
+
+<!-- ══════════ PROTOTYPE ══════════ -->
+<div class="wrap"><section style="padding-top:22px">
+  <div class="stage-shell">
+    <div class="stage" id="stage">
+      <div class="capsule" id="capsule">
+        <div class="meridian"></div>
+        <div class="marker" id="marker"></div>
+
+        <!-- INSTRUMENT FACE -->
+        <div class="inst" id="inst">
+          <div class="hall">TC-84KZQM3P</div>
+          <div class="cap-title">Letter to my daughter</div>
+          <div class="cap-sub">Sealed 14 March 2026 · for Amara</div>
+          <div class="clock" id="clock">
+            <div><b>Travelled</b><span>2 y 11 m 30 d</span></div>
+            <div><b>Remaining</b><span id="remain">00:03</span></div>
+          </div>
+          <div class="cd" id="cd">00:03</div>
+        </div>
+
+        <!-- RECORD FACE — bounded object, never full-bleed -->
+        <div class="record" id="record">
+          <div class="hall">TC-84KZQM3P · OPENED 14 MARCH 2029</div>
+          <div style="margin-top:14px;font-size:1rem;line-height:1.7">
+            <div class="rline" id="l1">Amara,</div>
+            <div class="rline" id="l2" style="margin-top:9px">By the time you read this you'll be eighteen.</div>
+            <div class="rline" id="l3" style="margin-top:7px;color:#5E635C">I've spent three years wondering what to say, and I still don't know. So I'll just say this —</div>
+          </div>
+          <div class="rstamp" id="stamp"><div>
+            <b>TRAVELLED</b><strong>3Y 0M 0D</strong>
+            <i>SEALED 14 MAR 2026</i><i>OPENED 14 MAR 2029</i>
+          </div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ctrl">
+      <button class="btn" id="play">Play</button>
+      <button class="btn sec" id="reset">Reset</button>
+      <input type="range" id="scrub" min="0" max="5800" value="0" step="10" aria-label="Scrub transition timeline">
+      <span class="beat" id="beat">0 ms · waiting</span>
+      <label class="sw"><input type="checkbox" id="rm"> Reduced motion</label>
+      <label class="sw">Mechanic
+        <select id="mech" style="font:inherit;font-size:.76rem;background:transparent;color:var(--p-ink);border:1px solid var(--p-rule);border-radius:3px;padding:4px 6px">
+          <option value="A">A · meridian wipe</option>
+          <option value="B">B · withdrawal</option>
+        </select>
+      </label>
+    </div>
+  </div>
+  <p style="font-size:.8rem;color:var(--p-mute);margin-top:10px">Scrub slowly through <span class="num">2000–2400ms</span>. That stretch is deliberately empty — it is the most important part of the sequence.</p>
+</section></div>
+
+<hr class="rule">
+
+<!-- ══════════ STORYBOARD ══════════ -->
+<div class="wrap"><section>
+  <div class="lbl">Storyboard</div>
+  <h2>Seven frames</h2>
+  <div class="frames">
+    <div class="frame"><div class="fvis"><div class="fmer"></div>
+      <div style="position:absolute;left:8%;top:50%;width:8px;height:8px;margin-top:-4px;border:2px solid #E0B84A;border-radius:50%"></div></div>
+      <div class="fcap"><b>1 · WAITING</b><span>Instrument. Marker distant. Dual clock reads both directions.</span></div></div>
+    <div class="frame"><div class="fvis"><div class="fmer"></div>
+      <div style="position:absolute;left:22%;top:50%;width:8px;height:8px;margin-top:-4px;border:2px solid #E0B84A;border-radius:50%"></div></div>
+      <div class="fcap"><b>2 · APPROACH</b><span>Constant velocity. Countdown in final register. Nothing accelerates.</span></div></div>
+    <div class="frame"><div class="fvis"><div class="fmer"></div>
+      <div style="position:absolute;left:calc(30% - 4px);top:50%;width:8px;height:8px;margin-top:-4px;border:2px solid #E0B84A;border-radius:50%"></div></div>
+      <div class="fcap"><b>3 · SILENCE</b><span>00:00. Everything stops for 400ms. No motion at all. The hardest beat to hold.</span></div></div>
+    <div class="frame"><div class="fvis"><div class="fmer" style="opacity:.9"></div>
+      <div style="position:absolute;left:calc(30% - 4px);top:50%;width:8px;height:8px;margin-top:-4px;border:2px solid #E0B84A;border-radius:50%;clip-path:polygon(0 0,100% 0,100% 40%,0 40%,0 100%,100% 100%,100% 60%,0 60%)"></div></div>
+      <div class="fcap"><b>4 · TRANSIT</b><span>The marker reaches the line. The seal opens — a state change, not an animation.</span></div></div>
+    <div class="frame"><div class="fvis"><div class="fmer"></div>
+      <div style="position:absolute;inset:9px;border:1px solid rgba(230,232,236,.13);opacity:.5"></div></div>
+      <div class="fcap"><b>5 · THE INSTRUMENT RECEDES</b><span>Countdown, clock and title fade and settle 6px. The frame is emptied <em>before</em> anything arrives.</span></div></div>
+    <div class="frame" style="outline:1px solid var(--p-acc)"><div class="fvis"><div class="fmer"></div>
+      <div style="position:absolute;inset:9px;border:1px solid rgba(230,232,236,.13)"></div></div>
+      <div class="fcap"><b>6 · THE EMPTY FRAME</b><span>200ms holding nothing but the line and the broken seal. <b>Discovered in prototyping — this is the actual ceremony beat.</b></span></div></div>
+    <div class="frame"><div class="fvis"><div class="fmer"></div>
+      <div class="fpap" style="clip-path:inset(0 55% 0 22%)"></div></div>
+      <div class="fcap"><b>7 · THE RECORD ARRIVES</b><span>Paper wipes outward from the meridian into the emptied frame. Nothing to cut through.</span></div></div>
+    <div class="frame"><div class="fvis"><div class="fmer"></div><div class="fpap" style="display:grid;place-items:end;padding:7px">
+      <div style="width:26px;height:26px;border:1.2px solid #6E5A0E;border-radius:50%"></div></div></div>
+      <div class="fcap"><b>8 · THE STAMP</b><span>After a long stillness, the duration franks itself. Last, quietest, and the thing that gets screenshotted.</span></div></div>
+  </div>
+</section></div>
+
+<hr class="rule">
+
+<!-- ══════════ TIMELINE ══════════ -->
+<div class="wrap"><section>
+  <div class="lbl">Transition timeline</div>
+  <h2>Motion specification</h2>
+  <div class="tbl-scroll"><table>
+    <tr><th>Time</th><th>Beat</th><th>What happens</th><th>Easing</th></tr>
+    <tr><td class="num">0–2000</td><td>Waiting / approach</td><td>Marker travels toward the meridian. Countdown ticks 00:03 → 00:00. Instrument register throughout.</td><td class="num">linear</td></tr>
+    <tr><td class="num">2000–2400</td><td><b>Silence</b></td><td><b>Nothing moves.</b> No fade, no pulse, no anticipation. 400ms of complete stillness at zero.</td><td>—</td></tr>
+    <tr><td class="num">2400–2700</td><td>Transit</td><td>Marker completes its crossing of the line. Meridian brightens .42 → .85.</td><td class="num">linear</td></tr>
+    <tr><td class="num">2700</td><td>Seal opens</td><td>Ring breaks at two points. <b>Instant state change</b>, not a tween — a seal is either intact or it isn't.</td><td class="num">step</td></tr>
+    <tr><td class="num">2705–3050</td><td>Instrument recedes</td><td>The whole instrument face — title, dual clock, countdown — fades out and settles <span class="num">6px</span>. The frame is emptied.</td><td class="num">ease-out</td></tr>
+    <tr><td class="num">3050–3250</td><td><b>The empty frame</b></td><td>200ms holding nothing but the meridian and the broken seal. The instrument has gone; the record has not come.</td><td>—</td></tr>
+    <tr><td class="num">3250–4100</td><td>The record arrives</td><td>Paper wipes outward from the meridian (<span class="num">clip-path inset</span>), 30%→0 left, 70%→0 right — asymmetric, so it reads as drawn out rather than symmetrically revealed. Lift <span class="num">scale .985→1</span>, warm rise capped at 6%.</td><td class="num">cubic-bezier(.32,0,.24,1)</td></tr>
+    <tr><td class="num">4100–4700</td><td>The letter</td><td>Three lines fade in, staggered 90ms. Reading rhythm, not a reveal effect.</td><td class="num">ease-out</td></tr>
+    <tr><td class="num">4700–5400</td><td><b>Stillness</b></td><td>Nothing happens for 700ms. The letter is simply there to be read.</td><td>—</td></tr>
+    <tr><td class="num">5400–5800</td><td>Duration stamp</td><td>Franks in at 88% opacity. No rotation animation, no bounce. It was always going to be true.</td><td class="num">ease-out</td></tr>
+  </table></div>
+
+  <div class="tbl-scroll"><table style="margin-top:20px">
+    <tr><th>Category</th><th>Element</th><th>Rationale</th></tr>
+    <tr><td><b>Fixed — never moves or fades</b></td><td>The meridian line · the hallmark (<span class="num">TC-84KZQM3P</span>) · the dark surround · the capsule's outer frame</td><td>These are the institution. If the permanent things moved, nothing would feel permanent.</td></tr>
+    <tr><td><b>Moves</b></td><td>The transit marker · the paper's arrival and lift</td><td>These are the instrument and the record — the only two things with anywhere to be.</td></tr>
+    <tr><td><b>Fades out</b></td><td>The entire instrument face — title, dual clock, countdown</td><td>Their purpose is complete, and they must be <em>gone</em> before the record arrives. The elapsed figure returns as the duration stamp, in the record's own register.</td></tr>
+    <tr><td><b>Changes instantly</b></td><td>The seal state</td><td>A seal is intact or broken. Tweening it would be a lie about what a seal is.</td></tr>
+    <tr><td><b>Changes gradually</b></td><td>The surface · the light · the letter</td><td>Withdrawal is a physical act with duration.</td></tr>
+    <tr><td><b>Where motion stops</b></td><td>2000–2400 · 3050–3250 · 4700–5400</td><td>Three silences. The first makes the transit land. The second — the empty frame — is the threshold itself. The third gives the letter room to be read rather than watched.</td></tr>
+  </table></div>
+
+  <div class="note"><b>Where silence beats animation.</b> The 400ms dead stop at zero and the 200ms empty frame are the two most important instructions in this spec. Every instinct — and every animation library — wants to peak at those moments. Stopping instead is what converts a transition into a threshold. They are also the beats most likely to be "fixed" by a well-meaning engineer who thinks the page has frozen. Protect them in review.</div>
+
+  <div class="note warn"><b>Two things prototyping changed, that reasoning had not.</b>
+  <p style="margin:8px 0 0"><b>1 · The registers must not overlap.</b> The first build ran the paper reveal over the still-present instrument face. Every mid-transition frame sliced the headline mid-word — an ugly geometric cut that read as a slide-deck wipe. Fixing the <em>mechanic</em> didn't help; a vertical variant just read as a modal dropping in. The fix was sequencing: <b>clear the instrument, hold nothing, then bring the record in.</b> Two acts with a pause, not one crossfade.</p>
+  <p style="margin:8px 0 0"><b>2 · The empty frame is the ceremony.</b> Once the pause existed, it became obvious it was carrying the whole moment — not the paper's arrival. The threshold is the instant the instrument has given way and the record has not yet come. That beat was not in the original design. It is now the thing to protect.</p>
+  <p style="margin:8px 0 0"><b>Also corrected:</b> the transit marker kept travelling during the "silence" — the silence wasn't silent. Zero and the crossing are now the same event at <span class="num">2000ms</span>, and the marker holds absolutely still until <span class="num">2400</span>.</p></div>
+</section></div>
+
+<hr class="rule">
+
+<!-- ══════════ CRAFT NOTES ══════════ -->
+<div class="wrap"><section>
+  <div class="lbl">Craft</div>
+  <h2>Typography, lighting, spacing, sound</h2>
+  <div class="tbl-scroll"><table>
+    <tr><th>Dimension</th><th>Decision</th></tr>
+    <tr><td><b>Typography</b></td><td><b>Nothing morphs.</b> Instrument text (hallmark, dates, clock) is sans and stays sans. The letter is serif and <em>didn't exist before</em> — it arrives already in Source Serif. No text ever crossfades between faces, which is where this kind of transition normally looks cheap.</td></tr>
+    <tr><td><b>Colour</b></td><td>The dark never changes value. Only the record's own surface is paper. The register shift is a change of <em>object</em>, not of environment.</td></tr>
+    <tr><td><b>Lighting</b></td><td>A brief warm rise as the paper arrives, settling to neutral within 400ms — light falling on a document as it's drawn out, not a glow effect. Peak stays under 6% opacity. Any more and it becomes spectacle.</td></tr>
+    <tr><td><b>Spacing</b></td><td>The record's padding is slightly greater than the instrument's (26px vs 24px). Imperceptible consciously; reads as the document having room to breathe.</td></tr>
+    <tr><td><b>Hierarchy</b></td><td>Inverts cleanly. Instrument: the countdown dominates. Record: the letter's first line dominates and the metadata recedes to a caption. The reader's attention is handed from the clock to the words.</td></tr>
+    <tr><td><b>Sound (optional)</b></td><td>At most one event: a soft mechanical release at the seal — a latch, not a chime. Never musical, never a swell, never at arrival. Default off. If it can't be done at the quality of a well-made drawer closing, do it not at all.</td></tr>
+    <tr><td><b>Accessibility</b></td><td>Transition announced via <span class="num">aria-live="polite"</span>: "Capsule opened. Travelled three years." Focus moves to the letter heading. All state also carried in text — nothing depends on colour or motion. Paper register is <span class="num">14.73:1</span>.</td></tr>
+    <tr><td><b>Reduced motion</b></td><td>No wipe, no lift, no stagger, no glow. Instrument fades over 150ms, paper cross-fades in over 300ms, letter and stamp arrive with it. <b>All three silences are preserved</b> — including the empty frame. They aren't motion, they're timing, and they carry the meaning. Toggle it in the prototype and compare.</td></tr>
+  </table></div>
+</section></div>
+
+<hr class="rule">
+
+<!-- ══════════ EVALUATION ══════════ -->
+<div class="wrap"><section>
+  <div class="lbl">Evaluation</div>
+  <h2>The six questions</h2>
+
+  <div class="q"><b>1 · Does this feel like ceremony rather than a theme switch? <span class="yes">YES — on two conditions</span></b>
+    <span>Yes, but only after two structural fixes that prototyping forced. <b>(a) The record must be a bounded object with the dark surviving on all four sides</b> — the moment paper becomes the page background it is a theme toggle, immediately and irrecoverably. <b>(b) The registers must never overlap in time</b> — instrument out, pause, record in. The first build crossfaded them and looked like a slide-deck wipe; no easing or mechanic change rescued it, because the problem was sequencing. Both conditions are load-bearing, not polish.</span></div>
+
+  <div class="q"><b>2 · Does it strengthen trust? <span class="yes">YES</span></b>
+    <span>The permanent things — meridian, hallmark, frame — visibly do not move while everything else does. That's the institution holding still while the instrument works, made literal. Nothing overshoots, nothing bounces, nothing accelerates into arrival.</span></div>
+
+  <div class="q"><b>3 · Does it reinforce waiting as the manufacturing process? <span class="qual">PARTIALLY — the weakest answer</span></b>
+    <span>The transition dramatises <em>arrival</em>, not the wait that produced it. The manufacturing idea rides entirely on the duration stamp at 5400ms — "travelled 3 years" — which lands last and quietest. That's the right restraint, but it puts the philosophical payload in the least emphatic beat. The empty frame helps more than expected (it reads as something being retrieved from storage), but I won't claim it closes the gap. <b>If this needs strengthening, the fix belongs in the static composition of the record, not in more motion.</b></span></div>
+
+  <div class="q"><b>4 · Would a first-time recipient understand the shift without explanation? <span class="yes">YES</span></b>
+    <span>The physical metaphor — something sealed, opening, a document coming out — needs no product literacy. Test it on the P8 persona path (no account, old phone, arriving cold) before shipping, but the grammar is universal.</span></div>
+
+  <div class="q"><b>5 · Is this worth making the defining interaction? <span class="qual">NOT ON ITS OWN</span></b>
+    <span>The <b>Seal</b> should remain the defining interaction. It's the creator's moment, it's irreversible, it's active, and it happens to everyone who uses the product. This transition is the <em>recipient's</em> counterpart — the payoff, not the signature. Naming it the defining interaction would put the brand's weight on the moment users experience least often. Keep them paired: you press to seal, you watch to receive.</span></div>
+
+  <div class="q"><b>6 · If not, what should replace it? <span class="yes">NOTHING — IT HOLDS</span></b>
+    <span>Direction 3 survives the gate. No fallback to Direction 1 required.</span></div>
+</section></div>
+
+<hr class="rule">
+
+<div class="wrap"><section>
+  <div class="verdict">
+    <div class="lbl">Verdict</div>
+    <h2 style="margin-top:8px">Gate 1 passes — with two non-negotiable constraints</h2>
+    <p style="margin-bottom:6px"><b>1 · The record is an object, never a background.</b> Bounded on all four sides, with the instrument surround always visible.</p>
+    <p style="margin-bottom:14px"><b>2 · The registers never overlap in time.</b> Instrument clears → empty frame → record arrives. Never a crossfade.</p>
+    <p style="margin:0;color:var(--p-mute);font-size:.9rem">Direction 3 survives, but not in the form it was signed off in — the second constraint is new, and the version I first built failed. Everything else — the semantic register split, type mapping to surface, paper for records and email — is validated and can proceed. Both rules belong in the Design Constitution.</p>
+  </div>
+
+  <h3 style="margin-top:30px">Implementation recommendation</h3>
+  <ul class="t">
+    <li><b>CSS only.</b> This entire prototype is <span class="num">clip-path</span>, opacity and transform driven by one scalar. <b>GSAP is not needed here</b> — which revises the earlier recommendation. It may still earn its place on the <em>seal</em> timeline, where a user-controlled reversible scrub is genuinely harder; it does not earn it on the reveal, and the reveal is the path that must run on old phones.</li>
+    <li><b>Drive from a single timeline scalar</b> (0→1), not chained transitions. That's what makes it scrubbable, interruptible and skippable for free.</li>
+    <li><b>Skippable at any point</b> — tap advances to the end state immediately. The reveal belongs to the recipient; if they want the letter now, they get the letter now.</li>
+    <li><b>Never replay.</b> Returning to an opened capsule shows the record at rest. Ceremony repeated is spectacle.</li>
+  </ul>
+
+  <h3 style="margin-top:24px">Risks</h3>
+  <ul class="t">
+    <li><b>The silences will be "fixed."</b> A 400ms freeze and a 200ms empty frame both look like bugs to anyone who doesn't know they're deliberate. The empty frame is the more fragile of the two — it looks like a failed render. Comment both in code and defend them in review.</li>
+    <li><b>The overlap will creep back.</b> Crossfading the two registers is the obvious, cheap implementation, and it is exactly what fails. Any PR that animates instrument-out and record-in concurrently has broken the gate.</li>
+    <li><b>The full-bleed temptation.</b> On mobile, the record will want to fill the viewport. It must not — the surround needs to survive at every breakpoint, which is a real constraint on small-screen layout. <b>This is the most likely way the identity quietly dies.</b></li>
+    <li><b>Lighting creep.</b> The warm rise is capped at 6% opacity. Glow effects grow every time someone touches them.</li>
+    <li><b>Question 3 remains half-answered.</b> The wait's meaning rides on the duration stamp. If usage shows people miss it, the fix is emphasis in the <em>static</em> composition — not more motion.</li>
+  </ul>
+
+  <div class="note good" style="margin-top:22px"><b>Cleared to proceed.</b> Final logo (system v + ii) → Meridian design system refresh → T-21 → web UI → mobile. Carry forward two new constitutional principles: <b>the record is an object, never a background</b>, and <b>the registers never overlap in time.</b></div>
+</section></div>
+
+<script>
+(function(){
+  var DUR=5800;
+  var stage=document.getElementById('stage'), rec=document.getElementById('record'),
+      marker=document.getElementById('marker'), cd=document.getElementById('cd'),
+      remain=document.getElementById('remain'), clock=document.getElementById('clock'),
+      inst=document.getElementById('inst'), stamp=document.getElementById('stamp'),
+      mer=document.querySelector('.meridian'), cap=document.getElementById('capsule'),
+      beat=document.getElementById('beat'), scrub=document.getElementById('scrub'),
+      play=document.getElementById('play'), reset=document.getElementById('reset'),
+      rm=document.getElementById('rm'), mech=document.getElementById('mech'),
+      L=[document.getElementById('l1'),document.getElementById('l2'),document.getElementById('l3')];
+
+  function clamp(v,a,b){return Math.min(b,Math.max(a,v));}
+  function seg(t,a,b){return clamp((t-a)/(b-a),0,1);}
+  // cubic-bezier(.32,0,.24,1) approximation
+  function ease(p){return p<.5?4*p*p*p:1-Math.pow(-2*p+2,3)/2;}
+
+  function label(t){
+    if(t<2000)return 'approach · instrument';
+    if(t<2400)return '· · · silence · · ·';
+    if(t<2700)return 'transit';
+    if(t<2705)return 'seal opens';
+    if(t<3050)return 'instrument recedes';
+    if(t<3250)return '· · · the empty frame · · ·';
+    if(t<4100)return 'the record arrives';
+    if(t<4700)return 'the letter';
+    if(t<5400)return '· · · stillness · · ·';
+    return 'duration stamp';
+  }
+
+  function render(t){
+    var reduced=rm.checked;
+
+    // countdown 00:03 -> 00:00
+    var secs=Math.max(0,3-Math.floor(t/667));
+    var txt='00:0'+secs;
+    cd.textContent=txt; remain.textContent=txt;
+
+    // marker approaches and ARRIVES at the meridian exactly at zero (2000).
+    // It then holds absolutely still through the silence, and completes its
+    // crossing at 2400. Zero and the crossing must be the same event.
+    var mx;
+    if(t<2000)      mx = 8 + seg(t,0,2000)*22;      // approach, constant velocity
+    else if(t<2400) mx = 30;                        // SILENCE — nothing moves
+    else            mx = 30 + seg(t,2400,2700)*2;   // the crossing completes
+    marker.style.left=mx+'%';
+
+    // seal opens — instant step at 2700
+    marker.classList.toggle('open', t>=2700);
+
+    // meridian brightens through transit
+    mer.style.opacity = 0.42 + seg(t,2400,2700)*0.43;
+
+    // ── the instrument recedes FIRST. The two registers must never
+    //    coexist mid-transition, or the reveal slices through live text.
+    var gone = reduced ? seg(t,2705,2855) : seg(t,2705,3050);
+    inst.style.opacity = 1-gone;
+    inst.style.transform = 'translateY('+(gone*6).toFixed(2)+'px)';
+
+    // ── then, after the empty frame, the record arrives.
+    var w;
+    if(reduced){
+      w = t>=3050 ? seg(t,3050,3350) : 0;      // 300ms crossfade, no wipe
+      rec.style.clipPath='inset(0 0 0 0)';
+      rec.style.opacity=w;
+      rec.style.transform='none';
+      rec.style.boxShadow='none';
+    } else {
+      w = ease(seg(t,3250,4100));
+      rec.style.opacity = t>=3250?1:0;
+      if(mech.value==='B'){
+        // B — WITHDRAWAL. The sheet is drawn upward out of the instrument.
+        // Revealed top-edge-first, growing downward, translating up as it clears.
+        rec.style.clipPath='inset(0 0 '+(100-100*w)+'% 0)';
+        rec.style.transform='translateY('+(14-14*w).toFixed(2)+'px) scale('+(0.985+0.015*w)+')';
+      } else {
+        // A — MERIDIAN WIPE. Opens outward from the line, asymmetrically:
+        // the right edge travels 2.3x further, so it reads as being drawn out
+        // rather than symmetrically revealed.
+        rec.style.clipPath='inset(0 '+(70-70*w)+'% 0 '+(30-30*w)+'%)';
+        rec.style.transform='scale('+(0.985+0.015*w)+')';
+      }
+      var glow=Math.sin(w*Math.PI)*0.06;           // rises then settles, capped 6%
+      rec.style.boxShadow='0 0 40px rgba(224,184,74,'+glow.toFixed(3)+')';
+    }
+
+    // letter lines
+    L.forEach(function(el,i){
+      el.style.opacity = reduced ? (t>=3050?seg(t,3050,3350):0)
+                                 : seg(t,4100+i*90,4400+i*90);
+    });
+
+    // stamp
+    stamp.style.opacity = (reduced ? (t>=3050?seg(t,3050,3350):0) : seg(t,5400,5800))*0.88;
+
+    beat.textContent = Math.round(t)+' ms · '+label(t);
+  }
+
+  var raf=null, start=null, playing=false;
+  function frame(ts){
+    if(!start) start=ts - (+scrub.value);
+    var t=clamp(ts-start,0,DUR);
+    scrub.value=t; render(t);
+    if(t<DUR){ raf=requestAnimationFrame(frame); }
+    else { playing=false; play.textContent='Replay'; }
+  }
+  play.addEventListener('click',function(){
+    if(playing){ cancelAnimationFrame(raf); playing=false; play.textContent='Resume'; return; }
+    if(+scrub.value>=DUR){ scrub.value=0; }
+    start=null; playing=true; play.textContent='Pause'; raf=requestAnimationFrame(frame);
+  });
+  reset.addEventListener('click',function(){
+    cancelAnimationFrame(raf); playing=false; play.textContent='Play';
+    scrub.value=0; render(0);
+  });
+  scrub.addEventListener('input',function(){
+    cancelAnimationFrame(raf); playing=false; play.textContent='Play'; render(+scrub.value);
+  });
+  rm.addEventListener('change',function(){ render(+scrub.value); });
+  mech.addEventListener('change',function(){ render(+scrub.value); });
+
+  if(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches){ rm.checked=true; }
+  render(0);
+})();
+</script>

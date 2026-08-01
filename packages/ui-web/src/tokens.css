@@ -1,35 +1,186 @@
 /**
- * Meridian design tokens — plan/02-UX-DESIGN.md §6.
- * Component library is built out in T-06; this file is the source of truth
- * for color/spacing/radius/shadow primitives consumed by Tailwind config.
+ * Meridian V2 — design tokens.
+ *
+ * Supersedes the V1 palette from plan/02-UX-DESIGN.md §6.
+ * Source of truth: design/05-IDENTITY-DECISION.md (verified WCAG values),
+ * design/06-GATE-1-RESULT.md (register rules), design/07-EXPERIENCE-BIBLE.md
+ * (motion constitution).
+ *
+ * ─────────────────────────────────────────────────────────────────────────
+ * THE ONE RULE THIS FILE ENCODES
+ *
+ *   Instruments are dark and set in sans. Records are paper and set in serif.
+ *
+ * There are two REGISTERS, and they are semantic, not decorative:
+ *
+ *   INSTRUMENT (--i-*)  app chrome, timeline, countdown, waiting, composer
+ *   RECORD     (--r-*)  the letter, reveal, exports, emails, print, keepsakes
+ *
+ * A register is chosen by WHAT A SURFACE IS, never by user preference.
+ * The light/dark toggle is a preference override of the INSTRUMENT register
+ * only. The record register is paper permanently, in both themes — because
+ * Gate 1 proved the ceremony dies the moment paper becomes a background
+ * rather than a bounded object (design/06 §Constraint 1).
+ *
+ * Every ratio below was computed, not estimated. The V1 ramp shipped a 2.72
+ * contrast into the most-viewed component because it was eyeballed
+ * (design/05 §Temperature ramps). Do not re-derive these by eye.
+ * ─────────────────────────────────────────────────────────────────────────
  */
 
 :root {
-  /* Core palette (light) */
-  --color-bg-primary: #faf7f2; /* parchment */
-  --color-bg-raised: #ffffff;
-  --color-text-primary: #1c1e2e; /* ink */
-  --color-text-secondary: #8a8fa3; /* mist */
-  --color-accent-gold: #d4a24e; /* amber-gold — seal color */
-  --color-accent-violet: #6c5ce7; /* dusk-violet */
-  --color-success: #2f9e6e;
-  --color-warning: #e0a63a;
-  --color-danger: #d95656;
-  --color-info: #4a7fd4;
+  /* ══ REGISTER 1 · INSTRUMENT ══════════════════════════════════════════
+     Dark. Ratios are against --i-ground unless noted. */
+  --i-ground: #0b0e14;
+  --i-raised: #141922;
+  --i-overlay: #1c2230;
+  --i-ink: #e6e8ec; /* 15.75 AAA */
+  --i-muted: #8b93a3; /* 6.26 AA  */
+  --i-brass: #e0b84a; /* 10.23 AAA — WAITING, and nothing else */
+  --i-steel: #7a8ab0; /* 5.60 AA  — interactive */
 
-  /* Capsule state colors — one per real CapsuleStateSchema value (03-ARCHITECTURE.md §8) */
-  --color-state-draft: #8a8fa3;
-  --color-state-sealing: #4a9fd8;
-  --color-state-sealed: #d4a24e;
-  --color-state-unlocked: #6c5ce7;
-  --color-state-expired: #6b7280;
-  --color-state-withdrawn: #a85d5d;
+  --i-rule: rgba(230, 232, 236, 0.13);
+  --i-rule-strong: rgba(230, 232, 236, 0.26);
 
-  /* Typography */
-  --font-display: 'Fraunces', serif;
-  --font-ui: 'Inter', sans-serif;
+  /* Temperature ramp, cold → warm. Corrected; every step clears AA.
+     Colours markers, rules and glyphs ONLY. Never carries text, and never
+     acts as a text-bearing surface (design/05 §Two rules). */
+  --i-temp-1: #7a8ab0; /* 5.60 */
+  --i-temp-2: #8e88b2; /* 5.81 */
+  --i-temp-3: #a78ca6; /* 6.39 */
+  --i-temp-4: #be9186; /* 6.98 */
+  --i-temp-5: #d0a06a; /* 8.20 */
+  --i-temp-6: #e0b84a; /* 10.23 */
 
-  /* Spacing (4pt grid) */
+  --i-success: #4e9e76;
+  --i-warning: #c8923c;
+  --i-danger: #d2694e;
+
+  /* ══ REGISTER 2 · RECORD ══════════════════════════════════════════════
+     Paper. Permanently, in both themes. Never themed away. */
+  --r-ground: #e9eae6;
+  --r-raised: #f3f4f0;
+  --r-ink: #16181a; /* 14.73 AAA on ground */
+  --r-muted: #5e635c; /* 5.09 AA */
+  --r-verdigris: #3f6154; /* 5.70 AA */
+  --r-iron: #2c3a4a; /* 9.59 AAA — interactive */
+
+  --r-rule: rgba(22, 24, 26, 0.14);
+  --r-rule-strong: rgba(22, 24, 26, 0.28);
+
+  --r-temp-1: #4a5c74; /* 5.65 */
+  --r-temp-2: #5a5674; /* 5.76 */
+  --r-temp-3: #6e566a; /* 5.43 */
+  --r-temp-4: #7a5348; /* 5.50 */
+  --r-temp-5: #7c5520; /* 5.47 */
+  --r-temp-6: #6e5a0e; /* 5.55 — waiting, in the record register */
+
+  --r-success: #2f6b4c;
+  --r-warning: #7a5a18;
+  --r-danger: #a33f28;
+
+  /* The surface a record actually paints on. Lifts in the light theme so a
+     record never sits on a ground of its own value — it must always read as
+     a bounded object (design/06 §Constraint 1). */
+  --r-surface: var(--r-ground);
+
+  /* ══ SEMANTIC LAYER ═══════════════════════════════════════════════════
+     What components consume. Chrome resolves to the instrument register.
+     These names are unchanged from V1 on purpose: the whole point of the
+     token architecture is that a register swap propagates without touching
+     component code. */
+  --color-bg-primary: var(--i-ground);
+  --color-bg-raised: var(--i-raised);
+  --color-bg-overlay: var(--i-overlay);
+  --color-text-primary: var(--i-ink);
+  --color-text-secondary: var(--i-muted);
+  --color-accent-gold: var(--i-brass);
+  --color-rule: var(--i-rule);
+  --color-rule-strong: var(--i-rule-strong);
+
+  /* Focus / interactive. V1 used a dusk-violet that V2 does not have;
+     `--color-accent-violet` is kept as a deprecated alias so V1 components
+     keep working until the primitives layer retires it. */
+  --color-interactive: var(--i-steel);
+  --color-accent-violet: var(--color-interactive); /* @deprecated → --color-interactive */
+
+  /* Text/iconography sitting ON a brass fill. Brass is a LIGHT surface in the
+     instrument register, so anything on it must be the dark ground — V1 put
+     near-white on gold and measured 1.54:1, an AA failure that predates this
+     refresh and is simply more visible now. In the light theme brass darkens,
+     so this inverts. */
+  --color-on-accent: var(--i-ground);
+
+  --color-success: var(--i-success);
+  --color-warning: var(--i-warning);
+  --color-danger: var(--i-danger);
+  --color-info: var(--i-steel);
+
+  /* Capsule states — CapsuleStateSchema, exactly.
+     Brass appears on `sealed` and nowhere else: the moment it decorates
+     anything but waiting, the reserved meaning is gone (design/05). */
+  --color-state-draft: var(--i-muted); /* nothing is waiting yet   */
+  --color-state-sealing: var(--i-steel); /* transient                */
+  --color-state-sealed: var(--i-brass); /* WAITING — the one use    */
+  --color-state-unlocked: var(--i-success); /* arrived                  */
+  --color-state-expired: color-mix(in srgb, var(--i-ink) 38%, transparent);
+  --color-state-withdrawn: var(--i-muted); /* deliberate, not an error */
+
+  /* ══ TYPOGRAPHY ═══════════════════════════════════════════════════════
+     Pairing C · The Almanac. Records read in serif, instruments in sans,
+     hallmarks and metadata in mono (design/05 §Typography).
+
+     The var(--font-*, '<name>') form matters: next/font generates its own
+     family names and exposes them as those variables, but the inner fallback
+     keeps this file valid anywhere next/font is absent (mobile, email,
+     Storybook) instead of collapsing the whole declaration. */
+  --font-record: var(--font-source-serif, 'Source Serif 4'), Charter, 'Iowan Old Style', Georgia, serif;
+  --font-instrument: var(--font-plex-sans, 'IBM Plex Sans'), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-plex-mono, 'IBM Plex Mono'), ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* ── Type scale ────────────────────────────────────────────────────────
+     A modular scale, not ad-hoc sizes. Numerals are structural here, not
+     cosmetic: the same face has to hold `00:47`, `9 days` and
+     `3 years, 2 months, 6 days` with equal authority and stay tabular
+     across every magnitude (design/03 §VII). That is why every size below
+     pairs with `--lh-*` rather than a unitless multiplier — a dual clock
+     must not reflow as digits change width. */
+  --text-hallmark: 0.6875rem; /* 11px · mono, uppercase, tracked */
+  --text-caption: 0.8125rem; /* 13px */
+  --text-body-s: 0.875rem; /* 14px */
+  --text-body: 1rem; /* 16px */
+  --text-body-l: 1.125rem; /* 18px · record reading size */
+  --text-title-s: 1.25rem; /* 20px */
+  --text-title: 1.5rem; /* 24px */
+  --text-display-s: 2rem; /* 32px */
+  --text-display: 2.75rem; /* 44px */
+  --text-clock: 3.25rem; /* 52px · the dual clock's own size */
+
+  --lh-tight: 1.1;
+  --lh-heading: 1.2;
+  --lh-body: 1.55;
+  --lh-record: 1.65; /* records are read, not scanned */
+
+  --tracking-hallmark: 0.14em; /* uppercase mono needs air */
+  --tracking-tight: -0.015em; /* display sizes only */
+  --tracking-normal: 0;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  /* Measure. Running text stays near 65 characters; records are the only
+     surface that gets the full comfortable width. */
+  --measure-record: 66ch;
+  --measure-ui: 58ch;
+
+  /* V1 aliases — retired. Kept only as a redirect so any straggling
+     reference resolves to the V2 family rather than silently falling back
+     to a system serif. Delete once grep is clean. */
+  --font-display: var(--font-record); /* @deprecated → --font-record     */
+  --font-ui: var(--font-instrument); /* @deprecated → --font-instrument */
+
+  /* ══ SPACING · 4pt grid (unchanged from V1) ═══════════════════════════ */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -39,40 +190,144 @@
   --space-12: 48px;
   --space-16: 64px;
 
-  /* Radius */
-  --radius-input: 10px;
-  --radius-card: 16px;
-  --radius-modal: 20px;
+  /* ══ RADIUS ═══════════════════════════════════════════════════════════
+     Tightened from V1. An instrument is machined, not rounded; V1's 10/16/20
+     read as consumer-app soft (design/04 §shape). Records are barely rounded
+     because paper has cut edges. */
+  --radius-input: 3px;
+  --radius-card: 4px;
+  --radius-modal: 5px;
+  --radius-record: 3px;
   --radius-pill: 999px;
 
-  /* Shadows (light) */
-  --shadow-sm: 0 1px 2px rgba(28, 30, 46, 0.06);
-  --shadow-md: 0 4px 12px rgba(28, 30, 46, 0.08);
-  --shadow-lg: 0 12px 32px rgba(28, 30, 46, 0.12);
-}
-
-:root[data-theme='dark'] {
-  --color-bg-primary: #0f1222; /* midnight */
-  --color-bg-raised: #171a2e;
-  --color-text-primary: #f3f1eb;
-  --color-text-secondary: #9a9fb3;
-  --color-accent-gold: #e3b865;
-  --color-accent-violet: #8b7cf0;
+  /* ══ ELEVATION ════════════════════════════════════════════════════════
+     The instrument register barely elevates — depth is carried by rules and
+     value, not by drop shadows. The RECORD always casts, in both themes:
+     that shadow is what makes it read as an object lying in a dark room
+     rather than a panel of background (design/06 §Constraint 1). */
   --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: none;
+  --shadow-md: 0 1px 0 rgba(0, 0, 0, 0.22);
+  --shadow-lg: 0 2px 0 rgba(0, 0, 0, 0.24), 0 18px 44px rgba(0, 0, 0, 0.3);
+  --shadow-record: 0 1px 0 rgba(0, 0, 0, 0.2), 0 16px 40px rgba(0, 0, 0, 0.26);
+
+  /* ══ MOTION ═══════════════════════════════════════════════════════════
+     Three tiers, decided by consequence, never by aesthetics
+     (design/07 §VI). If you can undo it, it is instant. If you cannot,
+     it is held. */
+
+  /* Tier 1 · INSTANT — reversible. Navigation, settings, typing, toggles. */
+  --motion-instant: 120ms;
+  --ease-instant: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Tier 2 · CONSIDERED — changes what you are looking at. */
+  --motion-considered: 240ms;
+  --motion-considered-max: 400ms;
+  --ease-considered: cubic-bezier(0.2, 0, 0, 1);
+
+  /* Tier 3 · HELD — irreversible. Seal, transit, reveal, permanent delete.
+     Three mandatory parts: an approach at CONSTANT VELOCITY (never eases
+     out — easing out anticipates arrival, and the point is that arrival is
+     not yet), a full stop, then an instant state change. */
+  --motion-approach: 900ms;
+  --ease-approach: linear;
+  --motion-hold: 400ms; /* total stillness — see the guard below */
+  --motion-empty-frame: 200ms; /* Gate 1's threshold beat            */
+  --motion-record-arrive: 850ms;
+  --ease-record: cubic-bezier(0.32, 0, 0.24, 1);
+
+  /* Springs, bounces and overshoot are permanently banned: materials in an
+     instrument do not bounce (design/07 §VI.1). No token is provided,
+     deliberately — there is nothing to reach for. */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --color-bg-primary: #0f1222;
-    --color-bg-raised: #171a2e;
-    --color-text-primary: #f3f1eb;
-    --color-text-secondary: #9a9fb3;
-    --color-accent-gold: #e3b865;
-    --color-accent-violet: #8b7cf0;
+/* ══════════════════════════════════════════════════════════════════════
+   LIGHT THEME — a preference override of the INSTRUMENT register only.
+   Values are borrowed from the verified record palette rather than
+   invented, so nothing here is un-computed.
+   ══════════════════════════════════════════════════════════════════════ */
+:root[data-theme='light'] {
+  --i-ground: #e9eae6;
+  --i-raised: #f3f4f0;
+  --i-overlay: #ffffff;
+  --i-ink: #16181a;
+  --i-muted: #5e635c;
+  --i-brass: #6e5a0e; /* 5.55 AA — still WAITING, still nothing else */
+  --i-steel: #2c3a4a; /* 9.59 AAA */
+  --color-on-accent: var(--r-raised); /* brass is dark here — invert */
+  --i-rule: rgba(22, 24, 26, 0.14);
+  --i-rule-strong: rgba(22, 24, 26, 0.28);
+
+  --i-temp-1: #4a5c74;
+  --i-temp-2: #5a5674;
+  --i-temp-3: #6e566a;
+  --i-temp-4: #7a5348;
+  --i-temp-5: #7c5520;
+  --i-temp-6: #6e5a0e;
+
+  --i-success: #2f6b4c;
+  --i-warning: #7a5a18;
+  --i-danger: #a33f28;
+
+  /* The page ground is now paper, so a record at --r-ground would stop
+     reading as an object. It lifts. */
+  --r-surface: var(--r-raised);
+
+  --shadow-sm: none;
+  --shadow-md: 0 1px 2px rgba(22, 24, 26, 0.07);
+  --shadow-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
+  --shadow-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --i-ground: #e9eae6;
+    --i-raised: #f3f4f0;
+    --i-overlay: #ffffff;
+    --i-ink: #16181a;
+    --i-muted: #5e635c;
+    --i-brass: #6e5a0e;
+    --i-steel: #2c3a4a;
+    --color-on-accent: var(--r-raised);
+    --i-rule: rgba(22, 24, 26, 0.14);
+    --i-rule-strong: rgba(22, 24, 26, 0.28);
+
+    --i-temp-1: #4a5c74;
+    --i-temp-2: #5a5674;
+    --i-temp-3: #6e566a;
+    --i-temp-4: #7a5348;
+    --i-temp-5: #7c5520;
+    --i-temp-6: #6e5a0e;
+
+    --i-success: #2f6b4c;
+    --i-warning: #7a5a18;
+    --i-danger: #a33f28;
+
+    --r-surface: var(--r-raised);
+
     --shadow-sm: none;
-    --shadow-md: none;
-    --shadow-lg: none;
+    --shadow-md: 0 1px 2px rgba(22, 24, 26, 0.07);
+    --shadow-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
+    --shadow-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   REDUCED MOTION
+
+   Movement collapses. THE HELD BEATS DO NOT.
+
+   The silences are timing, not motion, so they carry meaning that survives
+   the preference — arguably the reduced-motion version is the purer one
+   (design/07 §VI.3). Any future rule that zeroes --motion-hold or
+   --motion-empty-frame has broken the ceremony, not accommodated it.
+   ══════════════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-instant: 0ms;
+    --motion-considered: 0ms;
+    --motion-considered-max: 0ms;
+    --motion-approach: 0ms;
+    --motion-record-arrive: 300ms; /* a plain cross-fade, no wipe */
+    /* --motion-hold and --motion-empty-frame are deliberately untouched. */
   }
 }
