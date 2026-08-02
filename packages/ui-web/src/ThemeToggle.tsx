@@ -7,11 +7,12 @@ type Theme = 'light' | 'dark';
 function currentTheme(): Theme {
   if (typeof document === 'undefined') return 'light';
   const attr = document.documentElement.getAttribute('data-theme');
-  if (attr === 'dark' || attr === 'light') return attr;
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // The root layout's pre-paint script always writes one or the other —
+  // there's no absent-attribute case to fall back from here anymore.
+  return attr === 'dark' ? 'dark' : 'light';
 }
 
-/** Manual override on top of the system default — 02-UX-DESIGN.md §6 ("dark mode via class + system"). */
+/** Manual override on top of the light default (see apps/web/src/app/layout.tsx's THEME_INIT_SCRIPT). */
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('light');
 

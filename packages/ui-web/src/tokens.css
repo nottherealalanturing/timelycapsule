@@ -30,31 +30,36 @@
 
 :root {
   /* ══ REGISTER 1 · INSTRUMENT ══════════════════════════════════════════
-     Dark. Ratios are against --i-ground unless noted. */
-  --i-ground: #0b0e14;
-  --i-raised: #141922;
-  --i-overlay: #1c2230;
-  --i-ink: #e6e8ec; /* 15.75 AAA */
-  --i-muted: #8b93a3; /* 6.26 AA  */
-  --i-brass: #e0b84a; /* 10.23 AAA — WAITING, and nothing else */
-  --i-steel: #7a8ab0; /* 5.60 AA  — interactive */
+     Light by default (T-22-era polish pass — light is now the product
+     default for anyone with no stored preference; see apps/web/src/app/
+     layout.tsx's THEME_INIT_SCRIPT). Values borrowed from the verified
+     record palette, same as the former `[data-theme='light']` override —
+     nothing here is newly un-computed. The dark instrument register moved
+     to the `:root[data-theme='dark']` override block below. */
+  --i-ground: #e9eae6;
+  --i-raised: #f3f4f0;
+  --i-overlay: #ffffff;
+  --i-ink: #16181a;
+  --i-muted: #5e635c;
+  --i-brass: #6e5a0e; /* 5.55 AA — still WAITING, still nothing else */
+  --i-steel: #2c3a4a; /* 9.59 AAA — interactive */
 
-  --i-rule: rgba(230, 232, 236, 0.13);
-  --i-rule-strong: rgba(230, 232, 236, 0.26);
+  --i-rule: rgba(22, 24, 26, 0.14);
+  --i-rule-strong: rgba(22, 24, 26, 0.28);
 
   /* Temperature ramp, cold → warm. Corrected; every step clears AA.
      Colours markers, rules and glyphs ONLY. Never carries text, and never
      acts as a text-bearing surface (design/05 §Two rules). */
-  --i-temp-1: #7a8ab0; /* 5.60 */
-  --i-temp-2: #8e88b2; /* 5.81 */
-  --i-temp-3: #a78ca6; /* 6.39 */
-  --i-temp-4: #be9186; /* 6.98 */
-  --i-temp-5: #d0a06a; /* 8.20 */
-  --i-temp-6: #e0b84a; /* 10.23 */
+  --i-temp-1: #4a5c74; /* 5.65 */
+  --i-temp-2: #5a5674; /* 5.76 */
+  --i-temp-3: #6e566a; /* 5.43 */
+  --i-temp-4: #7a5348; /* 5.50 */
+  --i-temp-5: #7c5520; /* 5.47 */
+  --i-temp-6: #6e5a0e; /* 5.55 */
 
-  --i-success: #4e9e76;
-  --i-warning: #c8923c;
-  --i-danger: #d2694e;
+  --i-success: #2f6b4c;
+  --i-warning: #7a5a18;
+  --i-danger: #a33f28;
 
   /* ══ REGISTER 2 · RECORD ══════════════════════════════════════════════
      Paper. Permanently, in both themes. Never themed away. */
@@ -79,10 +84,11 @@
   --r-warning: #7a5a18;
   --r-danger: #a33f28;
 
-  /* The surface a record actually paints on. Lifts in the light theme so a
-     record never sits on a ground of its own value — it must always read as
-     a bounded object (design/06 §Constraint 1). */
-  --r-surface: var(--r-ground);
+  /* The surface a record actually paints on. Lifts when the instrument
+     register is also paper (the light default, and dark's override below
+     un-lifts it) so a record never sits on a ground of its own value — it
+     must always read as a bounded object (design/06 §Constraint 1). */
+  --r-surface: var(--r-raised);
 
   /* ══ SEMANTIC LAYER ═══════════════════════════════════════════════════
      What components consume. Chrome resolves to the instrument register.
@@ -104,17 +110,20 @@
   --color-interactive: var(--i-steel);
   --color-accent-violet: var(--color-interactive); /* @deprecated → --color-interactive */
 
-  /* Text/iconography sitting ON a brass fill. Brass is a LIGHT surface in the
-     instrument register, so anything on it must be the dark ground — V1 put
-     near-white on gold and measured 1.54:1, an AA failure that predates this
-     refresh and is simply more visible now. In the light theme brass darkens,
-     so this inverts. */
-  --color-on-accent: var(--i-ground);
+  /* Text/iconography sitting ON a brass fill. Brass is a DARK, muted tone in
+     the light-default instrument register, so anything on it must be a
+     light surface — V1 put near-white on gold in the dark register and
+     measured 1.54:1, an AA failure that predates this refresh. Deliberately
+     `--r-raised` rather than `--i-ground`: they coincide in dark (both the
+     ground tone) but not in light, where raised reads with more separation
+     against the darker brass fill. Dark's override below inverts this back
+     to the ground tone. */
+  --color-on-accent: var(--r-raised);
 
   /* Same discipline for the destructive fill. Danger is a mid-tone in both
      registers, so neither pure white nor pure ink is safe by default —
      both values below are measured, not assumed. */
-  --color-on-danger: var(--i-ground);
+  --color-on-danger: var(--r-raised);
 
   --color-success: var(--i-success);
   --color-warning: var(--i-warning);
@@ -211,9 +220,9 @@
      that shadow is what makes it read as an object lying in a dark room
      rather than a panel of background (design/06 §Constraint 1). */
   --elev-sm: none;
-  --elev-md: 0 1px 0 rgba(0, 0, 0, 0.22);
-  --elev-lg: 0 2px 0 rgba(0, 0, 0, 0.24), 0 18px 44px rgba(0, 0, 0, 0.3);
-  --elev-record: 0 1px 0 rgba(0, 0, 0, 0.2), 0 16px 40px rgba(0, 0, 0, 0.26);
+  --elev-md: 0 1px 2px rgba(22, 24, 26, 0.07);
+  --elev-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
+  --elev-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
 
   /* ══ MOTION ═══════════════════════════════════════════════════════════
      Three tiers, decided by consequence, never by aesthetics
@@ -246,76 +255,45 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
-   LIGHT THEME — a preference override of the INSTRUMENT register only.
-   Values are borrowed from the verified record palette rather than
-   invented, so nothing here is un-computed.
+   DARK THEME — a preference override of the INSTRUMENT register only,
+   selected explicitly via `data-theme="dark"` (never by system preference
+   alone — THEME_INIT_SCRIPT always writes one value or the other, so there
+   is no longer a `prefers-color-scheme` fallback branch to keep in sync).
+   These are the values the base :root carried before light became the
+   default; nothing here is newly computed.
    ══════════════════════════════════════════════════════════════════════ */
-:root[data-theme='light'] {
-  --i-ground: #e9eae6;
-  --i-raised: #f3f4f0;
-  --i-overlay: #ffffff;
-  --i-ink: #16181a;
-  --i-muted: #5e635c;
-  --i-brass: #6e5a0e; /* 5.55 AA — still WAITING, still nothing else */
-  --i-steel: #2c3a4a; /* 9.59 AAA */
-  --color-on-accent: var(--r-raised); /* brass is dark here — invert */
-  --color-on-danger: var(--r-raised);
-  --i-rule: rgba(22, 24, 26, 0.14);
-  --i-rule-strong: rgba(22, 24, 26, 0.28);
+:root[data-theme='dark'] {
+  --i-ground: #0b0e14;
+  --i-raised: #141922;
+  --i-overlay: #1c2230;
+  --i-ink: #e6e8ec; /* 15.75 AAA */
+  --i-muted: #8b93a3; /* 6.26 AA */
+  --i-brass: #e0b84a; /* 10.23 AAA — WAITING, and nothing else */
+  --i-steel: #7a8ab0; /* 5.60 AA — interactive */
+  --color-on-accent: var(--i-ground); /* brass is light here — invert back */
+  --color-on-danger: var(--i-ground);
+  --i-rule: rgba(230, 232, 236, 0.13);
+  --i-rule-strong: rgba(230, 232, 236, 0.26);
 
-  --i-temp-1: #4a5c74;
-  --i-temp-2: #5a5674;
-  --i-temp-3: #6e566a;
-  --i-temp-4: #7a5348;
-  --i-temp-5: #7c5520;
-  --i-temp-6: #6e5a0e;
+  --i-temp-1: #7a8ab0;
+  --i-temp-2: #8e88b2;
+  --i-temp-3: #a78ca6;
+  --i-temp-4: #be9186;
+  --i-temp-5: #d0a06a;
+  --i-temp-6: #e0b84a;
 
-  --i-success: #2f6b4c;
-  --i-warning: #7a5a18;
-  --i-danger: #a33f28;
+  --i-success: #4e9e76;
+  --i-warning: #c8923c;
+  --i-danger: #d2694e;
 
-  /* The page ground is now paper, so a record at --r-ground would stop
-     reading as an object. It lifts. */
-  --r-surface: var(--r-raised);
+  /* The page ground is dark again, so a record at --r-raised would stop
+     reading as a distinct object lifted off it. Un-lifts to --r-ground. */
+  --r-surface: var(--r-ground);
 
   --elev-sm: none;
-  --elev-md: 0 1px 2px rgba(22, 24, 26, 0.07);
-  --elev-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
-  --elev-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
-}
-
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme='dark']) {
-    --i-ground: #e9eae6;
-    --i-raised: #f3f4f0;
-    --i-overlay: #ffffff;
-    --i-ink: #16181a;
-    --i-muted: #5e635c;
-    --i-brass: #6e5a0e;
-    --i-steel: #2c3a4a;
-    --color-on-accent: var(--r-raised);
-    --color-on-danger: var(--r-raised);
-    --i-rule: rgba(22, 24, 26, 0.14);
-    --i-rule-strong: rgba(22, 24, 26, 0.28);
-
-    --i-temp-1: #4a5c74;
-    --i-temp-2: #5a5674;
-    --i-temp-3: #6e566a;
-    --i-temp-4: #7a5348;
-    --i-temp-5: #7c5520;
-    --i-temp-6: #6e5a0e;
-
-    --i-success: #2f6b4c;
-    --i-warning: #7a5a18;
-    --i-danger: #a33f28;
-
-    --r-surface: var(--r-raised);
-
-    --elev-sm: none;
-    --elev-md: 0 1px 2px rgba(22, 24, 26, 0.07);
-    --elev-lg: 0 1px 0 rgba(22, 24, 26, 0.09), 0 14px 34px rgba(22, 24, 26, 0.11);
-    --elev-record: 0 1px 0 rgba(22, 24, 26, 0.1), 0 14px 34px rgba(22, 24, 26, 0.12);
-  }
+  --elev-md: 0 1px 0 rgba(0, 0, 0, 0.22);
+  --elev-lg: 0 2px 0 rgba(0, 0, 0, 0.24), 0 18px 44px rgba(0, 0, 0, 0.3);
+  --elev-record: 0 1px 0 rgba(0, 0, 0, 0.2), 0 16px 40px rgba(0, 0, 0, 0.26);
 }
 
 /* ══════════════════════════════════════════════════════════════════════

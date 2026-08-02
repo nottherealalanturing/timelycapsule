@@ -1,10 +1,19 @@
 import { cn } from './cn';
 
 const HOUR = 3_600_000;
-const TEN_YEARS = 10 * 365.25 * 24 * HOUR;
+const FIFTY_YEARS = 50 * 365.25 * 24 * HOUR;
 
 const LOG_NEAR = Math.log(HOUR);
-const LOG_FAR = Math.log(TEN_YEARS);
+// Calibration pass (post-T-22 web polish): was 10 years, which clamped every
+// capsule 10 years or longer to the identical marker position and
+// temperature — a 10yr, 20yr and 50yr capsule were pixel-indistinguishable,
+// even though the product's own scheduling engine allows up to 50 years
+// (01-PRODUCT.md, scheduling engine spec). Raised to match that real,
+// documented maximum rather than an arbitrary round number. Still strictly
+// logarithmic — only the far anchor moved, LOG_NEAR is untouched, and the
+// "log rather than linear" argument above is unaffected. See the session's
+// calibration report for the full before/after table across 1 day–50 years.
+const LOG_FAR = Math.log(FIFTY_YEARS);
 
 /**
  * Distance from the line, 0 (at transit) → 1 (far out), on a log scale.

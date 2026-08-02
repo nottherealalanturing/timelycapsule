@@ -162,7 +162,7 @@ export async function sendBounceAlert(
   await sendTemplated(db, {
     to,
     template: 'bounce-alert',
-    subject: 'We couldn’t reach a recipient',
+    subject: 'A recipient couldn’t be reached',
     node: BounceAlert(input),
     payload: input,
   });
