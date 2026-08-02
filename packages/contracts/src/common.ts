@@ -52,6 +52,8 @@ export const ERROR_CODES = [
   'tag_already_exists',
   // T-20 (production bug fix) OAuth-only accounts setting a first password
   'password_already_set',
+  // T-22 hardening — sender velocity limit
+  'velocity_limit_exceeded',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 

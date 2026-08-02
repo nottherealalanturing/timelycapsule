@@ -1,5 +1,5 @@
 import type { CreateRecipientRequest, PatchRecipientRequest, Recipient } from '@tc/contracts';
-import { and, eq } from 'drizzle-orm';
+import { and, count, eq, gte } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
@@ -21,6 +21,42 @@ function assertCanManageRecipients(capsule: CapsuleRow): void {
 
 function normalizePhone(phone: string): string {
   return phone.replace(/\D/g, '');
+}
+
+const VELOCITY_LIMIT_ACCOUNT_AGE_DAYS = 7;
+const VELOCITY_LIMIT_MAX_RECIPIENTS_PER_DAY = 5;
+
+/**
+ * Sender velocity limit — T-22 hardening, plan/03-ARCHITECTURE.md §17 threat
+ * #5: "sender velocity limits (new accounts: 5 outbound recipients/day until
+ * aged)". "Aged" isn't defined anywhere in the docs; 7 days confirmed with
+ * the user rather than assumed.
+ *
+ * Counted across every capsule the account owns, not per-capsule —
+ * `assertWithinRecipientLimit` already enforces the per-capsule plan cap
+ * (Free: 3/capsule); this is a separate, account-wide throttle aimed at a
+ * fresh account fanning a capsule out to many recipients in a short window,
+ * which the per-capsule limit alone doesn't prevent (a new account could
+ * still create many capsules, each just under the per-capsule cap).
+ */
+async function assertWithinVelocityLimit(db: Database, ownerId: string): Promise<void> {
+  const [owner] = await db.select({ createdAt: users.createdAt }).from(users).where(eq(users.id, ownerId)).limit(1);
+  if (!owner) return;
+
+  const accountAgeMs = Date.now() - owner.createdAt.getTime();
+  if (accountAgeMs >= VELOCITY_LIMIT_ACCOUNT_AGE_DAYS * 24 * 3_600_000) return;
+
+  const since = new Date(Date.now() - 24 * 3_600_000);
+  const rows = await db
+    .select({ value: count() })
+    .from(capsuleRecipients)
+    .innerJoin(capsules, eq(capsuleRecipients.capsuleId, capsules.id))
+    .where(and(eq(capsules.ownerId, ownerId), gte(capsuleRecipients.createdAt, since)));
+  const sentToday = rows[0]?.value ?? 0;
+
+  if (sentToday >= VELOCITY_LIMIT_MAX_RECIPIENTS_PER_DAY) {
+    throw ApiError.velocityLimitExceeded();
+  }
 }
 
 async function findExistingRecipient(
@@ -78,6 +114,7 @@ export async function createRecipient(
   }
 
   await assertWithinRecipientLimit(db, ownerId, capsuleId);
+  await assertWithinVelocityLimit(db, ownerId);
 
   let suppressed = false;
   if (input.email) {

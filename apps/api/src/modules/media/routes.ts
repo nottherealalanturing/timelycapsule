@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../../db/client.js';
 import { idempotency } from '../../middleware/idempotency.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import { completeMedia, createMediaTicket, deleteMedia, getMediaViewUrl, listMedia, patchMedia } from './service.js';
@@ -26,6 +27,7 @@ export function mediaRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/media/tickets',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: CapsuleIdParamSchema, body: CreateMediaTicketRequestSchema }),
     async (req, res, next) => {
@@ -40,6 +42,7 @@ export function mediaRouter(db: Database): Router {
 
   router.post(
     '/media/:id/complete',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: MediaIdParamSchema, body: CompleteMediaRequestSchema }),
     async (req, res, next) => {
@@ -52,23 +55,33 @@ export function mediaRouter(db: Database): Router {
     },
   );
 
-  router.patch('/media/:id', validate({ params: MediaIdParamSchema, body: PatchMediaRequestSchema }), async (req, res, next) => {
-    try {
-      const media = await patchMedia(db, req.user!.id, req.params.id as string, req.body);
-      res.status(200).json({ media });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.patch(
+    '/media/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: MediaIdParamSchema, body: PatchMediaRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const media = await patchMedia(db, req.user!.id, req.params.id as string, req.body);
+        res.status(200).json({ media });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
-  router.delete('/media/:id', validate({ params: MediaIdParamSchema }), async (req, res, next) => {
-    try {
-      await deleteMedia(db, req.user!.id, req.params.id as string);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.delete(
+    '/media/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: MediaIdParamSchema }),
+    async (req, res, next) => {
+      try {
+        await deleteMedia(db, req.user!.id, req.params.id as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.get('/media/:id/view', validate({ params: MediaIdParamSchema }), async (req, res, next) => {
     try {

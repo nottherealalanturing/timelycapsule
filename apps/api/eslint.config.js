@@ -9,6 +9,12 @@ export default [
     languageOptions: { globals: globals.node },
   },
   {
+    // k6 load test scripts run inside k6's own sandboxed JS runtime, not
+    // Node — `open` (reads a file at init time) and `__ENV` are its globals.
+    files: ['loadtest/*.js'],
+    languageOptions: { globals: { open: 'readonly', __ENV: 'readonly' } },
+  },
+  {
     plugins: { boundaries },
     settings: {
       'boundaries/elements': [{ type: 'module', pattern: 'src/modules/*', capture: ['moduleName'] }],

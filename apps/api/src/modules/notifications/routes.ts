@@ -1,6 +1,7 @@
 import { MarkNotificationsReadRequestSchema, NotificationPrefsSchema, PaginatedQuerySchema, type PaginatedQuery } from '@tc/contracts';
 import { Router } from 'express';
 import type { Database } from '../../db/client.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import { getNotificationPrefs, listNotifications, markNotificationsRead, putNotificationPrefs } from './service.js';
@@ -19,14 +20,19 @@ export function notificationsRouter(db: Database): Router {
     }
   });
 
-  router.post('/notifications/read', validate({ body: MarkNotificationsReadRequestSchema }), async (req, res, next) => {
-    try {
-      await markNotificationsRead(db, req.user!.id, req.body);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/notifications/read',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: MarkNotificationsReadRequestSchema }),
+    async (req, res, next) => {
+      try {
+        await markNotificationsRead(db, req.user!.id, req.body);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.get('/me/notification-prefs', async (req, res, next) => {
     try {
@@ -37,14 +43,19 @@ export function notificationsRouter(db: Database): Router {
     }
   });
 
-  router.put('/me/notification-prefs', validate({ body: NotificationPrefsSchema }), async (req, res, next) => {
-    try {
-      const prefs = await putNotificationPrefs(db, req.user!.id, req.body);
-      res.status(200).json({ prefs });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.put(
+    '/me/notification-prefs',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: NotificationPrefsSchema }),
+    async (req, res, next) => {
+      try {
+        const prefs = await putNotificationPrefs(db, req.user!.id, req.body);
+        res.status(200).json({ prefs });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   return router;
 }

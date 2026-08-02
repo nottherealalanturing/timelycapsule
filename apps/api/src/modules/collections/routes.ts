@@ -7,6 +7,7 @@ import {
 import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../../db/client.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import {
@@ -35,17 +36,23 @@ export function collectionsRouter(db: Database): Router {
     }
   });
 
-  router.post('/collections', validate({ body: CreateCollectionRequestSchema }), async (req, res, next) => {
-    try {
-      const collection = await createCollection(db, req.user!.id, req.body);
-      res.status(201).json({ collection });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/collections',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: CreateCollectionRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const collection = await createCollection(db, req.user!.id, req.body);
+        res.status(201).json({ collection });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.patch(
     '/collections/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: PatchCollectionRequestSchema }),
     async (req, res, next) => {
       try {
@@ -57,17 +64,23 @@ export function collectionsRouter(db: Database): Router {
     },
   );
 
-  router.delete('/collections/:id', validate({ params: IdParamSchema }), async (req, res, next) => {
-    try {
-      await deleteCollection(db, req.user!.id, req.params.id as string);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.delete(
+    '/collections/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        await deleteCollection(db, req.user!.id, req.params.id as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.post(
     '/collections/:id/items',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: AddCollectionItemRequestSchema }),
     async (req, res, next) => {
       try {
@@ -81,6 +94,7 @@ export function collectionsRouter(db: Database): Router {
 
   router.put(
     '/collections/:id/items',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: ReorderCollectionItemsRequestSchema }),
     async (req, res, next) => {
       try {
@@ -92,14 +106,19 @@ export function collectionsRouter(db: Database): Router {
     },
   );
 
-  router.delete('/collections/:id/items/:capsuleId', validate({ params: ItemParamsSchema }), async (req, res, next) => {
-    try {
-      await removeCollectionItem(db, req.user!.id, req.params.id as string, req.params.capsuleId as string);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.delete(
+    '/collections/:id/items/:capsuleId',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: ItemParamsSchema }),
+    async (req, res, next) => {
+      try {
+        await removeCollectionItem(db, req.user!.id, req.params.id as string, req.params.capsuleId as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   return router;
 }
