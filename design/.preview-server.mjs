@@ -7,7 +7,7 @@ const root = dirname(fileURLToPath(import.meta.url));
 
 createServer(async (req, res) => {
   const rel = normalize(decodeURIComponent(req.url.split('?')[0])).replace(/^(\.\.[/\\])+/, '');
-  const file = join(root, rel === '/' ? '10-product-bible.html' : rel);
+  const file = join(root, rel === '/' ? '.iter.html' : rel);
   try {
     const body = await readFile(file);
     res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });

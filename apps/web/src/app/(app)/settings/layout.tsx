@@ -1,7 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { Hallmark } from '@tc/ui-web';
+import { NavLink } from '../../../components/NavLink';
 
 const TABS = [
   { href: '/settings/account', label: 'Account' },
@@ -13,24 +14,27 @@ const TABS = [
   { href: '/settings/data', label: 'Data' },
 ];
 
-/** Two-pane settings shell per 02-UX-DESIGN.md §5.13 — nav left, panel right. */
+/**
+ * Two-pane settings shell — nav left, panel right.
+ *
+ * Meridian V2 rebuild: shares `NavLink` with the app sidebar instead of
+ * repeating the active-state markup, and the heading is a hallmark rather than
+ * a display-serif title. Settings is an instrument, not a record.
+ */
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
     <div className="flex min-h-full">
-      <nav className="flex w-48 shrink-0 flex-col gap-1 border-r border-[var(--color-text-secondary)]/15 px-4 py-10">
-        <h1 className="mb-4 px-2 font-[var(--font-display)] text-lg text-foreground">Settings</h1>
+      <nav
+        aria-label="Settings"
+        className="flex w-52 shrink-0 flex-col gap-0.5 border-r border-[var(--color-rule)] px-4 py-10"
+      >
+        <h1 className="mb-4 px-2">
+          <Hallmark>Settings</Hallmark>
+        </h1>
         {TABS.map((tab) => (
-          <Link
-            key={tab.href}
-            href={tab.href}
-            className={`rounded-[var(--radius-input)] px-3 py-2 text-sm ${
-              pathname === tab.href ? 'bg-[var(--color-bg-raised)] font-medium text-foreground' : 'text-secondary hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </Link>
+          <NavLink key={tab.href} href={tab.href} label={tab.label} active={pathname === tab.href} />
         ))}
       </nav>
       <div className="min-w-0 flex-1 px-8 py-10">{children}</div>

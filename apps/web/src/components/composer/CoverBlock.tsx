@@ -56,7 +56,7 @@ export function CoverBlock({ draft }: { draft: CapsuleDraft }) {
         placeholder="Name this capsule…"
         value={capsule.title ?? ''}
         onChange={(e) => draft.patch({ title: e.target.value })}
-        className="font-[var(--font-display)] text-xl"
+        className="text-[length:var(--text-title)]"
       />
 
       <div className="flex gap-2" role="radiogroup" aria-label="Capsule type">
@@ -69,10 +69,10 @@ export function CoverBlock({ draft }: { draft: CapsuleDraft }) {
             disabled
             title="Type is set at creation"
             className={cn(
-              'rounded-full border px-4 py-1.5 text-sm',
+              'rounded-full border px-4 py-1.5 text-[length:var(--text-body-s)]',
               capsule.type === chip.type
-                ? 'border-accent bg-accent/10 text-foreground'
-                : 'border-[var(--color-text-secondary)]/30 text-secondary',
+                ? 'border-[var(--color-interactive)] text-foreground'
+                : 'border-[var(--color-rule-strong)] text-secondary',
             )}
           >
             {chip.label}

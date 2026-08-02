@@ -47,14 +47,14 @@ export default function LoginPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-[var(--font-display)] text-xl text-foreground">Log in</h1>
+      <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Log in</h1>
 
       <GoogleSignInButton onCredential={handleGoogle} />
 
-      <div className="flex items-center gap-3 text-xs text-secondary" role="separator">
-        <div className="h-px flex-1 bg-[var(--color-text-secondary)]/20" />
+      <div className="flex items-center gap-3 text-[length:var(--text-caption)] text-secondary" role="separator">
+        <div className="h-px flex-1 bg-[var(--color-rule)]" />
         or
-        <div className="h-px flex-1 bg-[var(--color-text-secondary)]/20" />
+        <div className="h-px flex-1 bg-[var(--color-rule)]" />
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
@@ -75,14 +75,18 @@ export default function LoginPage() {
           onChange={(e) => setPassword(e.target.value)}
         />
 
-        {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
+            {error}
+          </p>
+        ) : null}
 
         <Button type="submit" fullWidth loading={loading}>
           Log in
         </Button>
       </form>
 
-      <div className="flex justify-between text-sm">
+      <div className="flex justify-between text-[length:var(--text-body-s)]">
         <Link href="/reset" className="text-secondary underline underline-offset-2">
           Forgot password?
         </Link>

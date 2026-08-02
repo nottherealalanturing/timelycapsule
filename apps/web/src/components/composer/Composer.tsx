@@ -107,21 +107,34 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-text-secondary)]/15 bg-[var(--color-bg)]/95 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-6 py-3 backdrop-blur">
         <Button variant="ghost" size="sm" onClick={handleClose}>
           Close
         </Button>
-        <span className="text-xs text-secondary">{statusText(draft.autosaveStatus)}</span>
+        {/* Autosave state is announced, not just shown — a draft silently
+            failing to save is exactly the kind of thing a sighted user
+            notices in the corner and a screen-reader user never learns. */}
+        <span aria-live="polite" className="text-[length:var(--text-caption)] text-secondary">
+          {statusText(draft.autosaveStatus)}
+        </span>
         <div className="relative">
-          <Button variant="ghost" size="sm" onClick={() => setMenuOpen((v) => !v)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Draft options"
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            onClick={() => setMenuOpen((v) => !v)}
+          >
             •••
           </Button>
           {menuOpen ? (
-            <div className="absolute right-0 top-full z-20 mt-1 w-44 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-1 shadow-md">
+            <div role="menu" className="absolute right-0 top-full z-20 mt-1 w-44 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] p-1 shadow-md">
               <button
                 type="button"
                 onClick={handleDeleteDraft}
-                className="w-full rounded-[var(--radius-input)] px-3 py-2 text-left text-sm text-[var(--color-danger)] hover:bg-[var(--color-bg)]"
+                role="menuitem"
+                className="motion-instant w-full rounded-[var(--radius-input)] px-3 py-2 text-left text-[length:var(--text-body-s)] text-[var(--color-danger)] hover:bg-[var(--color-bg-primary)]"
               >
                 Delete draft
               </button>
@@ -139,9 +152,9 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
         <SealsBlock draft={draft} />
       </main>
 
-      <footer className="sticky bottom-0 border-t border-[var(--color-text-secondary)]/15 bg-[var(--color-bg)]/95 px-6 py-4 backdrop-blur">
+      <footer className="sticky bottom-0 border-t border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-6 py-4 backdrop-blur">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
-          <span className="text-sm text-secondary">{blocker ?? 'Ready to seal'}</span>
+          <span className="text-[length:var(--text-body-s)] text-secondary">{blocker ?? 'Ready to seal'}</span>
           <Button disabled={Boolean(blocker)} onClick={() => setConfirmOpen(true)}>
             Seal capsule
           </Button>

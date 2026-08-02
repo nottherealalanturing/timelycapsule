@@ -1,12 +1,12 @@
 'use client';
 
 import type { Capsule, MediaItem, Recipient } from '@tc/contracts';
-import { Button, Dialog, Skeleton, StateChip, useToast } from '@tc/ui-web';
+import { Button, Dialog, DualClock, Skeleton, StateChip, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
-import { CountdownDisplay } from '../../../../components/CountdownDisplay';
+import { useCorrectedNow } from '../../../../lib/use-corrected-now';
 import { resolveUnlockDate } from '../../../../components/CapsuleCard';
 import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, mediaApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
 import { decodeIvCiphertext } from '../../../../lib/capsule-crypto';
@@ -69,14 +69,14 @@ function ContentsPanel({ capsule }: { capsule: Capsule }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="whitespace-pre-wrap rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-4 text-foreground">
+      <div className="whitespace-pre-wrap rounded-[var(--radius-card)] border border-[var(--color-rule)] p-4 text-foreground">
         {letter || 'No letter content.'}
       </div>
       {media.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {media.map((item) => (
-            <li key={item.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/15 px-4 py-2">
-              <span className="text-sm text-foreground">{item.originalName}</span>
+            <li key={item.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--color-rule)] px-4 py-2">
+              <span className="text-[length:var(--text-body-s)] text-foreground">{item.originalName}</span>
               <Button variant="ghost" size="sm" onClick={() => void viewMedia(item)}>
                 Decrypt &amp; view
               </Button>
@@ -106,6 +106,12 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
     queryFn: () => capsulesApi.get(id),
   });
   const capsule = data?.capsule;
+
+  // Placed above the loading early-return: hooks cannot be called
+  // conditionally. `useCorrectedNow` tolerates a null target.
+  const unlockTarget = capsule && capsule.state === 'sealed' ? resolveUnlockDate(capsule) : null;
+  const nowMs = useCorrectedNow(unlockTarget);
+  const sealedMs = capsule?.sealedAt ? new Date(capsule.sealedAt).getTime() : null;
 
   const { data: tagsData } = useQuery({ queryKey: ['tags'], queryFn: () => tagsApi.list() });
   const allTags = tagsData?.data ?? [];
@@ -195,12 +201,12 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
       <div className="flex items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-[var(--font-display)] text-2xl text-foreground">{capsule.title || 'Untitled capsule'}</h1>
+            <h1 className="text-[length:var(--text-display-s)] text-foreground">{capsule.title || 'Untitled capsule'}</h1>
             <button
               type="button"
               aria-label={capsule.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
               onClick={() => favoriteMutation.mutate(!capsule.isFavorite)}
-              className={capsule.isFavorite ? 'text-[var(--color-accent-gold)]' : 'text-secondary'}
+              className={capsule.isFavorite ? 'text-[var(--color-interactive)]' : 'text-secondary'}
             >
               ★
             </button>
@@ -210,19 +216,19 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
               {capsule.tagIds.map((tagId) => {
                 const tag = allTags.find((t) => t.id === tagId);
                 return tag ? (
-                  <span key={tagId} className="rounded-[var(--radius-pill)] border border-[var(--color-text-secondary)]/30 px-2 py-0.5 text-xs text-secondary">
+                  <span key={tagId} className="rounded-[var(--radius-pill)] border border-[var(--color-rule-strong)] px-2 py-0.5 text-[length:var(--text-caption)] text-secondary">
                     {tag.name}
                   </span>
                 ) : null;
               })}
             </div>
           ) : null}
-          {capsule.state === 'sealed' && unlockDate ? (
-            <p className="mt-1 text-sm text-secondary">
-              Unlocks in <CountdownDisplay target={unlockDate} className="font-medium text-foreground" />
-            </p>
+          {capsule.state === 'sealed' && unlockDate && sealedMs !== null && nowMs !== null ? (
+            <div className="mt-3">
+              <DualClock elapsedMs={nowMs - sealedMs} remainingMs={unlockDate.getTime() - nowMs} />
+            </div>
           ) : capsule.state === 'unlocked' && recipients.length > 0 ? (
-            <p className="mt-1 text-sm text-secondary">
+            <p className="mt-1 text-[length:var(--text-body-s)] text-secondary">
               Opened by {openedCount} of {recipients.length}
             </p>
           ) : null}
@@ -291,13 +297,13 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <div className="flex gap-4 border-b border-[var(--color-text-secondary)]/15">
+      <div className="flex gap-4 border-b border-[var(--color-rule)]">
         {(['overview', 'recipients', 'activity', 'contents'] as Tab[]).map((t) => (
           <button
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`border-b-2 px-1 pb-2 text-sm capitalize ${
+            className={`border-b-2 px-1 pb-2 text-[length:var(--text-body-s)] capitalize ${
               tab === t ? 'border-accent font-medium text-foreground' : 'border-transparent text-secondary'
             }`}
           >
@@ -307,7 +313,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
       </div>
 
       {tab === 'overview' ? (
-        <dl className="grid grid-cols-2 gap-4 text-sm">
+        <dl className="grid grid-cols-2 gap-4 text-[length:var(--text-body-s)]">
           <div>
             <dt className="text-secondary">Type</dt>
             <dd className="text-foreground">{capsule.type}</dd>
@@ -326,7 +332,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </dl>
       ) : tab === 'recipients' ? (
-        <table className="w-full text-left text-sm">
+        <table className="w-full text-left text-[length:var(--text-body-s)]">
           <thead>
             <tr className="text-secondary">
               <th className="pb-2 font-medium">Recipient</th>
@@ -335,7 +341,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           </thead>
           <tbody>
             {recipients.map((r) => (
-              <tr key={r.id} className="border-t border-[var(--color-text-secondary)]/10">
+              <tr key={r.id} className="border-t border-[var(--color-rule)]">
                 <td className="py-2 text-foreground">{r.displayName || r.email || r.phone}</td>
                 <td className="py-2 text-secondary">{r.status}</td>
               </tr>
@@ -350,16 +356,16 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           </tbody>
         </table>
       ) : tab === 'activity' ? (
-        <ul className="flex flex-col gap-2 text-sm">
+        <ul className="flex flex-col gap-2 text-[length:var(--text-body-s)]">
           {(activityData?.data ?? []).map((entry, i) => (
-            <li key={i} className="flex justify-between border-b border-[var(--color-text-secondary)]/10 pb-2">
+            <li key={i} className="flex justify-between border-b border-[var(--color-rule)] pb-2">
               <span className="text-foreground">{entry.action}</span>
               <span className="text-secondary">{new Date(entry.createdAt).toLocaleString()}</span>
             </li>
           ))}
         </ul>
       ) : contentsHidden ? (
-        <p className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-6 text-center text-sm text-secondary">
+        <p className="rounded-[var(--radius-card)] border border-[var(--color-rule)] p-6 text-center text-[length:var(--text-body-s)] text-secondary">
           This capsule&apos;s contents are hidden until it unlocks — the wait is the point.
         </p>
       ) : (
@@ -370,12 +376,12 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
 
       <Dialog open={extendOpen} onOpenChange={setExtendOpen} title="Extend unlock date" width="sm">
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-secondary">Can only be done once, up to 30 days later.</p>
+          <p className="text-[length:var(--text-body-s)] text-secondary">Can only be done once, up to 30 days later.</p>
           <input
             type="datetime-local"
             value={newUnlockAt}
             onChange={(e) => setNewUnlockAt(e.target.value)}
-            className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
           />
           <Button
             fullWidth
@@ -393,7 +399,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
 
       <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen} title="Withdraw this capsule?" width="sm">
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-secondary">
+          <p className="text-[length:var(--text-body-s)] text-secondary">
             Recipients who knew about this capsule will be told it was withdrawn. Its contents will never be shown.
           </p>
           <Button
@@ -419,7 +425,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
               value={newTagName}
               onChange={(e) => setNewTagName(e.target.value)}
               placeholder="New tag name"
-              className="flex-1 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-1.5 text-sm text-foreground"
+              className="flex-1 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-1.5 text-[length:var(--text-body-s)] text-foreground"
             />
             <Button type="submit" size="sm" variant="secondary" loading={createTagMutation.isPending} disabled={!newTagName.trim()}>
               Create
@@ -427,12 +433,12 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           </form>
 
           {allTags.length === 0 ? (
-            <p className="text-sm text-secondary">No tags yet — create your first one above.</p>
+            <p className="text-[length:var(--text-body-s)] text-secondary">No tags yet — create your first one above.</p>
           ) : (
             allTags.map((tag) => {
               const checked = capsule.tagIds.includes(tag.id);
               return (
-                <label key={tag.id} className="flex items-center gap-2 text-sm text-foreground">
+                <label key={tag.id} className="flex items-center gap-2 text-[length:var(--text-body-s)] text-foreground">
                   <input
                     type="checkbox"
                     checked={checked}
@@ -452,12 +458,12 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
       <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen} title="Add to collection" width="sm">
         <div className="flex flex-col gap-2">
           {allCollections.length === 0 ? (
-            <p className="text-sm text-secondary">No collections yet — create one from the Collections page.</p>
+            <p className="text-[length:var(--text-body-s)] text-secondary">No collections yet — create one from the Collections page.</p>
           ) : (
             allCollections.map((collection) => {
               const isMember = membership.find((m) => m.id === collection.id)?.isMember ?? false;
               return (
-                <label key={collection.id} className="flex items-center gap-2 text-sm text-foreground">
+                <label key={collection.id} className="flex items-center gap-2 text-[length:var(--text-body-s)] text-foreground">
                   <input
                     type="checkbox"
                     checked={isMember}

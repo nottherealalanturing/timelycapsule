@@ -43,7 +43,7 @@ function ResetForm() {
   if (token) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="font-[var(--font-display)] text-xl text-foreground">Set a new password</h1>
+        <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Set a new password</h1>
         <form onSubmit={handleReset} className="flex flex-col gap-4" noValidate>
           <Input
             label="New password"
@@ -53,7 +53,11 @@ function ResetForm() {
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
           />
-          {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
+              {error}
+            </p>
+          ) : null}
           <Button type="submit" fullWidth loading={loading}>
             Reset password
           </Button>
@@ -65,8 +69,8 @@ function ResetForm() {
   if (sent) {
     return (
       <div className="flex flex-col gap-3 text-center">
-        <h1 className="font-[var(--font-display)] text-xl text-foreground">Check your email</h1>
-        <p className="text-sm text-secondary">
+        <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Check your email</h1>
+        <p className="text-[length:var(--text-body-s)] text-secondary">
           If an account exists for {email}, we&apos;ve sent a link to reset your password.
         </p>
       </div>
@@ -75,7 +79,7 @@ function ResetForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-[var(--font-display)] text-xl text-foreground">Reset your password</h1>
+      <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Reset your password</h1>
       <form onSubmit={handleForgot} className="flex flex-col gap-4" noValidate>
         <Input
           label="Email"

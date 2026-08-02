@@ -26,5 +26,5 @@ export default function CapsuleLayout({ children }: { children: React.ReactNode 
     return null;
   }
 
-  return <div className="min-h-screen">{children}</div>;
+  return <div className="min-h-screen bg-[var(--color-bg-primary)]">{children}</div>;
 }

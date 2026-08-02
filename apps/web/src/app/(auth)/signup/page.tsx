@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Input, PasswordStrengthMeter } from '@tc/ui-web';
+import { Button, Checkbox, Input, PasswordStrengthMeter } from '@tc/ui-web';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
@@ -8,6 +8,7 @@ import { GoogleSignInButton } from '../../../components/GoogleSignInButton';
 import { ApiClientError } from '../../../lib/api-client';
 import { useAuth } from '../../../lib/auth-context';
 import { clearGuestSession, getGuestToken } from '../../../lib/guest-store';
+import { RecoveryKit } from '../../../components/RecoveryKit';
 
 export default function SignupPage() {
   return (
@@ -50,31 +51,20 @@ function SignupForm() {
   if (recoveryKit) {
     return (
       <div className="flex flex-col gap-6">
-        <h1 className="font-[var(--font-display)] text-xl text-foreground">Save your recovery code</h1>
-        <p className="text-sm text-secondary">
+        <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Save your recovery code</h1>
+        <p className="text-[length:var(--text-body-s)] text-secondary">
           Your capsules are end-to-end encrypted — we never see their contents, which means we can&apos;t recover
           your account if you lose both your password and this code. Save it somewhere safe (a password manager,
           printed and filed away). This is the only time it will be shown.
         </p>
-        <div className="rounded-lg border border-[var(--color-text-secondary)]/20 bg-[var(--color-surface-raised)] p-4 text-center font-mono text-lg tracking-wider text-foreground">
-          {recoveryKit}
-        </div>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => navigator.clipboard.writeText(recoveryKit)}
-        >
-          Copy to clipboard
-        </Button>
-        <label className="flex items-start gap-2 text-sm text-secondary">
-          <input
-            type="checkbox"
-            checked={savedConfirmed}
-            onChange={(e) => setSavedConfirmed(e.target.checked)}
-            className="mt-0.5"
-          />
-          I&apos;ve saved this recovery code somewhere safe.
-        </label>
+
+        <RecoveryKit code={recoveryKit} />
+
+        <Checkbox
+          checked={savedConfirmed}
+          onChange={(e) => setSavedConfirmed(e.target.checked)}
+          label="I&apos;ve saved this recovery code somewhere safe."
+        />
         <Button type="button" fullWidth disabled={!savedConfirmed} onClick={() => router.push('/verify')}>
           Continue
         </Button>
@@ -95,14 +85,14 @@ function SignupForm() {
 
   return (
     <div className="flex flex-col gap-6">
-      <h1 className="font-[var(--font-display)] text-xl text-foreground">Create your account</h1>
+      <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Create your account</h1>
 
       <GoogleSignInButton onCredential={handleGoogle} />
 
-      <div className="flex items-center gap-3 text-xs text-secondary" role="separator">
-        <div className="h-px flex-1 bg-[var(--color-text-secondary)]/20" />
+      <div className="flex items-center gap-3 text-[length:var(--text-caption)] text-secondary" role="separator">
+        <div className="h-px flex-1 bg-[var(--color-rule)]" />
         or
-        <div className="h-px flex-1 bg-[var(--color-text-secondary)]/20" />
+        <div className="h-px flex-1 bg-[var(--color-rule)]" />
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
@@ -134,25 +124,25 @@ function SignupForm() {
           <PasswordStrengthMeter password={password} />
         </div>
 
-        <label className="flex items-start gap-2 text-sm text-secondary">
-          <input
-            type="checkbox"
-            required
-            checked={agreed}
-            onChange={(e) => setAgreed(e.target.checked)}
-            className="mt-0.5"
-          />
-          I agree to the Terms of Service and Privacy Policy.
-        </label>
+        <Checkbox
+          required
+          checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)}
+          label="I agree to the Terms of Service and Privacy Policy."
+        />
 
-        {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+        {error ? (
+          <p role="alert" className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
+            {error}
+          </p>
+        ) : null}
 
         <Button type="submit" fullWidth loading={loading} disabled={!agreed}>
           Create account
         </Button>
       </form>
 
-      <p className="text-center text-sm text-secondary">
+      <p className="text-center text-[length:var(--text-body-s)] text-secondary">
         Already have an account?{' '}
         <Link href="/login" className="font-medium text-foreground underline underline-offset-2">
           Log in

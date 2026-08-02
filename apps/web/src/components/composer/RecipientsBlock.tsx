@@ -99,13 +99,13 @@ export function RecipientsBlock({
 
   return (
     <section aria-label="Recipients" className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-secondary">Recipients</h2>
+      <h2 className="text-[length:var(--text-body-s)] font-medium text-secondary">Recipients</h2>
 
       <div className="flex flex-wrap gap-2">
         {recipients.map((r) => (
           <span
             key={r.id}
-            className="flex items-center gap-2 rounded-full border border-[var(--color-text-secondary)]/30 px-3 py-1 text-sm text-foreground"
+            className="flex items-center gap-2 rounded-full border border-[var(--color-rule-strong)] px-3 py-1 text-[length:var(--text-body-s)] text-foreground"
           >
             {r.displayName || r.email || r.phone}
             <button type="button" onClick={() => void removeRecipient(r.id)} aria-label={`Remove ${r.email ?? r.phone}`} className="text-secondary">
@@ -135,7 +135,7 @@ export function RecipientsBlock({
             }}
           />
           {suggestions.length > 0 ? (
-            <ul className="absolute z-10 mt-1 w-full rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] py-1 shadow-md">
+            <ul className="absolute z-10 mt-1 w-full rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] py-1 shadow-md">
               {suggestions.map((contact) => (
                 <li key={contact.id}>
                   <button
@@ -144,7 +144,7 @@ export function RecipientsBlock({
                     onClick={() =>
                       void addRecipient({ email: contact.email ?? undefined, phone: contact.phone ?? undefined, displayName: contact.name })
                     }
-                    className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-[var(--color-bg-base)]"
+                    className="block w-full px-3 py-2 text-left text-[length:var(--text-body-s)] text-foreground hover:bg-[var(--color-bg-base)]"
                   >
                     {contact.name}{' '}
                     <span className="text-secondary">{contact.email ?? contact.phone}</span>
@@ -158,9 +158,9 @@ export function RecipientsBlock({
           Add
         </Button>
       </div>
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {error ? <p className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">{error}</p> : null}
 
-      <div className="flex flex-col gap-2 text-sm text-secondary">
+      <div className="flex flex-col gap-2 text-[length:var(--text-body-s)] text-secondary">
         <label className="flex items-center gap-2">
           <input
             type="checkbox"

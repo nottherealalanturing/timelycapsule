@@ -99,27 +99,27 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
 
   return (
     <section aria-label="Schedule" className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-secondary">Schedule</h2>
+      <h2 className="text-[length:var(--text-body-s)] font-medium text-secondary">Schedule</h2>
 
       <input
         placeholder="Try &quot;in 18 months&quot; or &quot;next New Year&apos;s&quot;"
         value={nlInput}
         onChange={(e) => handleNaturalLanguage(e.target.value)}
-        className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+        className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
       />
-      {nlError ? <p className="text-xs text-[var(--color-danger)]">{nlError}</p> : null}
+      {nlError ? <p className="text-[length:var(--text-caption)] text-[var(--color-danger)]">{nlError}</p> : null}
 
-      <div className="flex flex-wrap gap-2 text-sm">
-        <button type="button" onClick={() => shortcut('next-new-year')} className="rounded-full border border-[var(--color-text-secondary)]/30 px-3 py-1 text-secondary">
+      <div className="flex flex-wrap gap-2 text-[length:var(--text-body-s)]">
+        <button type="button" onClick={() => shortcut('next-new-year')} className="rounded-full border border-[var(--color-rule-strong)] px-3 py-1 text-secondary">
           Next New Year
         </button>
-        <button type="button" onClick={() => shortcut('+1y')} className="rounded-full border border-[var(--color-text-secondary)]/30 px-3 py-1 text-secondary">
+        <button type="button" onClick={() => shortcut('+1y')} className="rounded-full border border-[var(--color-rule-strong)] px-3 py-1 text-secondary">
           +1 year
         </button>
-        <button type="button" onClick={() => shortcut('+5y')} className="rounded-full border border-[var(--color-text-secondary)]/30 px-3 py-1 text-secondary">
+        <button type="button" onClick={() => shortcut('+5y')} className="rounded-full border border-[var(--color-rule-strong)] px-3 py-1 text-secondary">
           +5 years
         </button>
-        <button type="button" onClick={() => shortcut('+10y')} className="rounded-full border border-[var(--color-text-secondary)]/30 px-3 py-1 text-secondary">
+        <button type="button" onClick={() => shortcut('+10y')} className="rounded-full border border-[var(--color-rule-strong)] px-3 py-1 text-secondary">
           +10 years
         </button>
       </div>
@@ -135,7 +135,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
             next.setFullYear(y!, m! - 1, d);
             setDateTime(next);
           }}
-          className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+          className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         />
         <input
           type="time"
@@ -148,7 +148,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
             next.setHours(h!, min!, 0, 0);
             setDateTime(next);
           }}
-          className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+          className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         />
         <select
           value={recipientLocal ? '__recipient_local__' : tz}
@@ -162,7 +162,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
               draft.patch({ unlockMode: 'absolute', unlockLocal: null, unlockAt: currentDate?.toISOString() ?? null });
             }
           }}
-          className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+          className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         >
           <option value="__recipient_local__">Recipient&apos;s local time</option>
           {TIMEZONES.map((z) => (
@@ -173,7 +173,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
         </select>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-secondary">
+      <label className="flex items-center gap-2 text-[length:var(--text-body-s)] text-secondary">
         <input
           type="checkbox"
           checked={Boolean(capsule.recurrence)}
@@ -183,11 +183,11 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
       </label>
 
       {currentDate ? (
-        <p className="text-sm text-foreground">{summarySentence(currentDate, tz, recipientLocal)}</p>
+        <p className="text-[length:var(--text-body-s)] text-foreground">{summarySentence(currentDate, tz, recipientLocal)}</p>
       ) : (
-        <p className="text-sm text-secondary">No unlock date set yet.</p>
+        <p className="text-[length:var(--text-body-s)] text-secondary">No unlock date set yet.</p>
       )}
-      {validationError ? <p className="text-xs text-[var(--color-danger)]">{validationError}</p> : null}
+      {validationError ? <p className="text-[length:var(--text-caption)] text-[var(--color-danger)]">{validationError}</p> : null}
     </section>
   );
 }

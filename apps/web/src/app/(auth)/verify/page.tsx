@@ -57,14 +57,18 @@ export default function VerifyEmailPage() {
 
   return (
     <div className="flex flex-col items-center gap-6 text-center">
-      <h1 className="font-[var(--font-display)] text-xl text-foreground">Check your email</h1>
-      <p className="text-sm text-secondary">
+      <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">Check your email</h1>
+      <p className="text-[length:var(--text-body-s)] text-secondary">
         Enter the 6-digit code we sent to {user?.email ?? 'your email'}.
       </p>
 
       <OtpInput value={code} onChange={setCode} disabled={submitting} />
 
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
+          {error}
+        </p>
+      ) : null}
 
       <Button fullWidth loading={submitting} disabled={code.length !== 6} onClick={handleSubmit}>
         Verify
@@ -74,7 +78,7 @@ export default function VerifyEmailPage() {
         type="button"
         onClick={handleResend}
         disabled={cooldown > 0}
-        className="text-sm text-secondary underline underline-offset-2 disabled:no-underline disabled:opacity-60"
+        className="motion-instant text-[length:var(--text-body-s)] text-secondary underline underline-offset-2 hover:text-foreground disabled:no-underline disabled:opacity-60"
       >
         {cooldown > 0 ? `Resend code in ${cooldown}s` : 'Resend code'}
       </button>
@@ -84,7 +88,7 @@ export default function VerifyEmailPage() {
         onClick={() => {
           void logout().then(() => router.push('/signup'));
         }}
-        className="text-xs text-secondary underline underline-offset-2"
+        className="motion-instant text-[length:var(--text-caption)] text-secondary underline underline-offset-2 hover:text-foreground"
       >
         Wrong email? Start over
       </button>

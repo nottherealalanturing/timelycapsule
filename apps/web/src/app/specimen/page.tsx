@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
-import { Button, EmptyState, Hallmark, Record, Skeleton, StateChip, type CapsuleState } from '@tc/ui-web';
-import { SpecimenClient } from './SpecimenClient';
+import { Button, DualClock, EmptyState, Hallmark, Lockup, Mark, Record, Skeleton, StateChip, type CapsuleState } from '@tc/ui-web';
+import { SpecimenClient, ShellStage, AuthStage, DashboardStage, CeremonyStage, FIXTURE_CAPSULE } from './SpecimenClient';
+import { CapsuleCard } from '../../components/CapsuleCard';
 
 /**
  * Meridian V2 primitive specimen — the living component gallery.
@@ -105,6 +106,46 @@ export default function SpecimenPage() {
           because <code className="font-[family-name:var(--font-mono)]">.tc-record</code> re-points the semantic
           tokens for its subtree.
         </p>
+      </Section>
+
+      <Section title="The mark" note="Achromatic by construction — it paints in currentColor and offers no colour prop. Switches to minimal density below 20px.">
+        <div className="flex flex-wrap items-end gap-8">
+          <Mark size={64} title="TimelyCapsule" />
+          <Mark size={32} />
+          <Mark size={24} />
+          <Mark size={16} />
+          <Lockup size={28} />
+        </div>
+      </Section>
+
+      <Section title="The dual clock" note="Elapsed and remaining together, always. Emphasis shifts across the capsule's life — remaining-led at the ends, equal through the middle.">
+        <div className="flex flex-col gap-5">
+          <DualClock size="md" elapsedMs={9 * 864e5} remainingMs={3643 * 864e5} />
+          <DualClock size="md" elapsedMs={1065 * 864e5} remainingMs={2587 * 864e5} />
+          <DualClock size="md" elapsedMs={3650 * 864e5} remainingMs={47 * 60_000} />
+        </div>
+      </Section>
+
+      <Section title="Composites" note="Staged with fixture data — these live behind auth in the real app.">
+        <div className="grid max-w-[720px] gap-4 sm:grid-cols-2">
+          <CapsuleCard capsule={FIXTURE_CAPSULE} />
+        </div>
+      </Section>
+
+      <Section title="Recovery kit &amp; consent" note="The recovery code is a record — paper, bounded, meant to leave the software. The advice around it stays instrument.">
+        <AuthStage />
+      </Section>
+
+      <Section title="Dashboard filters &amp; timeline row" note="Favourites active state is interactive, not brass — a favourited capsule is not waiting. Timeline rows are links, not buttons.">
+        <DashboardStage />
+      </Section>
+
+      <Section title="The seal ceremony" note="The held beat: the meridian is struck outward at constant velocity, everything stops dead for 400ms, then the seal is an instant state change. Skippable at any point.">
+        <CeremonyStage />
+      </Section>
+
+      <Section title="Application shell" note="Extracted from the auth-gated layout so it can be verified without a session. Active state is a meridian rule, not a filled pill.">
+        <ShellStage />
       </Section>
 
       <Section title="Empty state" note="One line, one action. No illustration, no mascot, no encouragement.">
