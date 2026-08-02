@@ -50,14 +50,23 @@ export const metadata: Metadata = {
 // Applies the persisted theme choice before paint, so there's no flash of
 // the wrong theme while React hydrates (data-theme drives packages/ui-web's
 // tokens.css — see the [data-theme] rules there).
+//
+// Light is the default for anyone with no stored preference — including a
+// brand-new visitor and, unavoidably, a returning user whose browser never
+// happened to write tc-theme (there's no separate "has visited before" flag
+// to tell those two apart; a stored value is the only signal that exists).
+// This is a deliberate product decision superseding `02 §6`'s older "system
+// default" language, not a bug fix — previously the app followed
+// prefers-color-scheme and defaulted to dark whenever the OS expressed no
+// preference.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem('tc-theme');
-    if (stored === 'light' || stored === 'dark') {
-      document.documentElement.setAttribute('data-theme', stored);
-    }
-  } catch (e) {}
+    document.documentElement.setAttribute('data-theme', stored === 'dark' ? 'dark' : 'light');
+  } catch (e) {
+    document.documentElement.setAttribute('data-theme', 'light');
+  }
 })();
 `;
 

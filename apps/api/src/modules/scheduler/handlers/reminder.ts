@@ -34,6 +34,7 @@ export const reminderHandler: ActionHandler = async ({ db, clock, subjectId }) =
       audience: 'recipient',
       senderName: owner?.displayName ?? 'Someone',
       daysUntilUnlock: daysUntil(capsule.unlockAt, clock.now()),
+      unlockAtIso: capsule.unlockAt.toISOString(),
     });
     return;
   }
@@ -48,6 +49,7 @@ export const reminderHandler: ActionHandler = async ({ db, clock, subjectId }) =
     audience: 'owner',
     capsuleTitle: capsule.title,
     daysUntilUnlock: daysUntil(capsule.unlockAt, clock.now()),
+    unlockAtIso: capsule.unlockAt.toISOString(),
     dashboardUrl: `${process.env.APP_URL ?? 'http://localhost:3001'}/capsule/${capsule.id}`,
   });
 };

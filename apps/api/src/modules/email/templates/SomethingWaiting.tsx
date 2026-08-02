@@ -1,4 +1,4 @@
-import { EmailLayout, emailColors } from './Layout.js';
+import { EmailButton, EmailLayout, emailColors } from './Layout.js';
 
 export interface SomethingWaitingProps {
   senderName: string;
@@ -15,7 +15,7 @@ export function SomethingWaiting({ senderName, teaser, link }: SomethingWaitingP
   return (
     <EmailLayout>
       <p style={{ fontSize: 16, color: emailColors.ink, margin: '0 0 16px' }}>Something is waiting for you</p>
-      <p style={{ fontSize: 14, color: emailColors.mist, margin: '0 0 16px', lineHeight: 1.5 }}>
+      <p style={{ fontSize: 14, color: emailColors.muted, margin: '0 0 16px', lineHeight: 1.5 }}>
         {senderName} has sealed a time capsule for you. It&apos;ll open on its own — no need to do anything until then.
       </p>
       {teaser ? (
@@ -23,21 +23,10 @@ export function SomethingWaiting({ senderName, teaser, link }: SomethingWaitingP
           &ldquo;{teaser}&rdquo;
         </p>
       ) : null}
-      <table cellPadding={0} cellSpacing={0} role="presentation">
-        <tbody>
-          <tr>
-            <td style={{ borderRadius: 10, backgroundColor: emailColors.gold }}>
-              <a
-                href={link}
-                style={{ display: 'inline-block', padding: '12px 24px', fontSize: 14, fontWeight: 600, color: emailColors.ink, textDecoration: 'none' }}
-              >
-                View the countdown
-              </a>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      <p style={{ fontSize: 13, color: emailColors.mist, margin: '24px 0 0' }}>Save this email — this link is how you&apos;ll open it later.</p>
+      <EmailButton href={link}>View the countdown</EmailButton>
+      <p style={{ fontSize: 13, color: emailColors.muted, margin: '24px 0 0' }}>
+        Save this email — this link is how you&apos;ll open it later.
+      </p>
     </EmailLayout>
   );
 }
