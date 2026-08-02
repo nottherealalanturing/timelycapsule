@@ -1,13 +1,14 @@
 'use client';
 
 import type { Capsule, MediaItem, Recipient } from '@tc/contracts';
-import { Button, Dialog, DualClock, Skeleton, StateChip, useToast } from '@tc/ui-web';
+import { Button, Dialog, DualClock, MeridianApproach, Skeleton, StateChip, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 import { useCorrectedNow } from '../../../../lib/use-corrected-now';
 import { resolveUnlockDate } from '../../../../components/CapsuleCard';
+import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
 import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, mediaApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
 import { decodeIvCiphertext } from '../../../../lib/capsule-crypto';
 import { useMasterKey } from '../../../../lib/master-key-context';
@@ -198,8 +199,15 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div>
+      {/*
+        `flex-wrap` + a min-width on the title column: without it the actions
+        row squeezes the title to a ~200px column at narrower desktop widths,
+        which wrapped both the capsule title and — worse — the Dual Clock's
+        numerals. `03 §VII` requires the figure to "hold tabular alignment
+        across every magnitude"; a figure broken across two lines does not.
+      */}
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-6">
+        <div className="min-w-[19rem] flex-1">
           <div className="flex items-center gap-2">
             <h1 className="text-[length:var(--text-display-s)] text-foreground">{capsule.title || 'Untitled capsule'}</h1>
             <button
@@ -224,8 +232,25 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
             </div>
           ) : null}
           {capsule.state === 'sealed' && unlockDate && sealedMs !== null && nowMs !== null ? (
-            <div className="mt-3">
+            /*
+             * The owner's view of the same wait the recipient sees. Step 5 put
+             * the Dual Clock here; Step 6 completes it with the other three
+             * things `03 §V` asks a waiting state to carry — the Meridian
+             * (position), the temperature it warms through, and the literal
+             * absolute date (`07 §VIII.4`), which the header had never stated
+             * anywhere despite being the one fact the whole screen is about.
+             */
+            <div className="mt-4 flex max-w-md flex-col gap-4">
               <DualClock elapsedMs={nowMs - sealedMs} remainingMs={unlockDate.getTime() - nowMs} />
+              <MeridianApproach remainingMs={unlockDate.getTime() - nowMs} />
+              <div className="flex flex-col gap-0.5">
+                <p className="text-[length:var(--text-body-s)] text-foreground">
+                  Sealed until {formatAbsoluteDate(unlockDate.toISOString())}
+                </p>
+                <p className="text-[length:var(--text-caption)] text-secondary">
+                  {horizonPhrase(unlockDate.getTime() - nowMs)}
+                </p>
+              </div>
             </div>
           ) : capsule.state === 'unlocked' && recipients.length > 0 ? (
             <p className="mt-1 text-[length:var(--text-body-s)] text-secondary">

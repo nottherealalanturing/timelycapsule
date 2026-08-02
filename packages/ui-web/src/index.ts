@@ -23,6 +23,13 @@ export {
   type DualClockProps,
   type ClockEmphasis,
 } from './DualClock';
+export {
+  MeridianApproach,
+  approachDistance,
+  approachTemperature,
+  type MeridianApproachProps,
+} from './MeridianApproach';
+export { DurationStamp, formatFrankedDuration, type DurationStampProps } from './DurationStamp';
 export { PasswordStrengthMeter } from './PasswordStrengthMeter';
 export { OtpInput, type OtpInputProps } from './OtpInput';
 export { ThemeToggle } from './ThemeToggle';

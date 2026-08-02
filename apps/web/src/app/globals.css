@@ -178,3 +178,43 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * The Orbit Scrub's range input (T-21, design/07 §X.2). An instrument
+ * control: hairline track (a graduation rule, 04 §7), square 3px-radius
+ * thumb in the interactive steel — brass is reserved for waiting itself
+ * (design/05 "Two rules"), and the thumb is a control, not a capsule.
+ */
+.tc-scrub {
+  appearance: none;
+  height: 20px;
+  background: transparent;
+}
+.tc-scrub::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--color-rule-strong);
+}
+.tc-scrub::-webkit-slider-thumb {
+  appearance: none;
+  margin-top: -5px;
+  height: 11px;
+  width: 11px;
+  border-radius: 3px;
+  background: var(--color-interactive);
+  border: none;
+}
+.tc-scrub::-moz-range-track {
+  height: 1px;
+  background: var(--color-rule-strong);
+}
+.tc-scrub::-moz-range-thumb {
+  height: 11px;
+  width: 11px;
+  border-radius: 3px;
+  background: var(--color-interactive);
+  border: none;
+}
+.tc-scrub:focus-visible {
+  outline: 1px solid var(--color-interactive);
+  outline-offset: 4px;
+}

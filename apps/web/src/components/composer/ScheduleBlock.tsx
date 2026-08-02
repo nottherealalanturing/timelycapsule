@@ -102,6 +102,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
       <h2 className="text-[length:var(--text-body-s)] font-medium text-secondary">Schedule</h2>
 
       <input
+        aria-label="Describe when it opens"
         placeholder="Try &quot;in 18 months&quot; or &quot;next New Year&apos;s&quot;"
         value={nlInput}
         onChange={(e) => handleNaturalLanguage(e.target.value)}
@@ -127,6 +128,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
       <div className="flex flex-wrap gap-2">
         <input
           type="date"
+          aria-label="Unlock date"
           value={currentDate ? toDateInputValue(currentDate) : ''}
           onChange={(e) => {
             const base = currentDate ?? new Date();
@@ -139,6 +141,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
         />
         <input
           type="time"
+          aria-label="Unlock time"
           step={900}
           value={currentDate ? toTimeInputValue(currentDate) : ''}
           onChange={(e) => {
@@ -151,6 +154,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
           className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         />
         <select
+          aria-label="Time zone"
           value={recipientLocal ? '__recipient_local__' : tz}
           onChange={(e) => {
             if (e.target.value === '__recipient_local__') {

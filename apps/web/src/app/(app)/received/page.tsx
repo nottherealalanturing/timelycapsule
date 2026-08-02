@@ -1,11 +1,12 @@
 'use client';
 
 import type { ReceivedCapsule } from '@tc/contracts';
-import { Button, EmptyState, Skeleton } from '@tc/ui-web';
+import { Button, EmptyState, Skeleton, formatDuration } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { CountdownDisplay } from '../../../components/CountdownDisplay';
 import { blocksApi, receivedApi } from '../../../lib/api-client';
+import { useCorrectedNow } from '../../../lib/use-corrected-now';
+import { formatAbsoluteDate } from '../../../lib/waiting';
 
 const SECTION_COPY: Record<ReceivedCapsule['section'], { heading: string; empty: string }> = {
   waiting: { heading: 'Waiting to open', empty: '' },
@@ -20,6 +21,25 @@ function coverStyle(cover: ReceivedCapsule['cover']): React.CSSProperties {
 
 function initial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?';
+}
+
+/**
+ * The remaining figure in the Dual Clock's typographic idiom — mono, tabular,
+ * two largest units — rather than V1's prose countdown ("12 years").
+ *
+ * Not the full `DualClock`: `ReceivedCapsuleSchema` carries no `sealedAt`, so
+ * elapsed is unavailable on every recipient-facing surface. See the note on
+ * `LockedWait` in the reveal page — the gap is reported, not faked.
+ */
+function RemainingFigure({ unlockAt }: { unlockAt: string }) {
+  const target = new Date(unlockAt);
+  const nowMs = useCorrectedNow(target);
+  if (nowMs === null) return null;
+  return (
+    <span className="whitespace-nowrap font-[family-name:var(--font-mono)] tabular-nums">
+      {formatDuration(Math.max(0, target.getTime() - nowMs))}
+    </span>
+  );
 }
 
 function ReceivedRow({ item, onReport }: { item: ReceivedCapsule; onReport: (item: ReceivedCapsule) => void }) {
@@ -48,12 +68,22 @@ function ReceivedRow({ item, onReport }: { item: ReceivedCapsule; onReport: (ite
         <p className="truncate text-sm font-medium text-foreground">{item.title || 'Untitled capsule'}</p>
         <p className="truncate text-sm text-secondary">
           From {item.senderName}
-          {item.section !== 'opened' && item.unlockAt ? (
+          {/*
+            The absolute date always accompanies the relative figure
+            (`07 §VIII.4`) — and the figure only appears where there is
+            genuinely something remaining. The `waiting` section is *already
+            unlocked* and merely unopened, so V1's countdown rendered a
+            meaningless `00:00` there; it now states, in the past tense
+            (`09 §XVI`), that the capsule has arrived.
+          */}
+          {item.unlockAt && item.section === 'upcoming' ? (
             <>
               {' '}
-              &middot; {item.section === 'upcoming' ? 'opens in ' : ''}
-              <CountdownDisplay target={new Date(item.unlockAt)} />
+              &middot; {formatAbsoluteDate(item.unlockAt)} &middot;{' '}
+              <RemainingFigure unlockAt={item.unlockAt} />
             </>
+          ) : item.unlockAt && item.section === 'waiting' ? (
+            <> &middot; Unlocked {formatAbsoluteDate(item.unlockAt)}</>
           ) : null}
         </p>
       </div>

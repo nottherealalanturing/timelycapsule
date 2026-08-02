@@ -96,7 +96,7 @@ export function DualClock({
         <Hallmark>Travelled</Hallmark>
         <span
           className={cn(
-            'font-[family-name:var(--font-mono)] tabular-nums leading-none',
+            'whitespace-nowrap font-[family-name:var(--font-mono)] tabular-nums leading-none',
             travelledLead ? s.lead : s.sub,
             travelledLead ? 'text-foreground' : 'text-secondary',
           )}
@@ -108,7 +108,7 @@ export function DualClock({
         <Hallmark>Remaining</Hallmark>
         <span
           className={cn(
-            'font-[family-name:var(--font-mono)] tabular-nums leading-none text-foreground',
+            'whitespace-nowrap font-[family-name:var(--font-mono)] tabular-nums leading-none text-foreground',
             s.lead,
           )}
         >
