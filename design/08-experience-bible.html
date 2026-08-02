@@ -1,0 +1,764 @@
+<title>The TimelyCapsule Experience Bible</title>
+<style>
+/* ─────────────────────────────────────────────────────────────
+   The document obeys its own constitution.
+   It is an INSTRUMENT — a reference tool — so it is dark and sans.
+   Its RECORDS — the thesis, the verdicts, the north star — are
+   paper and serif, bounded, in both themes. Tokens are the
+   WCAG-verified values from 05-IDENTITY-DECISION.md.
+   ───────────────────────────────────────────────────────────── */
+:root{
+  --ground:#0B0E14; --raised:#141922; --overlay:#1C2230;
+  --ink:#E6E8EC; --muted:#8B93A3; --brass:#E0B84A; --steel:#7A8AB0;
+  --rule:rgba(230,232,236,.13); --rule-hi:rgba(230,232,236,.26);
+  --paper:#E9EAE6; --paper-raised:#F3F4F0; --paper-ink:#16181A;
+  --paper-muted:#5E635C; --verdigris:#3F6154; --iron:#2C3A4A;
+  /* verdigris is a RECORD token — unreadable on the instrument ground,
+     so the instrument register gets its own lifted variant */
+  --hold:#6E9E8A; --record-bg:#E9EAE6;
+  --sans:"Helvetica Neue",Helvetica,Inter,system-ui,sans-serif;
+  --serif:Charter,"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --measure:64ch;
+}
+@media (prefers-color-scheme:light){:root{
+  --ground:#E9EAE6; --raised:#F3F4F0; --overlay:#FFF;
+  --ink:#16181A; --muted:#5E635C; --brass:#6E5A0E; --steel:#2C3A4A;
+  --rule:rgba(22,24,26,.15); --rule-hi:rgba(22,24,26,.3); --hold:#3F6154; --record-bg:#F3F4F0;
+}}
+:root[data-theme=light]{
+  --ground:#E9EAE6; --raised:#F3F4F0; --overlay:#FFF;
+  --ink:#16181A; --muted:#5E635C; --brass:#6E5A0E; --steel:#2C3A4A;
+  --rule:rgba(22,24,26,.15); --rule-hi:rgba(22,24,26,.3); --hold:#3F6154; --record-bg:#F3F4F0;
+}
+:root[data-theme=dark]{
+  --ground:#0B0E14; --raised:#141922; --overlay:#1C2230;
+  --ink:#E6E8EC; --muted:#8B93A3; --brass:#E0B84A; --steel:#7A8AB0;
+  --rule:rgba(230,232,236,.13); --rule-hi:rgba(230,232,236,.26); --hold:#6E9E8A; --record-bg:#E9EAE6;
+}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);
+  font-family:var(--sans);font-size:16px;line-height:1.62;
+  -webkit-font-smoothing:antialiased}
+
+.shell{display:grid;grid-template-columns:200px minmax(0,1fr);gap:0;
+  max-width:1180px;margin:0 auto}
+/* minmax(0,1fr), not 1fr — 1fr's auto minimum lets the tables' min-width
+   blow the grid column open and scroll the whole page sideways */
+@media(max-width:900px){.shell{grid-template-columns:minmax(0,1fr)}}
+
+/* ── index rail: functional navigation for a reference document ── */
+.rail{position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:38px 20px 38px 26px;border-right:1px solid var(--rule);
+  font-family:var(--mono);font-size:.66rem;line-height:1.9;letter-spacing:.04em}
+@media(max-width:900px){.rail{display:none}}
+.rail a{display:block;color:var(--muted);text-decoration:none;
+  text-transform:uppercase;padding:1px 0;transition:color .12s}
+.rail a:hover,.rail a:focus-visible{color:var(--brass)}
+.rail .rn{color:var(--rule-hi);display:inline-block;width:3.1em}
+.rail h6{font-size:.66rem;letter-spacing:.16em;color:var(--ink);
+  margin:22px 0 6px;font-weight:600;text-transform:uppercase}
+.rail h6:first-child{margin-top:0}
+
+main{padding:38px 44px 120px;max-width:900px}
+@media(max-width:700px){main{padding:30px 22px 80px}}
+
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--muted);margin:0 0 14px}
+h1{font-family:var(--serif);font-size:clamp(2.1rem,5.2vw,3.15rem);
+  line-height:1.08;font-weight:600;letter-spacing:-.017em;margin:0 0 18px;
+  text-wrap:balance}
+h2{font-family:var(--serif);font-size:clamp(1.45rem,3vw,1.85rem);
+  line-height:1.2;font-weight:600;letter-spacing:-.012em;
+  margin:0 0 16px;text-wrap:balance}
+h3{font-family:var(--sans);font-size:.95rem;font-weight:650;
+  letter-spacing:.005em;margin:0 0 10px}
+p{margin:0 0 15px;max-width:var(--measure)}
+ul,ol{margin:0 0 15px;padding-left:1.15em;max-width:var(--measure)}
+li{margin-bottom:7px}
+b,strong{font-weight:650;color:var(--ink)}
+em{font-style:italic}
+a{color:var(--brass)}
+code{font-family:var(--mono);font-size:.86em;background:var(--overlay);
+  padding:1px 5px;border-radius:2px}
+:focus-visible{outline:2px solid var(--brass);outline-offset:3px}
+
+section{padding:44px 0;border-top:1px solid var(--rule)}
+section:first-of-type{border-top:0;padding-top:8px}
+.snum{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;
+  color:var(--brass);text-transform:uppercase;display:block;margin-bottom:9px}
+
+.lede{font-family:var(--serif);font-size:1.16rem;line-height:1.56;
+  color:var(--muted);max-width:58ch}
+
+/* ── RECORDS: paper objects, bounded, in both themes ── */
+/* In the light theme the page ground IS paper, so a record at --paper would
+   stop reading as a bounded object — the one rule this document calls
+   non-negotiable. It lifts to --paper-raised there. */
+.record{background:var(--record-bg);color:var(--paper-ink);
+  font-family:var(--serif);border-left:2px solid var(--verdigris);
+  border-radius:3px;padding:26px 30px;margin:0 0 22px;
+  box-shadow:0 1px 0 rgba(0,0,0,.2),0 16px 40px rgba(0,0,0,.26)}
+.record p{color:var(--paper-ink);max-width:56ch}
+.record p:last-child{margin-bottom:0}
+.record .rlbl{font-family:var(--mono);font-size:.63rem;letter-spacing:.2em;
+  text-transform:uppercase;color:var(--paper-muted);margin:0 0 12px;display:block}
+.record .big{font-family:var(--serif);font-size:clamp(1.3rem,3vw,1.72rem);
+  line-height:1.28;font-weight:600;letter-spacing:-.012em;margin:0 0 10px}
+.record .sub{color:var(--paper-muted);font-size:.93rem;margin:0}
+
+/* ── tables ── */
+.tw{overflow-x:auto;margin:0 0 20px;border:1px solid var(--rule);border-radius:3px}
+table{border-collapse:collapse;width:100%;font-size:.855rem;min-width:520px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--rule);
+  vertical-align:top}
+th{font-family:var(--mono);font-size:.63rem;letter-spacing:.15em;
+  text-transform:uppercase;color:var(--muted);font-weight:500;
+  background:var(--raised)}
+tbody tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;
+  color:var(--muted);white-space:nowrap}
+
+/* ── notes ── */
+.note{border:1px solid var(--rule);border-left:2px solid var(--steel);
+  border-radius:3px;padding:16px 20px;margin:0 0 20px;background:var(--raised);
+  font-size:.9rem}
+.note p{max-width:58ch}
+.note p:last-child{margin-bottom:0}
+.note.warn{border-left-color:var(--brass)}
+.note.kill{border-left-color:#D2694E}
+
+/* ── numbered principle list: the numbers encode the constitution
+     article, which is referenced in review, so they carry meaning ── */
+.arts{list-style:none;padding:0;margin:0 0 20px;display:flex;
+  flex-direction:column;gap:13px;max-width:var(--measure)}
+.arts li{display:grid;grid-template-columns:2.1rem 1fr;gap:12px;margin:0}
+.arts .a{font-family:var(--mono);font-size:.78rem;color:var(--brass);
+  font-variant-numeric:tabular-nums;padding-top:.16rem}
+
+/* ── the five devices ── */
+.devs{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));
+  gap:1px;background:var(--rule);border:1px solid var(--rule);
+  border-radius:3px;overflow:hidden;margin:0 0 20px}
+.dev{background:var(--ground);padding:18px 20px}
+.dev .dn{font-family:var(--mono);font-size:.63rem;letter-spacing:.18em;
+  color:var(--brass);text-transform:uppercase;display:block;margin-bottom:8px}
+.dev h4{font-family:var(--serif);font-size:1.06rem;font-weight:600;margin:0 0 6px}
+.dev p{font-size:.83rem;color:var(--muted);margin:0;max-width:none}
+
+/* ── the held beat demonstration: the single interactive moment ── */
+.beat{background:#0B0E14;border:1px solid rgba(230,232,236,.13);
+  border-radius:4px;padding:26px 26px 22px;margin:0 0 20px;color:#E6E8EC}
+.track{position:relative;height:64px;margin:6px 0 4px}
+.tline{position:absolute;left:0;right:0;top:31px;height:1px;
+  background:rgba(230,232,236,.15)}
+.tmer{position:absolute;left:72%;top:6px;bottom:6px;width:1px;
+  background:#E0B84A;opacity:.4}
+.tmark{position:absolute;top:24px;width:15px;height:15px;border-radius:50%;
+  border:1.5px solid #E0B84A;left:4%;margin-left:-7.5px;background:#0B0E14}
+.tmark.done{background:#E0B84A}
+.tstate{position:absolute;right:0;top:2px;font-family:var(--mono);
+  font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#8B93A3}
+.tstate.sealed{color:#E0B84A}
+.brow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.bbtn{font-family:var(--sans);font-size:.79rem;font-weight:600;padding:8px 15px;
+  border-radius:3px;cursor:pointer;border:1px solid rgba(230,232,236,.22);
+  background:transparent;color:#E6E8EC}
+.bbtn.prime{background:#E0B84A;color:#12151C;border-color:#E0B84A}
+.bbtn:disabled{opacity:.4;cursor:default}
+.breadout{font-family:var(--mono);font-size:.68rem;color:#8B93A3;
+  letter-spacing:.1em;text-transform:uppercase;margin-left:auto}
+
+.never{columns:2;column-gap:34px;font-size:.855rem;color:var(--muted);
+  max-width:none;margin:0 0 8px}
+@media(max-width:640px){.never{columns:1}}
+.never b{display:block;font-family:var(--mono);font-size:.63rem;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--ink);
+  margin:14px 0 5px;break-after:avoid}
+.never b:first-child{margin-top:0}
+
+.chal{border-top:1px solid var(--rule);padding:20px 0 0;margin:0 0 20px}
+.chal h3{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.tag{font-family:var(--mono);font-size:.6rem;letter-spacing:.16em;
+  text-transform:uppercase;padding:2px 7px;border-radius:2px;font-weight:500}
+.tag.chg{background:#E0B84A;color:#12151C}
+.tag.open{border:1px solid var(--rule-hi);color:var(--muted)}
+.tag.hold{border:1px solid var(--hold);color:var(--hold)}
+
+footer{border-top:1px solid var(--rule);padding:26px 0 0;margin-top:20px;
+  font-size:.83rem;color:var(--muted)}
+
+@media (prefers-reduced-motion:reduce){
+  *{transition-duration:.001ms !important;animation-duration:.001ms !important}
+}
+</style>
+
+<div class="shell">
+<nav class="rail" aria-label="Contents">
+  <h6>Bible</h6>
+  <a href="#manifesto"><span class="rn">I</span>Manifesto</a>
+  <a href="#principles"><span class="rn">II</span>Principles</a>
+  <a href="#devices"><span class="rn">III</span>Devices</a>
+  <a href="#timeline"><span class="rn">IV</span>Timeline</a>
+  <a href="#interaction"><span class="rn">V</span>Interaction</a>
+  <a href="#motion"><span class="rn">VI</span>Motion</a>
+  <a href="#sound"><span class="rn">VII</span>Sound</a>
+  <a href="#copy"><span class="rn">VIII</span>Copy</a>
+  <a href="#composition"><span class="rn">IX</span>Composition</a>
+  <a href="#landing"><span class="rn">X</span>Landing</a>
+  <a href="#states"><span class="rn">XI</span>States</a>
+  <a href="#imagery"><span class="rn">XII</span>Imagery</a>
+  <a href="#a11y"><span class="rn">XIII</span>Access</a>
+  <a href="#memorable"><span class="rn">XIV</span>Memorable</a>
+  <h6>Decisions</h6>
+  <a href="#challenges"><span class="rn">XV</span>Challenges</a>
+  <a href="#never"><span class="rn">XVI</span>Never</a>
+  <a href="#north"><span class="rn">XVII</span>North star</a>
+  <a href="#next"><span class="rn">XVIII</span>Next</a>
+</nav>
+
+<main>
+<section>
+  <p class="eyebrow">Meridian · Creative Foundation · Phase 07</p>
+  <h1>The Experience Bible</h1>
+  <p class="lede">Five documents answered what it should look like. This one
+  answers what it should feel like — and finds that the answer cannot come from
+  anything we can draw.</p>
+</section>
+
+<section id="manifesto">
+  <span class="snum">Part I · Manifesto</span>
+  <h2>We cannot be recognised the way our references are recognised</h2>
+  <p>The brief is to be identifiable in seconds, like Apple, Linear, Stripe, Arc,
+  Nothing. So look at how each is <em>actually</em> recognised.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Brand</th><th>Recognised by</th><th>Mechanism</th><th>Open to us</th></tr></thead>
+    <tbody>
+      <tr><td>Nothing</td><td>Dot-matrix type, transparency</td><td>One gimmick, no exceptions</td><td class="n">no — decoration</td></tr>
+      <tr><td>Arc</td><td>Colour, spatial play</td><td>Personality through motion</td><td class="n">no — spectacle</td></tr>
+      <tr><td>Apple</td><td>Scroll-driven product cinema</td><td>Spectacle, expensively made</td><td class="n">no — spectacle</td></tr>
+      <tr><td>Stripe</td><td>Gradient, graceful density</td><td>Craft at high volume</td><td class="n">partly</td></tr>
+      <tr><td>Linear</td><td>Zero latency, keyboard-first</td><td><b>Speed</b></td><td class="n">no — taken</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>We forbade ourselves four of those five in <code>01</code>–<code>05</code>.
+  And we cannot own speed: Linear owns it, and our premise is that some things
+  are worth waiting for. Recognisability cannot come from addition, and it cannot
+  come from being fast.</p>
+
+  <div class="record">
+    <span class="rlbl">The thesis</span>
+    <p class="big">We will be recognised by our timing. Not our colour, not our
+    type, not our motion — our rhythm.</p>
+    <p class="sub">Every product on earth has a uniform tempo: press a thing, it
+    answers in 100ms, always. Ours is bimodal, and the split carries meaning.</p>
+  </div>
+
+  <p>Everything reversible is <b>instant</b> — settings, navigation, typing,
+  search. No slower than Linear; reverence in a settings pane is not reverence,
+  it is a slow app. Everything irreversible is <b>held</b>: it stops, completely,
+  before it happens.</p>
+
+  <p>Nobody owns this. It is perceptible within seconds. It cannot be
+  screenshotted, so it cannot be casually copied. And unlike a gimmick it gets
+  <em>more</em> meaningful with use, because the rhythm is quietly teaching you
+  which of your actions can be taken back.</p>
+
+  <div class="record">
+    <span class="rlbl">The rule that decides every timing in the product</span>
+    <p class="big">Duration is a function of consequence, never of aesthetics.</p>
+    <p class="sub">If you can undo it, it is instant. If you cannot, it is held.
+    Any timing that cannot be justified by that sentence is decoration, and gets
+    cut.</p>
+  </div>
+</section>
+
+<section id="beat-demo">
+  <span class="snum">The signature, made tangible</span>
+  <h2>The Held Beat</h2>
+  <p>This document argues that timing is the identity, so it should let you feel
+  it once — and otherwise hold still. Press both. The difference between them is
+  the brand.</p>
+
+  <div class="beat">
+    <div class="track">
+      <div class="tline"></div><div class="tmer"></div>
+      <div class="tmark" id="mk"></div>
+      <div class="tstate" id="stt">Draft</div>
+    </div>
+    <div class="brow">
+      <button class="bbtn" id="bRev" type="button">Rename draft</button>
+      <button class="bbtn prime" id="bIrr" type="button">Seal permanently</button>
+      <button class="bbtn" id="bRes" type="button">Reset</button>
+      <span class="breadout" id="rdt">idle</span>
+    </div>
+  </div>
+
+  <div class="note"><p><b>Renaming</b> is reversible, so it resolves in
+  <code>0ms</code> — no transition at all. <b>Sealing</b> cannot be undone, so
+  the marker travels at constant velocity, <b>stops dead for 400ms</b>, and only
+  then flips state instantly. A seal is either intact or it isn't; that is never
+  a tween.</p>
+  <p>The stop is the whole thing. Every animation library — and every engineer —
+  will want to peak there. Stopping instead is what turns a transition into a
+  threshold.</p></div>
+</section>
+
+<section id="principles">
+  <span class="snum">Part II · Creative Principles</span>
+  <h2>Ten decision procedures</h2>
+  <ol class="arts">
+    <li><span class="a">01</span><span><b>Duration is a function of consequence.</b> The whole system in one line.</span></li>
+    <li><span class="a">02</span><span><b>The institution never changes; the instruments always do.</b> Return after six months: the building is identical, the readings are different.</span></li>
+    <li><span class="a">03</span><span><b>Behave, don't depict.</b> No hourglass, no vault, no clock face. The moment we illustrate our metaphor we admit the interface isn't carrying it.</span></li>
+    <li><span class="a">04</span><span><b>The record is an object, never a background.</b> Bounded on all four sides, at every breakpoint, forever. <em>(Gate 1)</em></span></li>
+    <li><span class="a">05</span><span><b>Silence is a design material</b> — and the one we spend most. The likeliest thing to be "fixed" by well-meaning contributors.</span></li>
+    <li><span class="a">06</span><span><b>Certainty before feeling.</b> Anticipation is pleasant only when the outcome is not in doubt. No soft language about delivery, ever.</span></li>
+    <li><span class="a">07</span><span><b>The moment belongs to the recipient.</b> No branding in the reveal. We are not in the room.</span></li>
+    <li><span class="a">08</span><span><b>Never simulate what we can state.</b> No animated "encrypting…" theatre. Security theatre is the fastest way to lose the trust the product runs on.</span></li>
+    <li><span class="a">09</span><span><b>Design for the worst day.</b> The composer may be dying; the recipient may be grieving. <b>Grief impairs attention</b> — one decision per screen at every loaded moment.</span></li>
+    <li><span class="a">10</span><span><b>Reliability is the marketing.</b> Nobody tells a friend about our easing curves. They tell a friend that it arrived.</span></li>
+  </ol>
+</section>
+
+<section id="devices">
+  <span class="snum">Part III · Signature Devices</span>
+  <h2>Five things, applied without exception</h2>
+  <div class="devs">
+    <div class="dev"><span class="dn">01 · rhythm</span><h4>The Held Beat</h4><p>The stillness before consequence. What makes us recognisable in seconds.</p></div>
+    <div class="dev"><span class="dn">02 · component</span><h4>The Dual Clock</h4><p>Elapsed and remaining, together, always. Carries more brand than the logo.</p></div>
+    <div class="dev"><span class="dn">03 · surface</span><h4>The Two Registers</h4><p>Instrument dark and sans; record paper and serif. Validated at Gate 1.</p></div>
+    <div class="dev"><span class="dn">04 · artifact</span><h4>The Duration Stamp</h4><p>The postmark. The only thing we make that is designed to leave the product.</p></div>
+    <div class="dev"><span class="dn">05 · mark</span><h4>The Meridian</h4><p>Logo, transit point, origin of the reveal, axis of the waiting screen.</p></div>
+  </div>
+  <p>If a proposed element is not one of these five and does not directly serve
+  one of them, it is decoration. Cut it.</p>
+</section>
+
+<section id="timeline">
+  <span class="snum">Part IV · Emotional Timeline</span>
+  <h2>Seven phases — and the gap they expose</h2>
+  <p>Every screen we build sits in exactly one row.</p>
+  <div class="tw"><table>
+    <thead><tr><th></th><th>Phase</th><th>Dominant feeling</th><th>Fails when</th><th>Obligation</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td><b>Arrival</b><br><span style="color:var(--muted)">stranger</span></td><td>Curiosity + scepticism — <em>"will this still exist in 2041?"</em></td><td>We answer with charm instead of evidence</td><td>Make the wait felt, then answer the survival question honestly</td></tr>
+      <tr><td class="n">2</td><td><b>Composition</b></td><td>Vulnerability, blankness, avoidance</td><td>We treat it as data entry</td><td><b>The hardest moment in the product.</b> Get them past the blank page</td></tr>
+      <tr><td class="n">3</td><td><b>Sealing</b></td><td>Commitment, a flinch of fear</td><td>We make it feel casual</td><td>The held beat at full weight</td></tr>
+      <tr><td class="n">4</td><td><b>The long wait</b></td><td>Trust decaying into doubt</td><td>Silence reads as abandonment</td><td>Proof of life. Position, not progress</td></tr>
+      <tr><td class="n">5</td><td><b>Approach</b></td><td>Anticipation sharpening</td><td>We nag, or we go quiet</td><td>Legibility without urgency</td></tr>
+      <tr><td class="n">6</td><td><b>Reveal</b><br><span style="color:var(--muted)">recipient</span></td><td>Being addressed across time</td><td>We are visible in the moment</td><td>Disappear</td></tr>
+      <tr><td class="n">7</td><td><b>Custody</b></td><td>Wanting to keep it</td><td>We make it feel rented</td><td>Export, print, download. It is theirs</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note warn">
+    <p><b>Almost all of our craft has gone into phase 6, which lasts six seconds.
+    Phase 2 is where people actually struggle, and where they abandon.</b></p>
+    <p>A blank field addressed to your daughter in fourteen years is one of the
+    harder things software has ever asked of anybody. People open the composer
+    and freeze — not because the UI is unclear, but because the task is
+    emotionally enormous.</p>
+    <p>We have designed a magnificent reveal for letters that never got written.
+    This is the largest gap in the work so far, and it now outranks the logo and
+    the design system.</p>
+  </div>
+</section>
+
+<section id="interaction">
+  <span class="snum">Part V · Interaction Constitution</span>
+  <h2>Twelve articles</h2>
+  <ol class="arts">
+    <li><span class="a">01</span><span>Reversible is instant; irreversible is held. No exceptions.</span></li>
+    <li><span class="a">02</span><span>One decision per screen at any emotionally loaded moment.</span></li>
+    <li><span class="a">03</span><span>Never surface a memory without consent. No "on this day", no unbidden excerpt, no preview of sealed content anywhere.</span></li>
+    <li><span class="a">04</span><span>State is always stated in text — never in colour, position or motion alone.</span></li>
+    <li><span class="a">05</span><span>Ceremony is skippable at any point, always, without penalty.</span></li>
+    <li><span class="a">06</span><span>Ceremony never repeats. Returning to an opened capsule shows the record at rest.</span></li>
+    <li><span class="a">07</span><span><b>But re-reading is trivial and unlimited.</b> Article 6 governs the animation, never the document. Someone re-reading a letter from a dead parent must never be made to wait.</span></li>
+    <li><span class="a">08</span><span>No modal ever interrupts the wait or the reveal. Not consent, not upsell, not a review prompt.</span></li>
+    <li><span class="a">09</span><span>The recipient path assumes nothing — no account, no app, no modern browser, no prior exposure to our conventions.</span></li>
+    <li><span class="a">10</span><span>Errors state what happened and what happens next, in the record register. A delivery problem is an institutional failure and is written like one.</span></li>
+    <li><span class="a">11</span><span>Nothing consequential is ever optimistic. We do not show success before we have it.</span></li>
+    <li><span class="a">12</span><span>No dark patterns at any scale. We forfeited the urgency toolkit permanently.</span></li>
+  </ol>
+</section>
+
+<section id="motion">
+  <span class="snum">Part VI · Motion Constitution</span>
+  <h2>Three tiers, decided by consequence</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Tier</th><th>Applies to</th><th>Timing</th><th>Easing</th></tr></thead>
+    <tbody>
+      <tr><td><b>Instant</b></td><td>Navigation, settings, typing, toggles, search, scroll</td><td class="n">0–120ms<br>or none</td><td class="n">.2,0,0,1</td></tr>
+      <tr><td><b>Considered</b></td><td>Entering the composer, opening a capsule</td><td class="n">200–400ms</td><td class="n">.2,0,0,1</td></tr>
+      <tr><td><b>Held</b></td><td>Seal, transit, reveal, permanent deletion</td><td class="n"><b>stop 200–400ms</b><br>then 800–2500ms</td><td class="n">linear<br>.32,0,.24,1</td></tr>
+    </tbody>
+  </table></div>
+  <p>The held beat has three mandatory parts: an <b>approach</b> at constant
+  velocity (never easing out — easing out anticipates arrival, and the point is
+  that arrival is not yet), the <b>stop</b> at total stillness, and the
+  <b>consequence</b> as an instant state change.</p>
+  <ol class="arts">
+    <li><span class="a">01</span><span>Constant velocity by default. Springs, bounces and overshoot permanently banned — materials in an instrument do not bounce.</span></li>
+    <li><span class="a">02</span><span>Nothing may read as <em>loading</em>. No spinners, progress bars, shimmer or skeleton pulse.</span></li>
+    <li><span class="a">03</span><span><b>Silence is timing, not motion — so it survives <code>prefers-reduced-motion</code>.</b> The reduced-motion version is arguably the purer one.</span></li>
+    <li><span class="a">04</span><span>The mark never animates. Institution is static.</span></li>
+    <li><span class="a">05</span><span>Registers never overlap in time. Instrument clears → empty frame → record arrives. <em>(Gate 1)</em></span></li>
+    <li><span class="a">06</span><span>CSS unless proven otherwise. Gate 1 built the full reveal from one scalar. WebGL remains permanently out.</span></li>
+    <li><span class="a">07</span><span>Cap every glow at 6% opacity. Lighting effects grow every time somebody touches them.</span></li>
+  </ol>
+</section>
+
+<section id="sound">
+  <span class="snum">Part VII · Sound</span>
+  <h2>There is no sound. That is the sound design.</h2>
+  <p>A reveal happens on an unknown device, in an unknown room, at an unknown
+  moment. It may be a commute, an open-plan office, a hospital ward, a funeral.
+  We have no idea, we cannot ask, and the recipient has no relationship with us
+  that would license us to make noise in their space.</p>
+  <p>This reverses <code>06</code>, which proposed one mechanical release at the
+  seal, default off. <b>The single narrow exception</b>, if ever requested:
+  haptics on the seal, on the creator's own device, in an interaction they
+  initiated. Never on the reveal. Never audio.</p>
+</section>
+
+<section id="copy">
+  <span class="snum">Part VIII · Copy</span>
+  <h2>The register of an institution that expects to outlive you</h2>
+  <p>Closer to a land registry than a greetings card. State, never sell.
+  <b>No exclamation marks, no emoji, ever</b> — in product, notification, email
+  or marketing. One of the cheapest recognisability wins available.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Use</th><th>Never</th></tr></thead>
+    <tbody>
+      <tr><td>Seal, sealed</td><td class="n">Save, submit, lock</td></tr>
+      <tr><td>Record</td><td class="n">Post, entry, content</td></tr>
+      <tr><td>Deliver, delivered</td><td class="n">Send, push, drop</td></tr>
+      <tr><td>Travelled / remaining</td><td class="n">Progress, % complete, ETA</td></tr>
+      <tr><td>Kept</td><td class="n">Stored, retained, backed up</td></tr>
+      <tr><td>Recipient</td><td class="n">User, contact, friend</td></tr>
+      <tr><td>The wait</td><td class="n">The countdown, the delay</td></tr>
+    </tbody>
+  </table></div>
+  <p>Never use the word <em>"just"</em> — it minimises, and nothing here is
+  small. Dates are always literal and absolute; relative time may accompany a
+  date, never replace one.</p>
+</section>
+
+<section id="composition">
+  <span class="snum">Part IX · Composition</span>
+  <h2>The underweighted phase</h2>
+  <p><b>Forbidden:</b> templates, prompts-as-content, AI-written suggestions,
+  mood pickers — anything producing a letter the person did not write. The value
+  of the artifact is that it is <em>theirs</em>. We would be automating away the
+  only thing that matters.</p>
+  <p><b>Available instead:</b></p>
+  <ul>
+    <li><b>Address the reader before the writing.</b> The recipient's future age
+    is the single most affecting piece of arithmetic we can perform.</li>
+    <li><b>Questions, not templates.</b> <em>"What do you want them to know that
+    you might not say out loud?"</em> — a question produces the person's own
+    words; a template produces ours. One at a time, dismissible, never inserted
+    into the document.</li>
+    <li><b>Resumable without shame.</b> A draft sitting for three weeks is
+    normal. No streaks, no nudges, no "you left something unfinished".</li>
+    <li><b>Sealing separable from writing.</b> The decision to commit is its own
+    emotional act, never a side-effect of finishing a sentence.</li>
+  </ul>
+</section>
+
+<section id="landing">
+  <span class="snum">Part X · Landing · T-21</span>
+  <h2>Answer the only question that matters</h2>
+  <p>Not "what does it do". <b>"Will you still exist?"</b> Every other objection
+  is downstream. A person deciding whether to write to their daughter in fourteen
+  years is evaluating our institutional durability, not our feature set.</p>
+  <ul>
+    <li><b>A thesis, not a hero.</b> The opening should <em>be</em> a dual clock —
+    a real duration, moving, unexplained. Not a headline about memories.</li>
+    <li><b>Compress the wait.</b> The one place we may accelerate time, and the
+    only permitted spectacle in the entire product.</li>
+    <li><b>Answer survival with evidence.</b> Escrow, export guarantees, what
+    happens if the company dies. Boring, specific, and the most persuasive
+    section on the page — most competitors will not dare.</li>
+    <li><b>Show the record, not the app.</b> No device mockups, no floating UI.</li>
+    <li><b>No testimonials at launch.</b> We have not kept anything yet.</li>
+  </ul>
+  <div class="note"><p><b>The unusual rule:</b> the marketing site must be
+  <em>slower than the app</em> — in tempo, not performance. It is the only
+  surface allowed to hold a beat for effect rather than for consequence, because
+  its job is to transmit a feeling rather than execute a task.</p></div>
+</section>
+
+<section id="states">
+  <span class="snum">Part XI · Onboarding · Notification · Empty · Loading</span>
+  <h2>Four sends in a decade</h2>
+  <p><b>Onboarding: there isn't one.</b> No tour, no checklist, no sample
+  capsule. The first act is composition. What we owe instead is the master-key
+  and recovery-kit moment handled with total clarity — the one genuinely
+  unfamiliar concept, and the one place where confusion is unrecoverable.</p>
+  <div class="tw"><table>
+    <thead><tr><th></th><th>Notification</th><th>When</th><th>Contains</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td><b>Sealed</b></td><td class="n">immediate</td><td>A receipt. The only immediate one.</td></tr>
+      <tr><td class="n">2</td><td><b>Proof of life</b></td><td class="n">rare</td><td><em>Still here, still counting, nothing for you to do.</em> No CTA, no metric, no streak.</td></tr>
+      <tr><td class="n">3</td><td><b>Approach</b></td><td class="n">once</td><td>Factual, to the recipient, close to transit.</td></tr>
+      <tr><td class="n">4</td><td><b>Delivered</b></td><td class="n">transit</td><td>The arrival.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Everything else is forbidden — anniversaries, re-engagement, feature
+  announcements, and anything surfacing a memory the person did not ask to see.</p>
+  <p><b>Loading:</b> we mostly should not have any. Where unavoidable,
+  layout-stable placeholders with no shimmer and no pulse. If a surface genuinely
+  needs a loading indicator, that is a performance bug filed against engineering,
+  not a design problem to be decorated.</p>
+</section>
+
+<section id="imagery">
+  <span class="snum">Part XII · Imagery</span>
+  <h2>We photograph nothing we did not make</h2>
+  <p><b>Photography:</b> objects only, never people. Instruments, paper, seals,
+  mechanisms — shot flat and forensically, evenly lit, like a museum accession
+  photograph or an auction catalogue plate. Never a model looking wistfully at a
+  phone.</p>
+  <p><b>Illustration:</b> none, permanently. <b>Icons:</b> engraved marks, single
+  weight, unrounded, no filled variants, never unlabelled at a consequential
+  moment. <b>The imagery of the product is its own artifacts</b> — the record,
+  the stamp, the seal, the clock.</p>
+</section>
+
+<section id="a11y">
+  <span class="snum">Part XIII · Accessibility &amp; Performance</span>
+  <h2>Accessibility is the trust argument</h2>
+  <p>A product whose entire premise is <em>this will reach the person you
+  intend</em> cannot ship a reveal that fails for someone using a screen reader.
+  That is not an edge case; it is the product failing at the only thing it does.</p>
+  <p>WCAG AA minimum, <b>computed and never estimated</b> — the corrected ramp in
+  <code>05</code> is the precedent: eyeballing shipped a 2.72 contrast into the
+  most-viewed component. All held beats preserved under reduced motion. That the
+  recipient path is our most accessible surface — paper, serif, high contrast, no
+  motion — is by design, not coincidence.</p>
+  <p><b>Performance is a trust signal.</b> A slow product does not feel like it
+  will last a decade. The reveal must work on a three-year-old Android over a
+  poor connection, which is why WebGL is permanently out.</p>
+</section>
+
+<section id="memorable">
+  <span class="snum">Part XIV · Memorable</span>
+  <h2>What leaves the product</h2>
+  <div class="devs">
+    <div class="dev"><span class="dn">screenshot</span><h4>The Duration Stamp</h4><p>Composed at share aspect ratio, legible at thumbnail, content-blind by construction. It says how long, and nothing about what.</p></div>
+    <div class="dev"><span class="dn">share</span><h4>The commitment</h4><p>Zero-access means we <em>cannot</em> build content sharing. Our share artifact holds a duration and nothing else.</p></div>
+    <div class="dev"><span class="dn">remember</span><h4>The empty frame</h4><p>People don't remember animations. They remember the moment they held their breath.</p></div>
+    <div class="dev"><span class="dn">tell friends</span><h4>That it arrived</h4><p>The only word-of-mouth we will ever get, earned entirely in engineering.</p></div>
+  </div>
+  <div class="note"><p>The sharing constraint is the sharpest brand asset we
+  have. <em>"Sealed until 14 March 2041."</em> Necessarily mysterious, because
+  the mystery is architectural. <b>Lead with it; do not apologise for it.</b></p></div>
+</section>
+
+<section id="challenges">
+  <span class="snum">Part XV · Challenges</span>
+  <h2>Seven, ordered by what they cost if ignored</h2>
+
+  <div class="chal">
+    <h3>1 · The name works against the brand <span class="tag open">unresolved</span></h3>
+    <p>We have built an identity that is grave, institutional and horological,
+    for a product called <b>TimelyCapsule</b>. <em>Timely</em> means punctual or
+    opportune — a business-software word, and mildly ironic for a product about
+    long waits. The compound is a SaaS name, and it will fight every piece of
+    design we make.</p>
+    <p><b>You cannot be recognised in three seconds if the first word people read
+    contradicts everything the next three seconds say.</b> This is a founder
+    decision, not a design one — but it is the largest unaddressed threat to the
+    goal in this brief, and it gets harder to change every week.</p>
+  </div>
+
+  <div class="chal">
+    <h3>2 · "Meridian" and "TimelyCapsule" are not reconciled <span class="tag open">unresolved</span></h3>
+    <p><code>02</code> calls Meridian the institution; <code>05</code> uses it as
+    the design-system name. Meridian is currently both the brand and a subsystem,
+    and we will propagate that contradiction into token names, component names
+    and marketing copy.</p>
+    <p><b>Recommendation:</b> Meridian is the institution. The design system takes
+    a subordinate name. This is also the cheapest route out of challenge 1, if you
+    want one.</p>
+  </div>
+
+  <div class="chal">
+    <h3>3 · Gate 1 was validated for the creator, not the recipient <span class="tag hold">gate 1 stands</span></h3>
+    <p>The transition reads as ceremony <em>because you have learned the
+    instrument register</em>. You have watched that dark screen for years. The
+    paper arriving means something because you know what it replaced.</p>
+    <p><b>The recipient has never seen the instrument register.</b> They arrive
+    cold, from a link, on a phone, with no account. For them there is no register
+    <em>change</em>, because there was no register — they see a dark screen for a
+    few seconds and then a letter.</p>
+    <p>That may still be good; the physical grammar of a seal opening needs no
+    product literacy. But it is a different experience than the one we validated,
+    and it belongs to the person the moment is <em>for</em>.</p>
+    <p><b>Action: add Gate 5 — the cold recipient path.</b> Tested with someone
+    who has never seen the product, on a real cheap Android, from a real link. It
+    outranks gates 2–4.</p>
+  </div>
+
+  <div class="chal">
+    <h3>4 · Sound: "default off" becomes "never" <span class="tag chg">changed</span></h3>
+    <p>Part VII. The implementation note in <code>06</code> is superseded.</p>
+  </div>
+
+  <div class="chal">
+    <h3>5 · Elapsed-and-remaining breaks at both ends <span class="tag chg">refined</span></h3>
+    <p>On day one of a ten-year wait, <em>"Travelled: 0 days"</em> against
+    <em>"Remaining: 3,652 days"</em> is demoralising — the exact impatience the
+    principle exists to prevent. In the final hours, elapsed is emotionally
+    irrelevant.</p>
+    <p><b>The Dual Clock's weighting shifts across the life of the capsule</b> —
+    remaining-led at the start, genuinely equal through the long middle,
+    remaining-led again at the approach. Both figures always present; the emphasis
+    moves. The component becomes an instrument that changes with time, which is
+    Principle 2 applied to the thing carrying the most brand.</p>
+  </div>
+
+  <div class="chal">
+    <h3>6 · Proof of life: build it <span class="tag chg">decided</span></h3>
+    <p>Left open in <code>03</code>. It is the only answer to decade-long
+    silence, and silence is the failure mode of the entire trust asymmetry.</p>
+  </div>
+
+  <div class="chal">
+    <h3>7 · Priority order changes <span class="tag chg">changed</span></h3>
+    <p><code>05</code> scheduled logo → design system → T-21 → web → mobile. A
+    perfect logo on a product nobody finishes writing in is worthless.</p>
+    <p><b>Cold-recipient gate → composition experience → logo → design system →
+    T-21 → web → mobile.</b></p>
+  </div>
+</section>
+
+<section id="never">
+  <span class="snum">Part XVI · Anti-patterns</span>
+  <h2>The permanent never list</h2>
+  <div class="never">
+    <b>Motion</b>spinners · progress bars · skeleton shimmer · spring and
+    overshoot easing · confetti · parallax · scroll-jacking · hover flourishes ·
+    animated logos · countdown urgency animation
+    <b>Sound</b>all of it
+    <b>Growth</b>streaks · badges · gamified waiting · re-engagement notifications ·
+    anniversary nudges · "your capsule misses you" · referral prompts at emotional
+    moments · social proof counters · testimonials before we have kept anything
+    <b>Copy</b>exclamation marks · emoji · the word "just" · "oops" · apologising
+    for the wait · relative dates without absolute ones · "we" as a personality
+    <b>Visual</b>celestial imagery · photography of people · illustration of our
+    metaphors · cream grounds · device mockups · floating UI cards · filled icons ·
+    the uncorrected ramp · brass for anything except waiting
+    <b>Structural</b>WebGL of any kind · paper as a page background · registers
+    crossfading · modals on the wait or reveal path · optimistic UI on
+    consequential actions · onboarding tours · AI-generated letter content · any
+    preview of sealed content anywhere
+    <b>Business</b>dark patterns of every kind · friction on cancellation ·
+    gating delivery of a sealed capsule behind payment state, under any
+    circumstances, ever
+  </div>
+</section>
+
+<section id="north">
+  <span class="snum">Part XVII · North Star</span>
+  <div class="record">
+    <span class="rlbl">The filter that outranks the others</span>
+    <p class="big">Nobody says "what a beautiful app."<br>They say "I can't
+    believe it actually came."</p>
+    <p class="sub">The product succeeds by being forgotten in favour of its
+    contents. The highest possible outcome is that someone reads a letter from a
+    person they have lost, is undone by it, and cannot afterwards describe a
+    single thing about the interface.</p>
+  </div>
+  <p>This is an uncomfortable north star for a design team, which is exactly why
+  it is the right one. Our craft is measured by how little of it is noticed — and
+  it makes every decision testable:</p>
+  <div class="note warn"><p><b>Does this make the letter matter more, or does it
+  make us matter more?</b> If the second, it does not ship, regardless of how
+  good it is.</p></div>
+  <p>The three filters, in order: <b>1.</b> Does this make the promise more
+  believable? <b>2.</b> Does the waiting state look like something valuable is
+  happening? <b>3.</b> Does this make the letter matter more than us?</p>
+</section>
+
+<section id="next">
+  <span class="snum">Part XVIII · Next</span>
+  <h2>What happens now</h2>
+  <ol class="arts">
+    <li><span class="a">01</span><span><b>Gate 5 — the cold recipient path.</b> Elevated above gates 2–4.</span></li>
+    <li><span class="a">02</span><span><b>The composition experience.</b> The largest gap in the work.</span></li>
+    <li><span class="a">03</span><span>Gates 2–4: serif at density · corrected ramp on real hardware · the Dual Clock, now including the shifting-weight refinement.</span></li>
+    <li><span class="a">04</span><span>Logo — system v + ii.</span></li>
+    <li><span class="a">05</span><span>Design system refresh, then T-21, web, mobile.</span></li>
+  </ol>
+  <div class="note kill"><p><b>Two founder decisions</b> blocking nothing but
+  getting more expensive by the week: the name, and the
+  Meridian/TimelyCapsule reconciliation.</p>
+  <p><b>Closing obligation:</b> the redesign ends by rewriting
+  <code>plan/02-UX-DESIGN.md §6</code>, or future sessions build against the
+  stale spec and silently undo all of this.</p></div>
+  <footer>Meridian · Experience Bible · phase 07. Inherits from
+  <code>01</code>–<code>06</code>; contradictions recorded in Part XV.</footer>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  var mk=document.getElementById('mk'), stt=document.getElementById('stt'),
+      rdt=document.getElementById('rdt'), bRev=document.getElementById('bRev'),
+      bIrr=document.getElementById('bIrr'), bRes=document.getElementById('bRes');
+  var names=['Draft','Untitled','Letter','Note'], ni=0, raf=null, sealed=false;
+
+  var reduce = matchMedia('(prefers-reduced-motion:reduce)').matches;
+
+  function reset(){
+    if(raf) cancelAnimationFrame(raf); raf=null; sealed=false;
+    mk.style.left='4%'; mk.classList.remove('done');
+    stt.textContent=names[ni]; stt.classList.remove('sealed');
+    bIrr.disabled=false; bRev.disabled=false; rdt.textContent='idle';
+  }
+
+  // Reversible: resolves in 0ms. No transition at all.
+  bRev.addEventListener('click', function(){
+    if(sealed) return;
+    ni=(ni+1)%names.length; stt.textContent=names[ni];
+    rdt.textContent='0 ms · instant';
+  });
+
+  // Irreversible: approach at constant velocity, STOP DEAD, then flip.
+  bIrr.addEventListener('click', function(){
+    if(sealed||raf) return;
+    bIrr.disabled=true; bRev.disabled=true;
+    var APPROACH = reduce ? 0 : 900, HOLD = 400, t0=performance.now();
+
+    (function step(now){
+      var t = now - t0;
+      if(t < APPROACH){
+        var p = t/APPROACH;                     // linear — never eases out
+        mk.style.left = (4 + p*68) + '%';
+        rdt.textContent = Math.round(t)+' ms · approach';
+        raf = requestAnimationFrame(step);
+      } else if(t < APPROACH + HOLD){
+        mk.style.left = '72%';                  // absolute stillness
+        rdt.textContent = Math.round(t)+' ms · held';
+        raf = requestAnimationFrame(step);
+      } else {
+        mk.style.left='72%'; mk.classList.add('done');
+        stt.textContent='Sealed'; stt.classList.add('sealed');
+        rdt.textContent = Math.round(t)+' ms · sealed';
+        sealed=true; raf=null;                  // instant state change
+      }
+    })(t0);
+  });
+
+  bRes.addEventListener('click', reset);
+  reset();
+})();
+</script>

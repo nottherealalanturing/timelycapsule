@@ -3,10 +3,11 @@
 import { encryptBytes, generateCapsuleKey, toBase64Url } from '@tc/crypto';
 import { Button, Input, useToast } from '@tc/ui-web';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { guestApi } from '../../lib/api-client';
 import { encodeIvCiphertext } from '../../lib/capsule-crypto';
 import { getGuestToken, setGuestCapsule, setGuestToken } from '../../lib/guest-store';
+import { DRAFT_KEY } from '../../components/marketing/WriteAndSeal';
 
 const GRADIENT_PRESETS: { value: string; theme: string }[] = [
   { value: 'linear-gradient(135deg, #F4A261, #E76F51)', theme: 'sunset' },
@@ -45,6 +46,34 @@ export default function GuestComposerPage() {
   const [sealing, setSealing] = useState(false);
   const [handoff, setHandoff] = useState<{ url: string; capsuleId: string } | null>(null);
   const [mountedAtMs] = useState(() => Date.now());
+  const sealedHeadingRef = useRef<HTMLHeadingElement>(null);
+
+  // Same pattern as the reveal's `RecordAtRest` heading: without this, sealing
+  // silently left focus wherever the "Seal it" button used to be (removed from
+  // the DOM by this same state change), giving a screen-reader user no
+  // announcement that anything happened at all (design/07 §XIII).
+  useEffect(() => {
+    if (handoff) sealedHeadingRef.current?.focus();
+  }, [handoff]);
+
+  // Carry over anything written on the landing page, so the words survive the
+  // handoff instead of the visitor retyping them. Deferred like every other
+  // effect here — an effect body must not call setState synchronously.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        const raw = sessionStorage.getItem(DRAFT_KEY);
+        if (!raw) return;
+        sessionStorage.removeItem(DRAFT_KEY);
+        const draft = JSON.parse(raw) as { recipient?: string; letter?: string };
+        if (draft.letter) setLetter(draft.letter);
+        if (draft.recipient) setTitle(`For ${draft.recipient}`);
+      } catch {
+        // Malformed or unavailable storage is not worth surfacing.
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     const existing = getGuestToken();
@@ -99,7 +128,9 @@ export default function GuestComposerPage() {
   if (handoff) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">Sealed. Now send it.</h1>
+        <h1 ref={sealedHeadingRef} tabIndex={-1} className="font-[var(--font-display)] text-2xl text-foreground outline-none">
+          Sealed. Now send it.
+        </h1>
         <p className="max-w-md text-secondary">
           This link is the only way to open your capsule — copy it now and send it yourself. There&apos;s no account, so
           if you lose it, it&apos;s gone for good.
@@ -162,9 +193,12 @@ export default function GuestComposerPage() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-secondary">When it opens</label>
+        <label htmlFor="try-unlock-date" className="text-sm font-medium text-secondary">
+          When it opens
+        </label>
         <div className="flex gap-3">
           <input
+            id="try-unlock-date"
             type="date"
             value={date}
             onChange={(e) => setDateTime((s) => ({ ...s, date: e.target.value }))}
@@ -172,6 +206,7 @@ export default function GuestComposerPage() {
           />
           <input
             type="time"
+            aria-label="Unlock time"
             value={time}
             onChange={(e) => setDateTime((s) => ({ ...s, time: e.target.value }))}
             className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 px-3 py-2 text-foreground"

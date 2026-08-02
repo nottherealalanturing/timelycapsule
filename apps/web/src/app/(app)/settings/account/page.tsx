@@ -127,7 +127,7 @@ function SetInitialPasswordForm() {
         <p className="text-sm text-secondary">
           Save this recovery code somewhere safe — it&apos;s the only time it will be shown.
         </p>
-        <div className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-surface-raised)] p-3 text-center font-mono text-sm tracking-wider text-foreground">
+        <div className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-3 text-center font-mono text-sm tracking-wider text-foreground">
           {recoveryKit}
         </div>
         <Button type="button" variant="ghost" onClick={() => navigator.clipboard.writeText(recoveryKit)}>

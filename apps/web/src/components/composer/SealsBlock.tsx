@@ -70,28 +70,28 @@ export function SealsBlock({ draft }: { draft: CapsuleDraft }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 px-4 py-3 text-left"
+        className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-3 text-left"
       >
-        <span className="text-sm font-medium text-foreground">Seals &amp; Expiry</span>
-        <span className="text-xs text-secondary">{open ? 'Hide' : 'Show'}</span>
+        <span className="text-[length:var(--text-body-s)] font-medium text-foreground">Seals &amp; Expiry</span>
+        <span className="text-[length:var(--text-caption)] text-secondary">{open ? 'Hide' : 'Show'}</span>
       </button>
 
       <div className="flex flex-wrap gap-2">
         {activeStamps.map((stamp) => (
           <span
             key={stamp}
-            className="rounded-full border border-[var(--color-accent-gold,#c9a227)]/50 bg-[var(--color-accent-gold,#c9a227)]/10 px-3 py-1 text-xs font-medium text-foreground"
+            className="rounded-[var(--radius-pill)] border border-[var(--color-rule-strong)] px-3 py-1 text-[length:var(--text-caption)] font-medium text-secondary"
           >
-            ✦ {stamp}
+            {stamp}
           </span>
         ))}
       </div>
 
       {open ? (
-        <div className="flex flex-col gap-6 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-4">
+        <div className="flex flex-col gap-6 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-4">
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium text-foreground">Place Seal</h3>
-            <p className="text-xs text-secondary">Recipients must be near this location to unwrap the key.</p>
+            <h3 className="text-[length:var(--text-body-s)] font-medium text-foreground">Place Seal</h3>
+            <p className="text-[length:var(--text-caption)] text-secondary">Recipients must be near this location to unwrap the key.</p>
             <SealMap
               lat={placeSeal?.type === 'place' ? placeSeal.config.lat : undefined}
               lng={placeSeal?.type === 'place' ? placeSeal.config.lng : undefined}
@@ -102,58 +102,58 @@ export function SealsBlock({ draft }: { draft: CapsuleDraft }) {
               placeholder="Nickname this place (e.g. Grandma&apos;s porch)"
               value={placeName}
               onChange={(e) => setPlaceName(e.target.value)}
-              className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+              className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
             />
             {placeSeal ? (
-              <button type="button" onClick={() => draft.patch({ seals: removeSeal(seals, 'place') })} className="self-start text-xs text-[var(--color-danger)]">
+              <button type="button" onClick={() => draft.patch({ seals: removeSeal(seals, 'place') })} className="self-start text-[length:var(--text-caption)] text-[var(--color-danger)]">
                 Remove Place Seal
               </button>
             ) : null}
           </div>
 
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium text-foreground">Passphrase Seal</h3>
+            <h3 className="text-[length:var(--text-body-s)] font-medium text-foreground">Passphrase Seal</h3>
             <input
               type="password"
               placeholder="Passphrase"
               value={passphrase}
               onChange={(e) => setPassphrase(e.target.value)}
-              className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+              className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
             />
             <PasswordStrengthMeter password={passphrase} />
             <input
               placeholder="Hint (required — shown to recipients)"
               value={hint}
               onChange={(e) => setHint(e.target.value)}
-              className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+              className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
             />
             <div className="flex gap-2">
               <button
                 type="button"
                 onClick={() => void applyPassphrase()}
                 disabled={!passphrase || !hint}
-                className="self-start rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/30 px-3 py-1.5 text-xs text-foreground disabled:opacity-40"
+                className="self-start rounded-[var(--radius-input)] border border-[var(--color-rule-strong)] px-3 py-1.5 text-[length:var(--text-caption)] text-foreground disabled:opacity-40"
               >
                 {passphraseSeal ? 'Update Passphrase Seal' : 'Add Passphrase Seal'}
               </button>
               {passphraseSeal ? (
-                <button type="button" onClick={() => draft.patch({ seals: removeSeal(seals, 'passphrase') })} className="text-xs text-[var(--color-danger)]">
+                <button type="button" onClick={() => draft.patch({ seals: removeSeal(seals, 'passphrase') })} className="text-[length:var(--text-caption)] text-[var(--color-danger)]">
                   Remove
                 </button>
               ) : null}
             </div>
           </div>
 
-          <label className="flex items-center gap-2 text-sm text-secondary">
+          <label className="flex items-center gap-2 text-[length:var(--text-body-s)] text-secondary">
             <input type="checkbox" checked={Boolean(identitySeal)} onChange={(e) => toggleIdentity(e.target.checked)} />
             Require identity (OTP) to unlock
           </label>
 
           <div className="flex flex-col gap-2">
-            <h3 className="text-sm font-medium text-foreground">Expiry</h3>
+            <h3 className="text-[length:var(--text-body-s)] font-medium text-foreground">Expiry</h3>
             <div className="flex flex-col gap-1">
               {EXPIRY_OPTIONS.map((opt) => (
-                <label key={opt.label} className="flex items-center gap-2 text-sm text-secondary">
+                <label key={opt.label} className="flex items-center gap-2 text-[length:var(--text-body-s)] text-secondary">
                   <input
                     type="radio"
                     name="expiry"
@@ -168,7 +168,7 @@ export function SealsBlock({ draft }: { draft: CapsuleDraft }) {
               ))}
             </div>
             {capsule.expiresAfter === '0 seconds' ? (
-              <label className="flex items-center gap-2 text-xs text-secondary">
+              <label className="flex items-center gap-2 text-[length:var(--text-caption)] text-secondary">
                 <input
                   type="checkbox"
                   checked={ephemeralConfirmed}
@@ -183,7 +183,7 @@ export function SealsBlock({ draft }: { draft: CapsuleDraft }) {
           </div>
 
           {capsule.type === 'self' ? (
-            <label className="flex items-center gap-2 text-sm text-secondary">
+            <label className="flex items-center gap-2 text-[length:var(--text-body-s)] text-secondary">
               <input
                 type="checkbox"
                 checked={capsule.breakGlass === 'allowed'}

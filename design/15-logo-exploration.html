@@ -1,0 +1,642 @@
+<title>TimelyCapsule — Logo &amp; Brand Mark Exploration</title>
+<style>
+:root{
+  --ground:#0b0e14;--raised:#141922;--overlay:#1c2230;--ink:#e6e8ec;--muted:#8b93a3;
+  --brass:#e0b84a;--steel:#7a8ab0;--rule:rgba(230,232,236,.13);--rule-hi:rgba(230,232,236,.26);
+  --paper:#e9eae6;--paper-raised:#f3f4f0;--paper-ink:#16181a;--paper-muted:#5e635c;
+  --verdigris:#3f6154;--hold:#6e9e8a;--alarm:#d2694e;
+  --sans:"IBM Plex Sans","Helvetica Neue",Helvetica,system-ui,sans-serif;
+  --serif:Charter,"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:light){:root{
+  --ground:#e9eae6;--raised:#f3f4f0;--overlay:#fff;--ink:#16181a;--muted:#5e635c;
+  --brass:#6e5a0e;--steel:#2c3a4a;--rule:rgba(22,24,26,.15);--rule-hi:rgba(22,24,26,.3);
+  --hold:#3f6154;--alarm:#a33f28;}}
+:root[data-theme=light]{--ground:#e9eae6;--raised:#f3f4f0;--overlay:#fff;--ink:#16181a;
+  --muted:#5e635c;--brass:#6e5a0e;--steel:#2c3a4a;--rule:rgba(22,24,26,.15);
+  --rule-hi:rgba(22,24,26,.3);--hold:#3f6154;--alarm:#a33f28;}
+:root[data-theme=dark]{--ground:#0b0e14;--raised:#141922;--overlay:#1c2230;--ink:#e6e8ec;
+  --muted:#8b93a3;--brass:#e0b84a;--steel:#7a8ab0;--rule:rgba(230,232,236,.13);
+  --rule-hi:rgba(230,232,236,.26);--hold:#6e9e8a;--alarm:#d2694e;}
+
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+main{max-width:1120px;margin:0 auto;padding:44px 28px 110px}
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 13px}
+h1{font-family:var(--serif);font-size:clamp(2.1rem,5vw,3rem);line-height:1.08;font-weight:600;
+  letter-spacing:-.017em;margin:0 0 16px;text-wrap:balance}
+h2{font-family:var(--serif);font-size:clamp(1.4rem,3vw,1.8rem);line-height:1.2;font-weight:600;
+  letter-spacing:-.012em;margin:0 0 14px;text-wrap:balance}
+h3{font-size:1rem;font-weight:650;margin:0 0 8px}
+p{margin:0 0 14px;max-width:64ch}
+ul{margin:0 0 14px;padding-left:1.1em;max-width:64ch}li{margin-bottom:7px}
+b,strong{font-weight:650}
+code{font-family:var(--mono);font-size:.85em;background:var(--raised);padding:1px 5px;border-radius:2px}
+section{border-top:1px solid var(--rule);padding:42px 0 0;margin-top:42px}
+.snum{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;color:var(--brass);
+  text-transform:uppercase;display:block;margin-bottom:9px}
+.lede{font-family:var(--serif);font-size:1.12rem;color:var(--muted);max-width:60ch}
+
+.note{border:1px solid var(--rule);border-left:2px solid var(--steel);border-radius:3px;
+  padding:16px 20px;margin:0 0 20px;background:var(--raised);font-size:.9rem}
+.note.warn{border-left-color:var(--brass)}
+.note.kill{border-left-color:var(--alarm)}
+.note.good{border-left-color:var(--hold)}
+.note p{margin:0 0 9px;max-width:62ch}.note p:last-child{margin-bottom:0}
+
+/* ── direction cards ─────────────────────────────────────────── */
+.dirs{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:18px;margin:0 0 8px}
+.dir{border:1px solid var(--rule);border-radius:4px;background:var(--raised);overflow:hidden;
+  display:flex;flex-direction:column}
+.dir.rejected{opacity:.72}
+.dir .stage{background:var(--ground);display:grid;place-items:center;padding:30px 0;
+  border-bottom:1px solid var(--rule)}
+.dir .body{padding:16px 18px 18px;display:flex;flex-direction:column;gap:8px;flex:1}
+.dir h3{display:flex;align-items:baseline;gap:9px;flex-wrap:wrap;margin:0}
+.dir h3 .rn{font-family:var(--mono);font-size:.68rem;color:var(--brass);letter-spacing:.12em}
+.dir p{font-size:.85rem;margin:0;color:var(--muted);max-width:none}
+.verdict{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+  padding:3px 8px;border-radius:2px;align-self:flex-start;margin-top:auto}
+.verdict.keep{background:var(--hold);color:var(--ground);font-weight:600}
+.verdict.cut{border:1px solid var(--alarm);color:var(--alarm)}
+.verdict.hold{border:1px solid var(--rule-hi);color:var(--muted)}
+
+svg{display:block}
+.mk{stroke:var(--ink);fill:none;stroke-width:4;stroke-linecap:square}
+.mk-thin{stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:square;opacity:.55}
+.mk-fill{fill:var(--ink)}
+
+/* ── size ladder ─────────────────────────────────────────────── */
+.ladder{display:flex;align-items:flex-end;gap:26px;flex-wrap:wrap;background:var(--ground);
+  border:1px solid var(--rule);border-radius:4px;padding:26px 24px;margin:0 0 16px}
+.ladder figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:9px}
+.ladder figcaption{font-family:var(--mono);font-size:.6rem;letter-spacing:.12em;color:var(--muted)}
+
+/* ── lockups ─────────────────────────────────────────────────── */
+.lock{background:var(--ground);border:1px solid var(--rule);border-radius:4px;
+  padding:34px 30px;display:flex;flex-direction:column;gap:30px;margin:0 0 16px}
+.lockrow{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.wm{font-family:var(--sans);font-weight:600;letter-spacing:-.005em;color:var(--ink);
+  font-size:1.6rem;line-height:1;white-space:nowrap}
+.wm .thin{font-weight:400;color:var(--muted)}
+.wm-rule{width:1px;align-self:stretch;background:var(--rule-hi);margin:0 4px}
+.stacked{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.stacked .wm{font-size:1.25rem}
+
+/* ── app icons ───────────────────────────────────────────────── */
+.icons{display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end}
+.icon{display:flex;flex-direction:column;align-items:center;gap:9px}
+.icon .tile{border-radius:22%;display:grid;place-items:center;overflow:hidden}
+.icon .cap{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;color:var(--muted)}
+
+/* ── paper / engraved ────────────────────────────────────────── */
+.paperbox{background:var(--paper);border-radius:3px;padding:34px 30px;display:grid;
+  place-items:center;box-shadow:0 1px 0 rgba(0,0,0,.2),0 16px 40px rgba(0,0,0,.26)}
+.paperbox .mk{stroke:var(--paper-ink)}
+.paperbox .mk-thin{stroke:var(--paper-ink)}
+.paperbox .mk-fill{fill:var(--paper-ink)}
+.pairbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px;margin:0 0 16px}
+.darkbox{background:var(--ground);border:1px solid var(--rule);border-radius:3px;padding:34px 30px;
+  display:grid;place-items:center}
+
+/* ── scorecard ───────────────────────────────────────────────── */
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:.84rem;min-width:640px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);font-weight:500;background:var(--raised)}
+tbody tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.s5{color:var(--hold);font-weight:650}.s3{color:var(--brass)}.s1{color:var(--alarm)}
+footer{border-top:1px solid var(--rule);margin-top:46px;padding-top:24px;color:var(--muted);font-size:.82rem}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.001ms!important;animation-duration:.001ms!important}}
+</style>
+
+<main>
+<p class="eyebrow">Meridian V2 · Phase 10 · Exploration</p>
+<h1>Logo &amp; brand mark</h1>
+<p class="lede">Six directions, three rejected with reasons, one developed into a full system —
+and one inherited decision overturned because two approved documents contradict each other.</p>
+
+<section id="constraints">
+  <span class="snum">Before drawing · the constraints already decided</span>
+  <h2>What the earlier work has already ruled out</h2>
+  <p>These are not preferences. Each is a decision already taken and signed off, and together
+  they eliminate most of what a logo could be.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Constraint</th><th>Source</th><th>What it removes</th></tr></thead>
+    <tbody>
+      <tr><td><b>Behave, don't depict</b></td><td class="n">04 · 07 §II.3</td><td>Hourglass, vault, clock face, capsule, envelope, seal, tree, key</td></tr>
+      <tr><td><b>The mark never animates</b></td><td class="n">05</td><td>Any idea whose value depends on movement</td></tr>
+      <tr><td><b>Brass means <em>waiting</em> and nothing else</b></td><td class="n">05</td><td><b>The accent colour is unavailable to the logo.</b> The mark is achromatic — see below</td></tr>
+      <tr><td><b>Holds tension, not completion</b></td><td class="n">03 §VII</td><td>Anything depicting arrival, closure or a completed crossing</td></tr>
+      <tr><td><b>Must work in both registers</b></td><td class="n">05 · 06</td><td>Anything relying on a single ground or a fill effect</td></tr>
+      <tr><td><b>Engraves and embosses</b></td><td class="n">05</td><td>Gradients, soft edges, varying stroke weight, fine detail</td></tr>
+      <tr><td><b>Holds at 16px</b></td><td class="n">05</td><td>Anything with more than ~3 discrete elements</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="note warn">
+    <p><b>The colour constraint is stronger than it looks, and I want to state it plainly:
+    the logo cannot be brass.</b></p>
+    <p><code>05</code> reserves brass for <em>waiting</em> — &ldquo;the moment it decorates a
+    heading, the reserved meaning is gone.&rdquo; A logo is the most-repeated element in any
+    identity, so putting brass in it would destroy the reservation faster than anything else
+    could.</p>
+    <p>So the mark is <b>ink on ground, or ground on paper. Achromatic, permanently.</b> That is
+    unusual and it is an advantage: it is what institutions actually do — a hallmark, a watermark,
+    a seal die, a banknote intaglio. None of them are coloured. It also means the mark survives
+    fax, engraving, embossing, single-colour print and a monochrome favicon without a variant.</p>
+  </div>
+</section>
+
+<section id="directions">
+  <span class="snum">Part I · Six directions</span>
+  <h2>Explored, then judged</h2>
+
+  <div class="dirs">
+    <!-- A -->
+    <div class="dir">
+      <div class="stage">
+        <svg width="88" height="88" viewBox="0 0 64 64" role="img" aria-label="Direction A, the meridian: a vertical line crossed by one graduation">
+          <line class="mk" x1="32" y1="8" x2="32" y2="56"/>
+          <line class="mk" x1="21" y1="32" x2="43" y2="32"/>
+        </svg>
+      </div>
+      <div class="body">
+        <h3><span class="rn">A</span> The Meridian</h3>
+        <p>The reference line with a single graduation. Inherited from <code>05 §ii</code>, which
+        nominated it as the symbol.</p>
+        <span class="verdict cut">Rejected as primary</span>
+      </div>
+    </div>
+
+    <!-- B -->
+    <div class="dir">
+      <div class="stage">
+        <svg width="88" height="88" viewBox="0 0 64 64" role="img" aria-label="Direction B, the transit: an open marker approaching a vertical meridian">
+          <line class="mk" x1="44" y1="8" x2="44" y2="56"/>
+          <circle class="mk" cx="22" cy="32" r="8"/>
+        </svg>
+      </div>
+      <div class="body">
+        <h3><span class="rn">B</span> The Transit</h3>
+        <p>A marker approaching the meridian but not touching it. The gap is the wait; the line is
+        the appointed moment.</p>
+        <span class="verdict keep">Developed</span>
+      </div>
+    </div>
+
+    <!-- C -->
+    <div class="dir">
+      <div class="stage">
+        <svg width="88" height="88" viewBox="0 0 64 64" role="img" aria-label="Direction C, the vernier: a graduated scale with one longer tick">
+          <line class="mk-thin" x1="6" y1="44" x2="58" y2="44"/>
+          <line class="mk-thin" x1="12" y1="34" x2="12" y2="44"/>
+          <line class="mk-thin" x1="22" y1="34" x2="22" y2="44"/>
+          <line class="mk" x1="32" y1="18" x2="32" y2="44"/>
+          <line class="mk-thin" x1="42" y1="34" x2="42" y2="44"/>
+          <line class="mk-thin" x1="52" y1="34" x2="52" y2="44"/>
+        </svg>
+      </div>
+      <div class="body">
+        <h3><span class="rn">C</span> The Vernier</h3>
+        <p>A graduated scale, one mark longer than the rest. The most literally instrument-like of
+        the six.</p>
+        <span class="verdict cut">Rejected</span>
+      </div>
+    </div>
+
+    <!-- D -->
+    <div class="dir">
+      <div class="stage">
+        <svg width="88" height="88" viewBox="0 0 64 64" role="img" aria-label="Direction D, the seal: a ring broken at the top">
+          <path class="mk" d="M32 8a24 24 0 1 1-.001 0" style="stroke-dasharray:120 10;stroke-dashoffset:-5"/>
+        </svg>
+      </div>
+      <div class="body">
+        <h3><span class="rn">D</span> The Seal</h3>
+        <p>A ring with a break in it — intact until the appointed moment, then not.</p>
+        <span class="verdict cut">Rejected</span>
+      </div>
+    </div>
+
+    <!-- E -->
+    <div class="dir">
+      <div class="stage">
+        <svg width="88" height="88" viewBox="0 0 64 64" role="img" aria-label="Direction E, the registers: a frame containing an offset block, crossed by a meridian">
+          <rect class="mk-thin" x="8" y="14" width="48" height="36"/>
+          <rect class="mk-fill" x="30" y="20" width="20" height="24" opacity=".85"/>
+          <line class="mk" x1="26" y1="6" x2="26" y2="58"/>
+        </svg>
+      </div>
+      <div class="body">
+        <h3><span class="rn">E</span> The Registers</h3>
+        <p>The two registers as one figure: an instrument frame, a record inside it, the meridian
+        running through both.</p>
+        <span class="verdict cut">Rejected</span>
+      </div>
+    </div>
+
+    <!-- F -->
+    <div class="dir">
+      <div class="stage">
+        <svg width="88" height="88" viewBox="0 0 64 64" role="img" aria-label="Direction F, the interval: two marks with a measured gap between them">
+          <line class="mk" x1="14" y1="12" x2="14" y2="52"/>
+          <line class="mk" x1="50" y1="12" x2="50" y2="52"/>
+          <line class="mk-thin" x1="14" y1="32" x2="50" y2="32"/>
+        </svg>
+      </div>
+      <div class="body">
+        <h3><span class="rn">F</span> The Interval</h3>
+        <p>Two marks and the measured distance between them. The subject of the logo is the gap,
+        not either end.</p>
+        <span class="verdict hold">Runner-up</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="critique">
+  <span class="snum">Part II · Critique</span>
+  <h2>Why three were cut, and why the inherited recommendation was overturned</h2>
+
+  <div class="note kill">
+    <p><b>A · The Meridian — rejected as primary, and this overturns <code>05</code>.</b></p>
+    <p>Two problems. First, <b>a vertical line crossed by a horizontal one is a plus sign, a
+    dagger, or a crosshair.</b> At 16px it is indistinguishable from a &ldquo;+&rdquo; button.
+    There is no ownable character in it — it is the least differentiated form in the entire
+    exploration, which is fatal for the one element whose whole job is recognition.</p>
+    <p>Second, and more seriously: <b>it depicts a crossing that has already happened.</b>
+    <code>03 §VII</code> is explicit that the mark must hold <em>&ldquo;tension, not completion —
+    something approaching a line, not resting on it. A moment just short of happening, held
+    still.&rdquo;</b> A graduation sitting on the meridian is the moment <em>after</em>. It
+    encodes arrival, and arrival is the one thing the brand is not about.</p>
+    <p><b><code>05</code> and <code>03</code> contradict each other here.</b> <code>05</code>
+    nominated the Meridian (ii) as the symbol and demoted the Transit (i) to
+    &ldquo;if one is wanted later.&rdquo; That choice was made on engraving and legibility
+    grounds, which are real, but it did not test the mark against <code>03 §VII</code>'s
+    requirement. Resolving in favour of <code>03</code>, because it is the more specific
+    instruction about what the mark must carry.</p>
+  </div>
+
+  <div class="note kill">
+    <p><b>C · The Vernier — rejected on scalability, exactly as predicted.</b></p>
+    <p><code>05</code> abandoned the Dial Segment for failing below 24px. The Vernier fails the
+    same way for the same reason: five discrete elements at different weights. At 16px the short
+    ticks merge into the baseline and it reads as a signal-strength icon or a barcode. It is the
+    handsomest of the six at 96px and unusable at 16px, and the small size is the one that
+    matters — it is the favicon, the app icon at its smallest, and the embossed blind stamp.</p>
+  </div>
+
+  <div class="note kill">
+    <p><b>D · The Seal — rejected on principle, and it would have been rejected on craft anyway.</b></p>
+    <p>It <em>depicts</em>. A broken ring is a picture of a seal, and <code>07 §II.3</code>
+    forbids illustrating our own metaphors: &ldquo;the moment we illustrate our metaphor we have
+    admitted the interface isn't carrying it.&rdquo;</p>
+    <p>Independently, a ring is the single most generic mark in software. And the break — the
+    thing that carries all the meaning — is the first detail to disappear at small sizes, leaving
+    a plain circle. A mark whose meaning is the first casualty of scaling is not a mark.</p>
+  </div>
+
+  <div class="note">
+    <p><b>E · The Registers — rejected, reluctantly.</b></p>
+    <p>Conceptually the richest of the six: it carries the two-register system, the bounded record
+    and the meridian in one figure. But three overlapping forms at three weights is roughly twice
+    the complexity budget a 16px mark allows, and the filled block reads as a solid rectangle the
+    moment it goes below 24px, at which point the whole idea collapses.</p>
+    <p>It also fails the <em>behave, don't depict</em> test on a technicality that turns out to
+    matter: it is a picture of our own interface. That is a diagram, not a mark.</p>
+  </div>
+
+  <div class="note">
+    <p><b>F · The Interval — held as runner-up, not developed.</b></p>
+    <p>The strongest <em>idea</em> in the set. The product is the gap between two moments, and a
+    mark whose subject is the negative space is conceptually exact. It engraves superbly and is
+    unmistakably not a software logo.</p>
+    <p>Two reasons it is not the recommendation. It is <b>symmetrical</b>, so it has no direction —
+    no sense of approach, no before and after, and therefore none of the tension <code>03 §VII</code>
+    requires. And at small sizes two vertical bars with a rule between them read as a
+    <b>&ldquo;pause&rdquo; glyph</b>, which is an unfortunate thing for a product about waiting to
+    be mistaken for.</p>
+    <p>Kept on file. If the Transit ever proves too slight, this is where to go next.</p>
+  </div>
+</section>
+
+<section id="recommendation">
+  <span class="snum">Part III · The recommendation</span>
+  <h2>B · The Transit, as a three-density system</h2>
+  <p>A marker approaching the meridian and not reaching it. Two elements, one relationship, and
+  the relationship is the brand: <b>something is on its way to a fixed appointed moment.</b></p>
+
+  <p>The scalability answer is not to simplify the mark until it survives 16px — it is to let the
+  mark <b>shed detail at defined thresholds</b>, the way a chart sheds gridlines. Three densities,
+  one idea.</p>
+
+  <div class="ladder">
+    <figure>
+      <svg width="96" height="96" viewBox="0 0 64 64" role="img" aria-label="Transit mark, full density">
+        <line class="mk-thin" x1="44" y1="4" x2="44" y2="60"/>
+        <line class="mk-thin" x1="36" y1="16" x2="44" y2="16"/>
+        <line class="mk-thin" x1="36" y1="48" x2="44" y2="48"/>
+        <line class="mk" x1="44" y1="8" x2="44" y2="56"/>
+        <circle class="mk" cx="22" cy="32" r="8"/>
+      </svg>
+      <figcaption>FULL · 96&ndash;48px</figcaption>
+    </figure>
+    <figure>
+      <svg width="48" height="48" viewBox="0 0 64 64" role="img" aria-label="Transit mark, reduced density">
+        <line class="mk" x1="44" y1="8" x2="44" y2="56"/>
+        <circle class="mk" cx="22" cy="32" r="8"/>
+      </svg>
+      <figcaption>REDUCED · 48&ndash;24px</figcaption>
+    </figure>
+    <figure>
+      <svg width="32" height="32" viewBox="0 0 64 64" role="img" aria-label="Transit mark, reduced at 32 pixels">
+        <line class="mk" x1="44" y1="8" x2="44" y2="56" stroke-width="5"/>
+        <circle class="mk" cx="22" cy="32" r="8" stroke-width="5"/>
+      </svg>
+      <figcaption>32px</figcaption>
+    </figure>
+    <figure>
+      <svg width="24" height="24" viewBox="0 0 64 64" role="img" aria-label="Transit mark, minimal density">
+        <line class="mk" x1="44" y1="10" x2="44" y2="54" stroke-width="7"/>
+        <circle class="mk-fill" cx="21" cy="32" r="8"/>
+      </svg>
+      <figcaption>MINIMAL · 24px</figcaption>
+    </figure>
+    <figure>
+      <svg width="16" height="16" viewBox="0 0 64 64" role="img" aria-label="Transit mark at 16 pixels">
+        <line class="mk" x1="44" y1="10" x2="44" y2="54" stroke-width="9"/>
+        <circle class="mk-fill" cx="20" cy="32" r="9"/>
+      </svg>
+      <figcaption>16px · favicon</figcaption>
+    </figure>
+  </div>
+
+  <div class="note warn">
+    <p><b>A correction I only found by rendering it.</b> The graduations first ran <em>across</em>
+    the meridian, projecting equally either side. At 96px that read as a double dagger —
+    reintroducing the exact crossbar problem Direction A was rejected for, in the mark meant to
+    replace it.</p>
+    <p>They now project <b>left only</b>, into the side the marker travels through. The meridian
+    stays an uninterrupted vertical, and the ticks read as a scale the marker is moving along
+    rather than as something crossing it. Nothing may cross that line except at transit.</p>
+  </div>
+
+  <div class="note good">
+    <p><b>The one change that makes it survive 16px: the ring fills.</b> An open ring at 16px
+    becomes a grey smudge — the counter closes up and the stroke and hole merge. Filling it keeps
+    a hard, readable silhouette.</p>
+    <p>This is a meaning change, not just a drawing change, and it happens to be the right one.
+    An <em>open</em> marker is in transit. A <em>filled</em> marker has weight — it is the same
+    distinction the product draws between a capsule pending and a capsule sealed. At sizes too
+    small to read nuance, the mark states the simpler fact.</p>
+  </div>
+
+  <h3 style="margin-top:26px">Why the gap is 22 units and not zero</h3>
+  <p>The marker sits at <code>x=22</code>, the meridian at <code>x=44</code> — the marker has
+  travelled exactly half the distance it will travel. Not nearly-arrived, which would read as
+  impatience; not barely-started, which would read as inert. <b>Held at the midpoint, the mark is
+  permanently in the middle of a wait</b>, which is where a capsule spends 99% of its life
+  (<code>03 §IV</code>).</p>
+</section>
+
+<section id="registers">
+  <span class="snum">Part IV · Both registers</span>
+  <h2>Ink on ground, ground on paper</h2>
+  <p>The same geometry, no variants. The mark is achromatic in both registers, so there is no
+  &ldquo;logo on dark&rdquo; and &ldquo;logo on light&rdquo; file — there is one mark and it
+  inverts.</p>
+  <div class="pairbox">
+    <div class="darkbox">
+      <svg width="110" height="110" viewBox="0 0 64 64" role="img" aria-label="Mark in the instrument register">
+        <line class="mk-thin" x1="44" y1="4" x2="44" y2="60"/>
+        <line class="mk-thin" x1="36" y1="16" x2="44" y2="16"/>
+        <line class="mk-thin" x1="36" y1="48" x2="44" y2="48"/>
+        <line class="mk" x1="44" y1="8" x2="44" y2="56"/>
+        <circle class="mk" cx="22" cy="32" r="8"/>
+      </svg>
+    </div>
+    <div class="paperbox">
+      <svg width="110" height="110" viewBox="0 0 64 64" role="img" aria-label="Mark in the record register">
+        <line class="mk-thin" x1="44" y1="4" x2="44" y2="60"/>
+        <line class="mk-thin" x1="36" y1="16" x2="44" y2="16"/>
+        <line class="mk-thin" x1="36" y1="48" x2="44" y2="48"/>
+        <line class="mk" x1="44" y1="8" x2="44" y2="56"/>
+        <circle class="mk" cx="22" cy="32" r="8"/>
+      </svg>
+    </div>
+  </div>
+
+  <h3>Engraved and embossed</h3>
+  <p>A blind emboss carries no ink at all — only a light and a shadow edge. This is the hardest
+  test any mark faces, and it is the one the Transit is best suited to: two forms, uniform stroke,
+  no counters below 2mm.</p>
+  <div class="pairbox">
+    <div class="paperbox">
+      <svg width="110" height="110" viewBox="0 0 64 64" role="img" aria-label="Mark shown as a blind deboss on paper">
+        <g transform="translate(0,1)" opacity=".55">
+          <line x1="44" y1="8" x2="44" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+          <circle cx="22" cy="32" r="8" stroke="#ffffff" stroke-width="4" fill="none"/>
+        </g>
+        <g opacity=".34">
+          <line x1="44" y1="8" x2="44" y2="56" stroke="#16181a" stroke-width="4" stroke-linecap="square"/>
+          <circle cx="22" cy="32" r="8" stroke="#16181a" stroke-width="4" fill="none"/>
+        </g>
+      </svg>
+    </div>
+    <div class="paperbox" style="background:#d8d4c8">
+      <svg width="110" height="110" viewBox="0 0 64 64" role="img" aria-label="Mark shown engraved on a warmer stock">
+        <g transform="translate(0,-1)" opacity=".5">
+          <line x1="44" y1="8" x2="44" y2="56" stroke="#ffffff" stroke-width="4" stroke-linecap="square"/>
+          <circle cx="22" cy="32" r="8" stroke="#ffffff" stroke-width="4" fill="none"/>
+        </g>
+        <g opacity=".42">
+          <line x1="44" y1="8" x2="44" y2="56" stroke="#2b2618" stroke-width="4" stroke-linecap="square"/>
+          <circle cx="22" cy="32" r="8" stroke="#2b2618" stroke-width="4" fill="none"/>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section id="icons">
+  <span class="snum">Part V · App icon &amp; favicon</span>
+  <h2>The tile</h2>
+  <p>The icon is <b>ground, not paper</b>. An app icon sits on a home screen among competitors, and
+  the instrument register is where our chrome lives — a paper tile would read as a document app.
+  The mark is centred on the optical axis rather than the geometric one, because the meridian's
+  weight sits right of centre.</p>
+  <div class="icons">
+    <div class="icon">
+      <div class="tile" style="width:120px;height:120px;background:#0b0e14;border:1px solid var(--rule)">
+        <svg width="72" height="72" viewBox="0 0 64 64" role="img" aria-label="App icon, 120 pixels">
+          <line x1="44" y1="12" x2="44" y2="52" stroke="#e6e8ec" stroke-width="4" stroke-linecap="square"/>
+          <circle cx="22" cy="32" r="8" stroke="#e6e8ec" stroke-width="4" fill="none"/>
+        </svg>
+      </div>
+      <span class="cap">180 · iOS</span>
+    </div>
+    <div class="icon">
+      <div class="tile" style="width:76px;height:76px;background:#0b0e14;border:1px solid var(--rule)">
+        <svg width="46" height="46" viewBox="0 0 64 64" role="img" aria-label="App icon, 76 pixels">
+          <line x1="44" y1="12" x2="44" y2="52" stroke="#e6e8ec" stroke-width="5" stroke-linecap="square"/>
+          <circle cx="22" cy="32" r="8" stroke="#e6e8ec" stroke-width="5" fill="none"/>
+        </svg>
+      </div>
+      <span class="cap">76</span>
+    </div>
+    <div class="icon">
+      <div class="tile" style="width:48px;height:48px;background:#0b0e14;border:1px solid var(--rule)">
+        <svg width="30" height="30" viewBox="0 0 64 64" role="img" aria-label="App icon, 48 pixels">
+          <line x1="44" y1="12" x2="44" y2="52" stroke="#e6e8ec" stroke-width="7" stroke-linecap="square"/>
+          <circle cx="21" cy="32" r="9" fill="#e6e8ec"/>
+        </svg>
+      </div>
+      <span class="cap">48</span>
+    </div>
+    <div class="icon">
+      <div class="tile" style="width:32px;height:32px;background:#0b0e14;border:1px solid var(--rule);border-radius:6px">
+        <svg width="20" height="20" viewBox="0 0 64 64" role="img" aria-label="Favicon, 32 pixels">
+          <line x1="44" y1="12" x2="44" y2="52" stroke="#e6e8ec" stroke-width="9" stroke-linecap="square"/>
+          <circle cx="20" cy="32" r="10" fill="#e6e8ec"/>
+        </svg>
+      </div>
+      <span class="cap">32 · favicon</span>
+    </div>
+    <div class="icon">
+      <div class="tile" style="width:16px;height:16px;background:#0b0e14;border-radius:3px">
+        <svg width="12" height="12" viewBox="0 0 64 64" role="img" aria-label="Favicon, 16 pixels">
+          <line x1="46" y1="14" x2="46" y2="50" stroke="#e6e8ec" stroke-width="11" stroke-linecap="square"/>
+          <circle cx="19" cy="32" r="11" fill="#e6e8ec"/>
+        </svg>
+      </div>
+      <span class="cap">16</span>
+    </div>
+  </div>
+  <div class="note" style="margin-top:18px"><p>At 16px the mark is two shapes and a gap, and the
+  gap is still legible. That gap is the entire idea, so this is the size that decides whether the
+  direction works at all — which is why it was drawn first, not last.</p></div>
+</section>
+
+<section id="lockups">
+  <span class="snum">Part VI · Wordmark &amp; lockups</span>
+  <h2>The meridian as a typographic device</h2>
+  <p>The wordmark sets the name against the same vertical reference, so the symbol and the
+  wordmark are the same idea at two scales rather than two unrelated objects. Shown here in a
+  substitute sans; production sets it in <b>IBM Plex Sans</b>, the instrument face.</p>
+
+  <div class="lock">
+    <div class="lockrow">
+      <svg width="34" height="34" viewBox="0 0 64 64" aria-hidden="true">
+        <line class="mk" x1="44" y1="8" x2="44" y2="56"/><circle class="mk" cx="22" cy="32" r="8"/>
+      </svg>
+      <span class="wm">Timely<span class="thin">Capsule</span></span>
+    </div>
+
+    <div class="lockrow">
+      <span class="wm">Timely</span>
+      <span class="wm-rule"></span>
+      <span class="wm">Capsule</span>
+    </div>
+
+    <div class="lockrow">
+      <div class="stacked">
+        <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true">
+          <line class="mk" x1="44" y1="8" x2="44" y2="56"/><circle class="mk" cx="22" cy="32" r="8"/>
+        </svg>
+        <span class="wm">Timely<span class="thin">Capsule</span></span>
+      </div>
+    </div>
+
+    <div class="lockrow">
+      <span class="wm" style="font-family:var(--mono);font-size:1.05rem;letter-spacing:.22em;font-weight:500">
+        TIMELYCAPSULE
+      </span>
+    </div>
+  </div>
+
+  <p>Four treatments, in descending order of confidence: <b>symbol + wordmark</b> (the primary
+  lockup), <b>rule-separated</b> (the <code>05 §v</code> proposal, where the meridian sits between
+  the words as the reference the name pivots on), <b>stacked</b> for square spaces, and a
+  <b>mono hallmark</b> setting for legal footers, embossing and anywhere the wordmark must behave
+  like metadata rather than a logo.</p>
+</section>
+
+<section id="scorecard">
+  <span class="snum">Part VII · Scorecard</span>
+  <h2>All six, against the eleven criteria</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Criterion</th><th>A Meridian</th><th>B Transit</th><th>C Vernier</th><th>D Seal</th><th>E Registers</th><th>F Interval</th></tr></thead>
+    <tbody>
+      <tr><td>Recognizability</td><td class="n s1">1 · a plus sign</td><td class="n s5">4</td><td class="n s3">3</td><td class="n s1">1 · generic ring</td><td class="n s5">4</td><td class="n s3">3</td></tr>
+      <tr><td>Timelessness</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s5">5</td></tr>
+      <tr><td>Scalability &le;16px</td><td class="n s5">5</td><td class="n s5">4</td><td class="n s1">1</td><td class="n s3">2</td><td class="n s1">1</td><td class="n s3">3</td></tr>
+      <tr><td>Accessibility</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s3">2</td><td class="n s5">4</td></tr>
+      <tr><td>Engraving</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s1">2</td><td class="n s5">5</td></tr>
+      <tr><td>Print</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s5">4</td><td class="n s3">3</td><td class="n s5">5</td></tr>
+      <tr><td>Digital</td><td class="n s3">3</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s5">4</td></tr>
+      <tr><td>App icon</td><td class="n s3">2</td><td class="n s5">5</td><td class="n s1">1</td><td class="n s3">3</td><td class="n s3">2</td><td class="n s3">3</td></tr>
+      <tr><td>Emotional fit</td><td class="n s1">1 · arrival</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s5">4</td></tr>
+      <tr><td>Tension, not completion</td><td class="n s1">0 · fails</td><td class="n s5">5</td><td class="n s3">2</td><td class="n s1">1</td><td class="n s3">2</td><td class="n s3">2</td></tr>
+      <tr><td>Fit with Meridian V2</td><td class="n s3">3</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s1">1</td><td class="n s5">4</td><td class="n s3">3</td></tr>
+      <tr><td><b>Total / 55</b></td><td class="n">35</td><td class="n s5"><b>53</b></td><td class="n">30</td><td class="n">27</td><td class="n">29</td><td class="n">41</td></tr>
+    </tbody>
+  </table></div>
+  <p style="font-size:.85rem;color:var(--muted)">Scores are mine and they are arguments, not
+  measurements. The two rows that decided it are <b>tension</b> and <b>app icon</b> — the first
+  because <code>03 §VII</code> makes it a requirement rather than a preference, the second because
+  it is the size at which most people will meet the brand.</p>
+</section>
+
+<section id="naming">
+  <span class="snum">Part VIII · The problem I cannot design around</span>
+  <h2>The wordmark commits you to the name</h2>
+  <div class="note kill">
+    <p><code>09 §XIV.1</code> recorded this as the largest unaddressed risk to the recognisability
+    goal, and it is still open: <b>&ldquo;TimelyCapsule&rdquo; is a SaaS name attached to a grave,
+    institutional, horological identity.</b> <em>Timely</em> means punctual or opportune — mildly
+    ironic for a product about long waits — and the compound reads like project-management
+    software.</p>
+    <p>Everything in Parts I&ndash;V is <b>rename-proof</b>. The Transit is a geometric mark with
+    no letterforms in it; it survives any name you choose. Part VI does not: a wordmark is the one
+    deliverable that hard-codes the decision, and it is also the piece that goes on every invoice,
+    email footer and app store listing.</p>
+    <p><b>Recommendation: approve the symbol now, hold the wordmark.</b> The symbol unblocks the
+    favicon, the app icon, the embossing die and the screen rebuild — everything the next phase
+    actually needs. The wordmark costs a day whenever the name is settled, and redoing it later
+    costs far more than that.</p>
+    <p>Related and still open from <code>09 §XIV.2</code>: <b>Meridian is currently both the brand
+    and the design system.</b> If Meridian became the product name, the mark above needs no change
+    at all — which is worth knowing before deciding.</p>
+  </div>
+</section>
+
+<section id="gaps">
+  <span class="snum">Part IX · What I would still test</span>
+  <h2>Honest gaps</h2>
+  <ul>
+    <li><b>The 16px favicon has not been tested in a real browser tab</b> against a strip of other
+    favicons. That is the only test that matters for recognition at that size, and a rendered
+    mock-up flatters it.</li>
+    <li><b>The ring may be too slight at physical small sizes.</b> On a debossed business card at
+    8mm, a 0.4mm stroke can disappear into the stock. A test emboss would settle it; my instinct is
+    the stroke wants to be ~15% heavier for physical production than for screen.</li>
+    <li><b>Directional bias is untested.</b> The marker approaches from the left, which reads
+    correctly in left-to-right scripts. In Arabic or Hebrew contexts the mark may read as
+    <em>departing</em> rather than approaching. <code>05</code> already limits us to Latin-plus, so
+    this is not blocking — but it is worth knowing before any RTL launch.</li>
+    <li><b>Direction F should be drawn properly before final sign-off</b>, not just sketched. It
+    scored 41 on a first pass and I developed the leader instead; if you dislike the Transit, F is
+    the one to develop, not A.</li>
+  </ul>
+</section>
+
+<footer>Meridian V2 · logo exploration. Marks drawn on a 64-unit grid, uniform stroke, no
+gradients, no colour. Overturns <code>05 §Logo</code>'s nomination of the Meridian (ii) in favour
+of the Transit (i), on the grounds of <code>03 §VII</code>.</footer>
+</main>

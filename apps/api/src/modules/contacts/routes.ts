@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../../db/client.js';
 import { idempotency } from '../../middleware/idempotency.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import {
@@ -41,32 +42,48 @@ export function contactsRouter(db: Database): Router {
     }
   });
 
-  router.post('/contacts', idempotency(db), validate({ body: CreateContactRequestSchema }), async (req, res, next) => {
-    try {
-      const contact = await createContact(db, req.user!.id, req.body);
-      res.status(201).json({ contact });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/contacts',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    idempotency(db),
+    validate({ body: CreateContactRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const contact = await createContact(db, req.user!.id, req.body);
+        res.status(201).json({ contact });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
-  router.patch('/contacts/:id', validate({ params: IdParamSchema, body: PatchContactRequestSchema }), async (req, res, next) => {
-    try {
-      const contact = await patchContact(db, req.user!.id, req.params.id as string, req.body);
-      res.status(200).json({ contact });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.patch(
+    '/contacts/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema, body: PatchContactRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const contact = await patchContact(db, req.user!.id, req.params.id as string, req.body);
+        res.status(200).json({ contact });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
-  router.delete('/contacts/:id', validate({ params: IdParamSchema }), async (req, res, next) => {
-    try {
-      await deleteContact(db, req.user!.id, req.params.id as string);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.delete(
+    '/contacts/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        await deleteContact(db, req.user!.id, req.params.id as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.get('/contact-groups', async (req, res, next) => {
     try {
@@ -77,17 +94,24 @@ export function contactsRouter(db: Database): Router {
     }
   });
 
-  router.post('/contact-groups', idempotency(db), validate({ body: CreateContactGroupRequestSchema }), async (req, res, next) => {
-    try {
-      const group = await createContactGroup(db, req.user!.id, req.body);
-      res.status(201).json({ group });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/contact-groups',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    idempotency(db),
+    validate({ body: CreateContactGroupRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const group = await createContactGroup(db, req.user!.id, req.body);
+        res.status(201).json({ group });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.patch(
     '/contact-groups/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: PatchContactGroupRequestSchema }),
     async (req, res, next) => {
       try {
@@ -99,17 +123,23 @@ export function contactsRouter(db: Database): Router {
     },
   );
 
-  router.delete('/contact-groups/:id', validate({ params: IdParamSchema }), async (req, res, next) => {
-    try {
-      await deleteContactGroup(db, req.user!.id, req.params.id as string);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.delete(
+    '/contact-groups/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        await deleteContactGroup(db, req.user!.id, req.params.id as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.post(
     '/contact-groups/:id/members',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: SetContactGroupMemberRequestSchema }),
     async (req, res, next) => {
       try {
@@ -121,14 +151,19 @@ export function contactsRouter(db: Database): Router {
     },
   );
 
-  router.delete('/contact-groups/:id/members/:contactId', validate({ params: GroupMemberParamsSchema }), async (req, res, next) => {
-    try {
-      await removeContactFromGroup(db, req.user!.id, req.params.id as string, req.params.contactId as string);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.delete(
+    '/contact-groups/:id/members/:contactId',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: GroupMemberParamsSchema }),
+    async (req, res, next) => {
+      try {
+        await removeContactFromGroup(db, req.user!.id, req.params.id as string, req.params.contactId as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   return router;
 }

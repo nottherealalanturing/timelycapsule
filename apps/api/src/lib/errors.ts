@@ -76,6 +76,11 @@ export class ApiError extends Error {
     return new ApiError('quota_exceeded', `Plan limit reached: ${limit}`, 403, { limit });
   }
 
+  /** T-22 hardening: sender velocity limit (plan/03-ARCHITECTURE.md §17 threat #5). */
+  static velocityLimitExceeded(message = 'Too many recipients added today — try again tomorrow'): ApiError {
+    return new ApiError('velocity_limit_exceeded', message, 429);
+  }
+
   static planRequired(feature: string): ApiError {
     return new ApiError('plan_required', `This feature requires a paid plan: ${feature}`, 403, { feature });
   }

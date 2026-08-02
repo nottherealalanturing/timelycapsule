@@ -60,7 +60,8 @@ export function OtpInput({ length = 6, value, onChange, disabled }: OtpInputProp
           inputMode="numeric"
           autoComplete="one-time-code"
           maxLength={1}
-          className="h-12 w-10 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/30 bg-[var(--color-bg-raised)] text-center text-lg text-foreground outline-none focus:ring-2 focus:ring-[var(--color-accent-violet)] focus:border-transparent"
+          aria-label={`Digit ${i + 1} of ${length}`}
+          className="motion-instant h-12 w-10 rounded-[var(--radius-input)] border border-[var(--color-rule-strong)] bg-[var(--color-bg-raised)] text-center text-lg text-foreground font-[family-name:var(--font-mono)] tabular-nums outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-interactive)]"
         />
       ))}
     </div>

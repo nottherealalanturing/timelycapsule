@@ -110,6 +110,11 @@ export function authRouter(db: Database): Router {
   router.post(
     '/auth/verify-email',
     requireAuth(),
+    // T-22 hardening: this route had no HTTP-level rate limit — only a
+    // per-code attempt-burn (service.verifyEmail burns a code after 5 wrong
+    // guesses). That bounds guesses per code, but not the raw request rate
+    // against the endpoint itself, unlike every other auth mutation route.
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ body: VerifyEmailRequestSchema }),
     async (req, res, next) => {
       try {

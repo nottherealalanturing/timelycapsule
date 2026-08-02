@@ -301,4 +301,81 @@ describe('auth module (T-04)', () => {
     expect(rows.length).toBeGreaterThanOrEqual(1);
     expect(rows[0]?.platform).toBe('web');
   });
+
+  /**
+   * T-22 hardening — "auth flow abuse tests". The existing suite above
+   * checks individual rejections (wrong password, wrong code, reused
+   * refresh token); these confirm the rate limiters actually trip at their
+   * configured ceiling rather than merely being present in the route chain
+   * — the threats named in `03-ARCHITECTURE.md §17` #3 (credential
+   * stuffing, IP velocity) are about *repeated* attempts, not one.
+   */
+  describe('abuse resistance (T-22 hardening)', () => {
+    it('rate-limits repeated login attempts (credential stuffing)', async () => {
+      const app = createApp(db);
+      const email = uniqueEmail();
+      await signupAndVerify(app, email, 'correct-horse-battery-staple');
+
+      // Configured limit is 10/15min (auth/routes.ts). Exhaust it with wrong
+      // passwords, then confirm the *next* attempt — even with the correct
+      // password — is rejected by the limiter, not evaluated at all.
+      let last;
+      for (let i = 0; i < 10; i++) {
+        last = await request(app).post('/v1/auth/login').send({ email, password: 'wrong-password' });
+        expect(last!.status).toBe(401);
+      }
+
+      const blocked = await request(app).post('/v1/auth/login').send({ email, password: 'correct-horse-battery-staple' });
+      expect(blocked.status).toBe(429);
+      expect(blocked.body.error.code).toBe('rate_limited');
+    });
+
+    it('rate-limits repeated signup attempts (mass account creation)', async () => {
+      const app = createApp(db);
+
+      // Configured limit is 10/hour. Real signups so each is otherwise valid
+      // — the point is the *rate*, not the payload.
+      for (let i = 0; i < 10; i++) {
+        const res = await request(app)
+          .post('/v1/auth/signup')
+          .send({
+            email: uniqueEmail(),
+            password: 'correct-horse-battery-staple',
+            displayName: 'Test User',
+            masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+            recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+          });
+        expect(res.status).toBe(201);
+        createdUserIds.push(res.body.user.id);
+      }
+
+      const blocked = await request(app)
+        .post('/v1/auth/signup')
+        .send({
+          email: uniqueEmail(),
+          password: 'correct-horse-battery-staple',
+          displayName: 'Test User',
+          masterKeyWrap: 'dGVzdC1tYXN0ZXIta2V5LXdyYXA=',
+          recoveryKeyWrap: 'dGVzdC1yZWNvdmVyeS1rZXktd3JhcA==',
+        });
+      expect(blocked.status).toBe(429);
+      expect(blocked.body.error.code).toBe('rate_limited');
+    });
+
+    it('rate-limits repeated forgot-password requests (email enumeration / spam)', async () => {
+      const app = createApp(db);
+      const email = uniqueEmail();
+      await signupAndVerify(app, email, 'correct-horse-battery-staple');
+
+      // Configured limit is 5/15min.
+      for (let i = 0; i < 5; i++) {
+        const res = await request(app).post('/v1/auth/password/forgot').send({ email });
+        expect(res.status).toBe(200);
+      }
+
+      const blocked = await request(app).post('/v1/auth/password/forgot').send({ email });
+      expect(blocked.status).toBe(429);
+      expect(blocked.body.error.code).toBe('rate_limited');
+    });
+  });
 });

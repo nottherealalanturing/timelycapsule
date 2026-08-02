@@ -3,6 +3,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../../db/client.js';
 import { idempotency } from '../../middleware/idempotency.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import { createRecipient, deleteRecipient, listRecipients, patchRecipient, resendInvite, sendAnnounce } from './service.js';
@@ -25,6 +26,7 @@ export function recipientsRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/recipients',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema, body: CreateRecipientRequestSchema }),
     async (req, res, next) => {
@@ -39,6 +41,7 @@ export function recipientsRouter(db: Database): Router {
 
   router.patch(
     '/capsules/:id/recipients/:rid',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: RecipientParamsSchema, body: PatchRecipientRequestSchema }),
     async (req, res, next) => {
       try {
@@ -52,6 +55,7 @@ export function recipientsRouter(db: Database): Router {
 
   router.delete(
     '/capsules/:id/recipients/:rid',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: RecipientParamsSchema }),
     async (req, res, next) => {
       try {
@@ -65,6 +69,7 @@ export function recipientsRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/recipients/:rid/resend-invite',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: RecipientParamsSchema, body: SendAnnounceRequestSchema }),
     async (req, res, next) => {
@@ -79,6 +84,7 @@ export function recipientsRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/recipients/:rid/announce',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: RecipientParamsSchema, body: SendAnnounceRequestSchema }),
     async (req, res, next) => {

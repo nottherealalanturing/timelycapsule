@@ -85,7 +85,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-24" onClick={() => setOpen(false)}>
       <div
-        className="w-full max-w-lg rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] shadow-[var(--shadow-lg)]"
+        className="w-full max-w-lg rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <input

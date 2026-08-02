@@ -1,0 +1,200 @@
+<title>TimelyCapsule — Identity Package</title>
+<style>
+:root{--g:#0b0e14;--r:#141922;--ink:#e6e8ec;--mu:#8b93a3;--br:#e0b84a;--st:#7a8ab0;
+ --ru:rgba(230,232,236,.13);--pa:#e9eae6;--pi:#16181a;--ho:#6e9e8a;--al:#d2694e;
+ --sa:"IBM Plex Sans","Helvetica Neue",system-ui,sans-serif;
+ --se:Charter,"Iowan Old Style",Georgia,serif;--mo:ui-monospace,"SF Mono",Menlo,monospace}
+@media(prefers-color-scheme:light){:root{--g:#e9eae6;--r:#f3f4f0;--ink:#16181a;--mu:#5e635c;
+ --br:#6e5a0e;--st:#2c3a4a;--ru:rgba(22,24,26,.15);--ho:#3f6154;--al:#a33f28}}
+:root[data-theme=light]{--g:#e9eae6;--r:#f3f4f0;--ink:#16181a;--mu:#5e635c;--br:#6e5a0e;
+ --st:#2c3a4a;--ru:rgba(22,24,26,.15);--ho:#3f6154;--al:#a33f28}
+:root[data-theme=dark]{--g:#0b0e14;--r:#141922;--ink:#e6e8ec;--mu:#8b93a3;--br:#e0b84a;
+ --st:#7a8ab0;--ru:rgba(230,232,236,.13);--ho:#6e9e8a;--al:#d2694e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--g);color:var(--ink);font-family:var(--sa);line-height:1.6;
+ -webkit-font-smoothing:antialiased}
+main{max-width:1080px;margin:0 auto;padding:44px 26px 100px}
+.eb{font-family:var(--mo);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--mu);margin:0 0 12px}
+h1{font-family:var(--se);font-size:clamp(2rem,4.6vw,2.8rem);line-height:1.08;font-weight:600;
+ letter-spacing:-.017em;margin:0 0 14px}
+h2{font-family:var(--se);font-size:1.5rem;font-weight:600;margin:0 0 14px;letter-spacing:-.012em}
+h3{font-size:.95rem;font-weight:650;margin:0 0 8px}
+p{margin:0 0 13px;max-width:64ch}ul{margin:0 0 13px;padding-left:1.1em;max-width:64ch}li{margin-bottom:6px}
+code{font-family:var(--mo);font-size:.85em;background:var(--r);padding:1px 5px;border-radius:2px}
+section{border-top:1px solid var(--ru);padding:40px 0 0;margin-top:40px}
+.sn{font-family:var(--mo);font-size:.68rem;letter-spacing:.2em;color:var(--br);text-transform:uppercase;display:block;margin-bottom:9px}
+.lede{font-family:var(--se);font-size:1.1rem;color:var(--mu);max-width:60ch}
+.note{border:1px solid var(--ru);border-left:2px solid var(--st);border-radius:3px;padding:15px 19px;
+ margin:0 0 18px;background:var(--r);font-size:.89rem}
+.note.w{border-left-color:var(--br)}.note.k{border-left-color:var(--al)}.note.g{border-left-color:var(--ho)}
+.note p{margin:0 0 8px;max-width:62ch}.note p:last-child{margin:0}
+.hero{background:var(--g);border:1px solid var(--ru);border-radius:4px;padding:54px 30px;display:grid;place-items:center;margin:0 0 18px}
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-end}
+figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:9px}
+figcaption{font-family:var(--mo);font-size:.58rem;letter-spacing:.1em;color:var(--mu);text-align:center}
+.box{background:var(--g);border:1px solid var(--ru);border-radius:4px;padding:24px;margin:0 0 16px}
+img{display:block;image-rendering:auto;border-radius:4px}
+img.px{image-rendering:pixelated}
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:0 0 16px}
+.dark{background:#0b0e14;color:#e6e8ec;border-radius:3px;padding:30px;display:grid;place-items:center}
+.pap{background:#e9eae6;color:#16181a;border-radius:3px;padding:30px;display:grid;place-items:center;
+ box-shadow:0 1px 0 rgba(0,0,0,.2),0 14px 34px rgba(0,0,0,.24)}
+.tw{overflow-x:auto;border:1px solid var(--ru);border-radius:3px;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:.83rem;min-width:520px}
+th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--ru);vertical-align:top}
+th{font-family:var(--mo);font-size:.58rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mu);font-weight:500;background:var(--r)}
+tbody tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mo);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--mu)}
+.cut{color:var(--al)}.ok{color:var(--ho);font-weight:650}
+.files{font-family:var(--mo);font-size:.72rem;line-height:1.75;color:var(--mu);background:var(--r);
+ border:1px solid var(--ru);border-radius:3px;padding:16px 18px;overflow-x:auto;margin:0 0 16px}
+.files b{color:var(--ink);font-weight:600}
+.tab{display:inline-flex;align-items:center;gap:7px;background:#0b0e14;color:#e6e8ec;
+ border:1px solid rgba(230,232,236,.16);border-radius:6px 6px 0 0;padding:7px 11px;font-size:.75rem}
+footer{border-top:1px solid var(--ru);margin-top:44px;padding-top:22px;color:var(--mu);font-size:.8rem}
+</style>
+<main>
+<p class="eb">Meridian V2 · Phase 10 · Identity package</p>
+<h1>The Transit, refined</h1>
+<p class="lede">Four rejected refinements, one that worked, and the production assets. The mark now
+carries a notch — a place reserved in the meridian, exactly the size of the marker coming to fill it.</p>
+
+<div class="hero"><svg width="150" height="150" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg></div>
+
+<section>
+<span class="sn">The diagnosis</span>
+<h2>Why the old mark failed</h2>
+<p><code>○ |</code> was <b>two isolated objects with no relationship beyond adjacency</b>. There was
+no single figure to remember, so at small sizes it collapsed into whatever nearby glyph it most
+resembled: a bullet and a rule, a slider handle, a record button.</p>
+<p>The fix could not be addition — a third element breaks 16px. It had to make the two existing
+elements <em>belong to each other</em>.</p>
+<div class="note g"><p><b>The notch does that.</b> The meridian is broken exactly where the marker
+will arrive, and the break is exactly the marker's diameter. The two elements are now cut for one
+another — a key and its keyway. Neither reads as complete without the other, which is precisely the
+emotional idea: <b>a moment already set aside, and something still on its way to it.</b></p></div>
+</section>
+
+<section>
+<span class="sn">Iterations</span>
+<h2>Six refinements, five rejected</h2>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Refinement</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td class="n">R2</td><td>Lozenge marker instead of a circle</td><td class="cut">Rejected — at 16px the diamond becomes a dot and the mark is the baseline again. No gain where it was needed.</td></tr>
+<tr><td class="n">R3</td><td>Notch, segments ≈ notch height</td><td class="cut">Rejected — 1:1 ratio reads as a <b>colon</b> at 16px. Right idea, wrong proportion.</td></tr>
+<tr><td class="n">R4</td><td>Notch + open ring marker</td><td class="cut">Rejected — the ring's counter closes at 16px and the marker becomes a blob.</td></tr>
+<tr><td class="n">R5</td><td>Marker touching the notch</td><td class="cut">Rejected — reads as <b>arrival</b>, not approach. The brand lives in the years before.</td></tr>
+<tr><td class="n">R9</td><td>Half-depth notch (a step, not a break)</td><td class="cut">Rejected — the notch vanishes by 16px. The feature carrying the meaning must not be the first casualty of scaling.</td></tr>
+<tr><td class="n">R10</td><td>Tapered meridian, heavier at the notch</td><td class="cut">Rejected — invisible at every size that matters. Complexity for nothing.</td></tr>
+<tr><td class="n ok">R7</td><td><b>Notch at a 2.1 : 1 segment ratio</b></td><td class="ok">Adopted. The line dominates, the notch reads as a bite taken out of it, and both survive to 16px.</td></tr>
+</tbody></table></div>
+<div class="note w"><p><b>The ratio is the whole refinement.</b> At 1:1 the mark is a colon; at 3:1
+the notch is a nick. 2.1:1 is the only window where a viewer reads &ldquo;one line, interrupted&rdquo;
+rather than &ldquo;two marks&rdquo; or &ldquo;one mark&rdquo;. It is the number to protect.</p></div>
+</section>
+
+<section>
+<span class="sn">Scale</span>
+<h2>The size ladder, as rendered</h2>
+<div class="box"><div class="row">
+<figure><svg width="96" height="96" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg><figcaption>96</figcaption></figure>
+<figure><svg width="48" height="48" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg><figcaption>48</figcaption></figure>
+<figure><svg width="32" height="32" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg><figcaption>32</figcaption></figure>
+<figure><svg width="24" height="24" viewBox="0 0 64 64" fill="none"><path d="M46 6V27M46 37V58" stroke="currentColor" stroke-width="9"/><circle cx="19" cy="32" r="8" fill="currentColor"/></svg><figcaption>24 · minimal</figcaption></figure>
+<figure><svg width="16" height="16" viewBox="0 0 64 64" fill="none"><path d="M46 6V27M46 37V58" stroke="currentColor" stroke-width="9"/><circle cx="19" cy="32" r="8" fill="currentColor"/></svg><figcaption>16 · minimal</figcaption></figure>
+</div></div>
+<h3>The 16px favicon, magnified 25×</h3>
+<p>The real raster, not a redraw. The notch survives as a clear break between two segments of one
+line — the failure mode this refinement existed to fix.</p>
+<div class="box"><div class="row" style="align-items:center">
+<figure><img class="px" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAA40lEQVR4nLxSTQ7BUBCeeYSk0m48B1ALTsAB1KrnYOX3ApwB4QBCxDkklTZhVUu16k633dbQaoJoa8GXl28y8+Yn85MWxDwAICLEwfM84lQmK0R4K0pdVVVJEi3rjHc/BpG5G4rS7bSJAx2RwZf4Z0Cv29lp29VyUSmXQ+PJsnTdIA4tmJM4CZ7nmrb1x7Veb4aj0acK6Udg/B583PZAwnVdxpgsF03zOJvNL47jf7dazUG/zwt8vz88VwAYT6b0XvKVZLlWq9q2De9NJ8TvA4KmI0BnpxsGsa+iINIevMTnjVcAAAD//9UGCssAAAAGSURBVAMABlpBBvIjRKUAAAAASUVORK5CYII=" width="200" height="200" alt="16px favicon magnified"><figcaption>favicon-16.png @25×</figcaption></figure>
+<figure><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAIAAAD8GO2jAAABEUlEQVR4nOyWu8rCQBCFZ/8/KChqwFh4eYP0WmgvKka0Vh9OrbUQtFJIE0hewKCtSwqFtCkCcWLQKgteErXYD7JM2OEcmCXZI6SzkucBgP8QQiAKvKtioCfgy1U3Gmm4C9+c/iBm3jWYTSeHvYkrq0GIau6hoPjPj4gbcIMPGPwnkinWnijmul1FlmXLshzHYbXtTNPQDVxDdwn+TRnq4nq1lKQC1ufzqd1RbNuG52GOqNVqBuoIFj1FgZf43iFvNlvXdYMaC1VV4SWYZ4AUS8VGvYGFpmmU0tCeQb9frpTpkc4Xi6cNHgFvglqtquvGcDQObeBfMjfgBmhwy5Gx4OfSVCYfX/b6RDb1o2Oc8Z1cAAAA//9LRjM1AAAABklEQVQDAAhqWODk/jhTAAAAAElFTkSuQmCC" width="32" height="32" alt="32px favicon"><figcaption>32 actual</figcaption></figure>
+<figure><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAA40lEQVR4nLxSTQ7BUBCeeYSk0m48B1ALTsAB1KrnYOX3ApwB4QBCxDkklTZhVUu16k633dbQaoJoa8GXl28y8+Yn85MWxDwAICLEwfM84lQmK0R4K0pdVVVJEi3rjHc/BpG5G4rS7bSJAx2RwZf4Z0Cv29lp29VyUSmXQ+PJsnTdIA4tmJM4CZ7nmrb1x7Veb4aj0acK6Udg/B583PZAwnVdxpgsF03zOJvNL47jf7dazUG/zwt8vz88VwAYT6b0XvKVZLlWq9q2De9NJ8TvA4KmI0BnpxsGsa+iINIevMTnjVcAAAD//9UGCssAAAAGSURBVAMABlpBBvIjRKUAAAAASUVORK5CYII=" width="16" height="16" alt="16px favicon"><figcaption>16 actual</figcaption></figure>
+<figure><span class="tab"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAA40lEQVR4nLxSTQ7BUBCeeYSk0m48B1ALTsAB1KrnYOX3ApwB4QBCxDkklTZhVUu16k633dbQaoJoa8GXl28y8+Yn85MWxDwAICLEwfM84lQmK0R4K0pdVVVJEi3rjHc/BpG5G4rS7bSJAx2RwZf4Z0Cv29lp29VyUSmXQ+PJsnTdIA4tmJM4CZ7nmrb1x7Veb4aj0acK6Udg/B583PZAwnVdxpgsF03zOJvNL47jf7dazUG/zwt8vz88VwAYT6b0XvKVZLlWq9q2De9NJ8TvA4KmI0BnpxsGsa+iINIevMTnjVcAAAD//9UGCssAAAAGSURBVAMABlpBBvIjRKUAAAAASUVORK5CYII=" width="14" height="14" alt="">TimelyCapsule</span><figcaption>browser tab</figcaption></figure>
+</div></div>
+</section>
+
+<section>
+<span class="sn">Icon set</span>
+<h2>Rasterised, not mocked up</h2>
+<div class="box"><div class="row">
+<figure><img src="data:image/png;base64,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" width="110" height="110" alt="180px app icon"><figcaption>180 · apple-touch</figcaption></figure>
+<figure><img src="data:image/png;base64,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" width="72" height="72" alt="192px icon"><figcaption>192 · PWA</figcaption></figure>
+<figure><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAB4klEQVR4nOyasU4CQRBA98gFAuau0Yor5A+w0ET5AvwKgrXaIl9ALIiJWssfYCkFRis00Z4OsZAGK0kkoVkHFuOxwEHudOcW51XL5C47D272yO6Ya/YGmwPn3P3RMAymCtfUMCn3mNr0uFllxhKTUxujlGabTAiEIfWZiHw4FyYT6ZnT14WWUXZyhhGmOSSAzVBAWi51QaQ9LOKQ1+48RNoRTb9+ASSvfQ2Y0yurVhggwNU72LaVy+XEuNls1uu3zCfcZBhYln18dCjG1ep1AAFmaroECSB5ehNjQwLYkAA2JIANCWBDAthoL2B47I0uSSazt5/NOsnkW6dzU6s1Gg8Lb4nFYlvptBh337ut1gvzS1CBg3y+WCy4I6XS6VWlwlQRSCAeTzw/PUajUXdwMBhs7+z2+59MCYFqIJXalLIHIAJxpor/vQq126/wwEhBiECcqSKQADzo5fKZFISIsgJgtIz6xHGc+7vxVgpsqxROiswv9FcCGxLAhgSwIQFsSAAbEsBGfwHdD7pxTil7vY/zi0sxhmNWFgAjYa3re1AJTw/OL/B7rECvxCocdFPDEw7jhiemOSSAjSzAeXhLGhKbTk5+kUFljBwW9IwrxqOpe8ab+Puin57xeTf/Hct3/n8BAAD//1X0Av4AAAAGSURBVAMAQyKpuL51Mi0AAAAASUVORK5CYII=" width="48" height="48" alt="64px icon"><figcaption>64</figcaption></figure>
+<figure><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAIAAADYYG7QAAABl0lEQVR4nOyZwUvCUBzH32wWPLVLBqYmdvVsUP0VRbeSDlr/QP5J/gUVEV0baCadpOG6GbhTwgabhxDW2wZD2er3Jps+4X28/Aa/9/zg+zLf3sTUdhbNYzkfF0EQUNRYluXV/vlFf6vdFL0G8ktYDmheSwxsXQ6BX5dAjMGk0GzKVoirYWdoydH5C1cjwcjP40JkmMuQiOIBY9xo1EnxNRze3T9QjxMEnNmJI0PZ7G6nLZFCepHq1zeUo8iSiYwk2oXI8BsjBBeC4EIQXAhi/f/LDsrly9pFqbTf73+0Wi1N0wPbdF2r1a6cQg81v+B/6viH3F7u+ekR45R7Kcvy6dl5tBuYcEt2cnTs2RAqlUo+n0eRsuahbr92JhPTuyRLpqoqipSNzS1M320YRq/3XigWRyN1oCi3zaZpmoGdyWTysFotFgqZdPp7PEbUhAs1PYtt0BC/McJwIQguBMGFILgQhEh2M3E8TU+nP93uGykGyif9KFsmpsOGxWDxfIi9DPHjGAAuBBHXoSclwMuX2SaPaFMPTv4LAAD//7NRi8oAAAAGSURBVAMA9l2C8bIEp7UAAAAASUVORK5CYII=" width="36" height="36" alt="48px icon"><figcaption>48</figcaption></figure>
+</div></div>
+</section>
+
+<section>
+<span class="sn">Registers</span>
+<h2>One mark, no variants</h2>
+<div class="pair">
+<div class="dark"><svg width="84" height="84" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg></div>
+<div class="pap"><svg width="84" height="84" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg></div>
+</div>
+<h3>Blind emboss</h3>
+<p>No ink — only a light edge and a shadow edge. Two forms and a uniform stroke is the easiest
+possible case for a die, and the notch gives the embosser a feature to register against.</p>
+<div class="pap" style="padding:40px">
+  <div style="position:relative;width:84px;height:84px">
+    <svg style="position:absolute;inset:0;transform:translateY(1.5px)" width="84" height="84" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="#fff" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="#fff"/></svg>
+    <svg style="position:absolute;inset:0;opacity:.32" width="84" height="84" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="#16181a" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="#16181a"/></svg>
+  </div>
+</div>
+</section>
+
+<section>
+<span class="sn">Lockups</span>
+<h2>Mark and wordmark</h2>
+<div class="box" style="display:flex;flex-direction:column;gap:28px">
+  <div style="display:flex;align-items:center;gap:22px"><svg width="34" height="34" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg>
+    <span style="font-size:1.5rem;font-weight:600;letter-spacing:-.005em">Timely<span style="font-weight:400;opacity:.62">Capsule</span></span></div>
+  <div style="display:flex;flex-direction:column;align-items:center;gap:12px;width:max-content"><svg width="38" height="38" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="currentColor" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="currentColor"/></svg>
+    <span style="font-size:1.05rem;font-weight:600;letter-spacing:-.005em">Timely<span style="font-weight:400;opacity:.62">Capsule</span></span></div>
+</div>
+<div class="note w"><p><b>The gap is 1.2× the mark's width — wider than optical default.</b> At a
+normal gap the notched meridian reads as punctuation attached to the word. This was the one
+weakness applied-identity testing found, and spacing fixes it.</p>
+<p><b>The <code>&lt;text&gt;</code> in the lockup SVGs must be outlined before production use.</b>
+A live text element falls back to a system face in most email clients, many PDF viewers, and every
+partner deck.</p></div>
+</section>
+
+<section>
+<span class="sn">Package</span>
+<h2>What shipped</h2>
+<div class="files">
+<b>design/brand/</b>
+  mark.svg · mark-minimal.svg          primary + &lt;20px, currentColor
+  mark-ink · mark-paper · mark-black · mark-white
+  mark-black-512.png · mark-black-128.png   transparent
+  app-icon.svg · app-icon-paper.svg · favicon.svg
+  wordmark.svg · lockup-horizontal.svg · lockup-vertical.svg   ⚠ outline first
+  <b>icon/</b>     1024 512 256 192 180 128 64 48
+  <b>favicon/</b>  48 32 16
+  <b>IDENTITY.md</b>  geometry · colour · clear space · lockups · never-list
+</div>
+<p>All assets generate from one geometry definition in
+<code>design/.build-brand.mjs</code>. Edit the generator, never the output — that is what keeps
+the notch ratio from drifting.</p>
+</section>
+
+<section>
+<span class="sn">Open</span>
+<h2>What I have not settled</h2>
+<ul>
+<li><b>The wordmark still commits you to the name.</b> The mark is rename-proof and can ship today;
+the lockups should be treated as provisional until <code>09 §XIV.1</code> is resolved.</li>
+<li><b>Emboss stroke weight is untested on a real press.</b> The guideline says +15%; that is an
+instinct, not a measurement. Proof before any print run.</li>
+<li><b>RTL reading is untested.</b> A left-approaching marker may read as departing in Arabic or
+Hebrew contexts. Not blocking — <code>05</code> limits us to Latin-plus.</li>
+<li><b>Nobody outside this project has seen it.</b> The cheapest useful test remains showing it to
+five people cold and asking only &ldquo;what is this?&rdquo;</li>
+</ul>
+</section>
+
+<footer>Meridian V2 · identity package. Geometry: 64-unit grid, meridian x45, notch 27→37,
+marker r5 @ cx22, segment ratio 2.1 : 1.</footer>
+</main>

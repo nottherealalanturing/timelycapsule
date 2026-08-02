@@ -7,7 +7,24 @@ import { scheduledActions } from '../../db/schema/index.js';
 import { QUEUE_NAMES, sendAction, type QueueName } from './queue.js';
 
 const LOOKAHEAD_MS = 5 * 60 * 1000;
-const BATCH_SIZE = 500;
+/*
+ * T-22 load test: at 500/tick × a 30s tick, combined throughput caps at
+ * ~1,000 actions/min regardless of backlog size — measured live against a
+ * real 20,000-action backlog (10k `capsule_unlock` + the `recipient_unlock`
+ * rows they spawn), it did not drain within the 10-minute DoD (9,300 still
+ * pending at t+597s). `recipient_unlock` rows don't exist until their parent
+ * `capsule_unlock` has already run, so a burst like this is two sequential
+ * ~10k waves through the same ceiling, not one — worse than the batch size
+ * alone suggests.
+ *
+ * Raised 4x rather than shortening the tick (plan/03-ARCHITECTURE.md fixes
+ * the interval at "every 30s in production"; a bigger claim per tick reaches
+ * the same throughput without touching that cadence). Safe at this size:
+ * `promoter.test.ts` already proves 10,000 rows claim, in order, with none
+ * dropped or duplicated, inside one transaction in ~5.8s — comfortably
+ * inside a single 30s tick.
+ */
+const BATCH_SIZE = 2000;
 
 function isQueueName(kind: string): kind is QueueName {
   return (QUEUE_NAMES as readonly string[]).includes(kind);

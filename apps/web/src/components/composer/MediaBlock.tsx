@@ -149,7 +149,7 @@ export function MediaBlock({ capsuleId, draft }: { capsuleId: string; draft: Cap
 
   return (
     <section aria-label="Media" className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium text-secondary">Media</h2>
+      <h2 className="text-[length:var(--text-body-s)] font-medium text-secondary">Media</h2>
 
       <div
         onDragOver={(e) => {
@@ -164,8 +164,11 @@ export function MediaBlock({ capsuleId, draft }: { capsuleId: string; draft: Cap
         }}
         onClick={() => inputRef.current?.click()}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border-2 border-dashed p-8 text-center text-sm text-secondary',
-          dragOver ? 'border-accent bg-accent/5' : 'border-[var(--color-text-secondary)]/25',
+          'flex cursor-pointer flex-col items-center justify-center rounded-[var(--radius-card)] border-2 border-dashed p-8 text-center text-[length:var(--text-body-s)] text-secondary',
+          // Interactive, not brass — a file being dragged in is not waiting.
+          dragOver
+            ? 'border-[var(--color-interactive)] bg-[var(--color-bg-raised)]'
+            : 'border-[var(--color-rule-strong)]',
         )}
       >
         Drag files here, or click to choose
@@ -181,7 +184,7 @@ export function MediaBlock({ capsuleId, draft }: { capsuleId: string; draft: Cap
         />
       </div>
 
-      <div className="flex items-center gap-3 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 px-3 py-2">
+      <div className="flex items-center gap-3 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2">
         <Button type="button" variant={recording ? 'destructive' : 'secondary'} size="sm" onClick={() => (recording ? stopRecording() : void startRecording())}>
           {recording ? 'Stop recording' : 'Record voice note'}
         </Button>
@@ -190,7 +193,7 @@ export function MediaBlock({ capsuleId, draft }: { capsuleId: string; draft: Cap
             {Array.from({ length: 24 }).map((_, i) => (
               <span
                 key={i}
-                className="w-1 rounded-full bg-accent"
+                className="w-1 bg-[var(--color-interactive)]"
                 style={{ height: `${Math.max(4, level * 24 * (0.5 + Math.abs(Math.sin(i))))}px` }}
               />
             ))}
@@ -199,7 +202,7 @@ export function MediaBlock({ capsuleId, draft }: { capsuleId: string; draft: Cap
       </div>
 
       {uploading.map((u) => (
-        <div key={u.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 px-3 py-2 text-sm">
+        <div key={u.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2 text-[length:var(--text-body-s)]">
           <span className="truncate text-foreground">{u.name}</span>
           <span className={u.error ? 'text-[var(--color-danger)]' : 'text-secondary'}>
             {u.error ?? `Uploading… (${u.partsDone}/${u.partsTotal})`}
@@ -210,16 +213,16 @@ export function MediaBlock({ capsuleId, draft }: { capsuleId: string; draft: Cap
       {items.length > 0 ? (
         <ul className="flex flex-col gap-2">
           {items.map((item, index) => (
-            <li key={item.id} className="flex items-center gap-3 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 p-3">
+            <li key={item.id} className="flex items-center gap-3 rounded-[var(--radius-input)] border border-[var(--color-rule)] p-3">
               <div className="flex flex-1 flex-col gap-1">
-                <span className="text-sm text-foreground">
+                <span className="text-[length:var(--text-body-s)] text-foreground">
                   {kindLabel(item.kind)} — {item.originalName} ({formatBytes(item.sizeBytes)})
                 </span>
                 <input
                   placeholder="Add a caption…"
                   defaultValue={item.caption ?? ''}
                   onBlur={(e) => void updateCaption(item, e.target.value)}
-                  className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-2 py-1 text-sm text-foreground"
+                  className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-2 py-1 text-[length:var(--text-body-s)] text-foreground"
                 />
               </div>
               <div className="flex flex-col gap-1">

@@ -1,0 +1,608 @@
+<title>Logo Exploration II — Six Conceptual Families</title>
+<style>
+:root{
+  --ground:#0b0e14;--raised:#141922;--ink:#e6e8ec;--muted:#8b93a3;--brass:#e0b84a;
+  --steel:#7a8ab0;--rule:rgba(230,232,236,.13);--rule-hi:rgba(230,232,236,.26);
+  --paper:#e9eae6;--paper-ink:#16181a;--hold:#6e9e8a;--alarm:#d2694e;
+  --sans:"IBM Plex Sans","Helvetica Neue",Helvetica,system-ui,sans-serif;
+  --serif:Charter,"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme:light){:root{--ground:#e9eae6;--raised:#f3f4f0;--ink:#16181a;
+  --muted:#5e635c;--brass:#6e5a0e;--steel:#2c3a4a;--rule:rgba(22,24,26,.15);
+  --rule-hi:rgba(22,24,26,.3);--hold:#3f6154;--alarm:#a33f28;}}
+:root[data-theme=light]{--ground:#e9eae6;--raised:#f3f4f0;--ink:#16181a;--muted:#5e635c;
+  --brass:#6e5a0e;--steel:#2c3a4a;--rule:rgba(22,24,26,.15);--rule-hi:rgba(22,24,26,.3);
+  --hold:#3f6154;--alarm:#a33f28;}
+:root[data-theme=dark]{--ground:#0b0e14;--raised:#141922;--ink:#e6e8ec;--muted:#8b93a3;
+  --brass:#e0b84a;--steel:#7a8ab0;--rule:rgba(230,232,236,.13);--rule-hi:rgba(230,232,236,.26);
+  --hold:#6e9e8a;--alarm:#d2694e;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+  font-size:16px;line-height:1.62;-webkit-font-smoothing:antialiased}
+main{max-width:1120px;margin:0 auto;padding:44px 28px 110px}
+.eyebrow{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 13px}
+h1{font-family:var(--serif);font-size:clamp(2.1rem,5vw,3rem);line-height:1.08;font-weight:600;
+  letter-spacing:-.017em;margin:0 0 16px;text-wrap:balance}
+h2{font-family:var(--serif);font-size:clamp(1.4rem,3vw,1.8rem);line-height:1.2;font-weight:600;
+  letter-spacing:-.012em;margin:0 0 14px;text-wrap:balance}
+h3{font-size:1rem;font-weight:650;margin:0 0 8px}
+p{margin:0 0 14px;max-width:64ch}
+ul{margin:0 0 14px;padding-left:1.1em;max-width:64ch}li{margin-bottom:7px}
+b,strong{font-weight:650}
+code{font-family:var(--mono);font-size:.85em;background:var(--raised);padding:1px 5px;border-radius:2px}
+section{border-top:1px solid var(--rule);padding:42px 0 0;margin-top:42px}
+.snum{font-family:var(--mono);font-size:.68rem;letter-spacing:.2em;color:var(--brass);
+  text-transform:uppercase;display:block;margin-bottom:9px}
+.lede{font-family:var(--serif);font-size:1.12rem;color:var(--muted);max-width:60ch}
+.note{border:1px solid var(--rule);border-left:2px solid var(--steel);border-radius:3px;
+  padding:16px 20px;margin:0 0 20px;background:var(--raised);font-size:.9rem}
+.note.warn{border-left-color:var(--brass)}
+.note.kill{border-left-color:var(--alarm)}
+.note.good{border-left-color:var(--hold)}
+.note p{margin:0 0 9px;max-width:62ch}.note p:last-child{margin-bottom:0}
+
+.fam{border:1px solid var(--rule);border-radius:4px;background:var(--raised);
+  margin:0 0 20px;overflow:hidden}
+.fam .head{padding:18px 22px 14px;display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule)}
+.fam .head .fn{font-family:var(--mono);font-size:.66rem;color:var(--brass);letter-spacing:.16em}
+.fam .head h3{margin:0;font-family:var(--serif);font-size:1.25rem;font-weight:600}
+.fam .head .idea{color:var(--muted);font-size:.86rem;margin:0;flex-basis:100%;max-width:62ch}
+.fam .marks{display:flex;gap:0;background:var(--ground);flex-wrap:wrap}
+.fam .marks figure{margin:0;flex:1 1 190px;display:flex;flex-direction:column;align-items:center;
+  gap:10px;padding:28px 12px 20px;border-right:1px solid var(--rule)}
+.fam .marks figure:last-child{border-right:0}
+.fam .marks figcaption{font-family:var(--mono);font-size:.6rem;letter-spacing:.1em;color:var(--muted);
+  text-align:center}
+.fam .verdictbar{padding:16px 22px 18px;font-size:.88rem;display:flex;flex-direction:column;gap:9px}
+.fam .verdictbar p{margin:0;max-width:66ch;color:var(--muted)}
+.fam .verdictbar p b{color:var(--ink)}
+.tag{font-family:var(--mono);font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+  padding:3px 8px;border-radius:2px;align-self:flex-start}
+.tag.keep{background:var(--hold);color:var(--ground);font-weight:600}
+.tag.cut{border:1px solid var(--alarm);color:var(--alarm)}
+.tag.hold{border:1px solid var(--rule-hi);color:var(--muted)}
+
+svg{display:block}
+.mk{stroke:var(--ink);fill:none;stroke-width:4;stroke-linecap:square;stroke-linejoin:miter}
+.mk-thin{stroke:var(--ink);fill:none;stroke-width:2.2;stroke-linecap:square;opacity:.5}
+.mk-fill{fill:var(--ink)}
+
+.silrow{display:flex;gap:34px;flex-wrap:wrap;align-items:center;background:var(--ground);
+  border:1px solid var(--rule);border-radius:4px;padding:26px 24px;margin:0 0 16px}
+.silrow figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:10px}
+.silrow figcaption{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;color:var(--muted)}
+
+.tw{overflow-x:auto;border:1px solid var(--rule);border-radius:3px;margin:0 0 18px}
+table{border-collapse:collapse;width:100%;font-size:.83rem;min-width:660px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--rule);vertical-align:top}
+th{font-family:var(--mono);font-size:.6rem;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted);font-weight:500;background:var(--raised)}
+tbody tr:last-child td{border-bottom:0}
+td.n{font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.s5{color:var(--hold);font-weight:650}.s3{color:var(--brass)}.s1{color:var(--alarm)}
+
+.paperbox{background:var(--paper);border-radius:3px;padding:32px;display:grid;place-items:center;
+  box-shadow:0 1px 0 rgba(0,0,0,.2),0 16px 40px rgba(0,0,0,.26)}
+.paperbox .mk{stroke:var(--paper-ink)}.paperbox .mk-fill{fill:var(--paper-ink)}
+.paperbox .mk-thin{stroke:var(--paper-ink)}
+.darkbox{background:var(--ground);border:1px solid var(--rule);border-radius:3px;padding:32px;
+  display:grid;place-items:center}
+.pairbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:18px;margin:0 0 16px}
+.icons{display:flex;gap:18px;flex-wrap:wrap;align-items:flex-end}
+.icon{display:flex;flex-direction:column;align-items:center;gap:8px}
+.icon .tile{border-radius:22%;display:grid;place-items:center}
+.icon .cap{font-family:var(--mono);font-size:.58rem;letter-spacing:.1em;color:var(--muted)}
+.lock{background:var(--ground);border:1px solid var(--rule);border-radius:4px;padding:30px;
+  display:flex;flex-direction:column;gap:26px;margin:0 0 16px}
+.lockrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.wm{font-weight:600;letter-spacing:-.005em;font-size:1.5rem;line-height:1;white-space:nowrap}
+.wm .thin{font-weight:400;color:var(--muted)}
+footer{border-top:1px solid var(--rule);margin-top:46px;padding-top:24px;color:var(--muted);font-size:.82rem}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.001ms!important;animation-duration:.001ms!important}}
+</style>
+<main>
+<p class="eyebrow">Meridian V2 · Phase 10 · Exploration II</p>
+<h1>Six conceptual families</h1>
+<p class="lede">The first exploration was six variations pretending to be six alternatives. This one
+starts from six different ideas about what the company <em>is</em>, and judges the results as logos
+before judging them as symbols.</p>
+
+<section>
+  <span class="snum">The correction</span>
+  <h2>What was wrong with the first round</h2>
+  <p>Every one of the six directions was built from the same two primitives: a vertical rule, and a
+  small element beside or upon it. Meridian, Transit, Vernier, Registers and Interval are all
+  <b>the same drawing with different spacing</b>. Only the Seal sat outside that family, and it was
+  rejected in a sentence.</p>
+  <p>So the comparison was rigged. A scorecard across six siblings measures which sibling is
+  tallest, not whether the family is right.</p>
+  <div class="note kill">
+    <p><b>And the winning argument was philosophical, not visual.</b> Transit won on
+    &ldquo;tension, not completion&rdquo; and &ldquo;position, not progress&rdquo; — both real
+    requirements, both invisible to anyone who has not read <code>03</code>.</p>
+    <p>Judged only as a logo, <b>a small circle beside a vertical line is two of the most generic
+    primitives in existence.</b> It is a bullet point next to a rule. It is a slider handle. It is
+    the record button in a video app. Simple is not the same as distinctive, and I conflated the
+    two because the idea behind it was good.</p>
+  </div>
+  <p>The test used below is the one you set: <b>would this be memorable to someone who knows
+  nothing about us?</b> A mark earns its meaning afterwards. It has to survive the first two
+  seconds on its form alone.</p>
+</section>
+
+<section>
+  <span class="snum">Family I · Transit</span>
+  <h2>Motion toward a fixed moment</h2>
+  <div class="fam">
+    <div class="head">
+      <span class="fn">I</span><h3>Transit</h3>
+      <p class="idea">Something is on its way to an appointed moment. The mark is a reading taken
+      mid-journey — a marker approaching a reference it has not yet reached.</p>
+    </div>
+    <div class="marks">
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Transit: open marker approaching a vertical meridian">
+          <line class="mk" x1="44" y1="8" x2="44" y2="56"/><circle class="mk" cx="22" cy="32" r="8"/>
+        </svg>
+        <figcaption>I·a  the transit</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Transit with graduations">
+          <line class="mk-thin" x1="36" y1="16" x2="44" y2="16"/><line class="mk-thin" x1="36" y1="48" x2="44" y2="48"/>
+          <line class="mk" x1="44" y1="8" x2="44" y2="56"/><circle class="mk" cx="22" cy="32" r="8"/>
+        </svg>
+        <figcaption>I·b  graduated</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Transit at sixteen pixels">
+          <line class="mk" x1="46" y1="12" x2="46" y2="52" stroke-width="10"/><circle class="mk-fill" cx="19" cy="32" r="10"/>
+        </svg>
+        <figcaption>I·a at 16px</figcaption>
+      </figure>
+    </div>
+    <div class="verdictbar">
+      <p><b>Succeeds as a symbol, fails as a logo.</b> Inside the product it is superb — it is
+      literally the waiting screen and the Gate 1 reveal geometry, so the chrome and the mark are
+      one idea. Outside the product it is a dot and a line, and it carries no memory. Nobody
+      describes it to a friend.</p>
+      <p><b>Demoted, not discarded.</b> See Part VIII.</p>
+      <span class="tag hold">Demoted to motif</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Family II · Institution</span>
+  <h2>The thing that holds</h2>
+  <div class="fam">
+    <div class="head">
+      <span class="fn">II</span><h3>The Keep</h3>
+      <p class="idea">We are not a journey, we are a <em>custodian</em>. The mark is an enclosure
+      with something inside it: brackets, a cartouche, an assay mark. The visual language of
+      registries, hallmarks and banknotes rather than of software.</p>
+    </div>
+    <div class="marks">
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="The Keep: two brackets enclosing a marker">
+          <path class="mk" d="M22 10 H10 V54 H22"/><path class="mk" d="M42 10 H54 V54 H42"/>
+          <circle class="mk-fill" cx="32" cy="32" r="6"/>
+        </svg>
+        <figcaption>II·a  the keep</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="The Keep with the marker held off centre">
+          <path class="mk" d="M22 10 H10 V54 H22"/><path class="mk" d="M42 10 H54 V54 H42"/>
+          <circle class="mk-fill" cx="32" cy="32" r="6"/>
+        </svg>
+        <figcaption>II·b  held, off-centre</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="A hexagonal cartouche containing a bar">
+          <path class="mk" d="M32 7 L54 19 V45 L32 57 L10 45 V19 Z"/>
+          <line class="mk" x1="22" y1="32" x2="42" y2="32"/>
+        </svg>
+        <figcaption>II·c  cartouche</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="The Custody: a bracket on the left, a meridian on the right, a marker between them">
+          <path class="mk" d="M24 10 H10 V54 H24"/>
+          <line class="mk" x1="52" y1="8" x2="52" y2="56"/>
+          <circle class="mk-fill" cx="33" cy="32" r="6"/>
+        </svg>
+        <figcaption>II·d  the custody</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="The Keep at sixteen pixels">
+          <path class="mk" d="M22 12 H12 V52 H22" stroke-width="7"/><path class="mk" d="M42 12 H52 V52 H42" stroke-width="7"/>
+          <circle class="mk-fill" cx="32" cy="32" r="7"/>
+        </svg>
+        <figcaption>II·b at 16px</figcaption>
+      </figure>
+    </div>
+    <div class="verdictbar">
+      <p><b>The strongest logo in either exploration.</b> It is a <em>containing</em> form, which
+      is what almost every durable mark has in common — a silhouette you can hold in your head.
+      It reads instantly and without any briefing: <b>something is being held, and held
+      carefully.</b></p>
+      <p>It also says the brand's one word. <code>02</code> settled on <b>Kept</b> — kept time,
+      kept safe, kept its word. This is that word drawn.</p>
+      <p><b>II·c is cut:</b> a hexagon with a bar is a hazard placard or a crypto token, and the
+      six vertices mush below 24px.</p>
+      <p><b>II·d is cut, reluctantly, and it was the interesting one.</b> Replacing the right
+      bracket with a bare meridian fuses this family with Transit: custody on the left, the
+      appointed moment on the right, the marker between them. Conceptually it is the most complete
+      mark in either exploration. Drawn, it reads as <em>a bracket pair whose right half is
+      broken</em> — an error rather than an intention — and the marker crowds the meridian. A mark
+      that looks like a mistake cannot be the mark.</p>
+      <span class="tag keep">Leading candidate</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Family III · Correspondence</span>
+  <h2>A letter, franked</h2>
+  <div class="fam">
+    <div class="head">
+      <span class="fn">III</span><h3>The Postmark</h3>
+      <p class="idea">The product is a letter that arrives late. The visual language is the
+      cancellation: a datestamp ring, killer bars, the mark a post office strikes to say
+      <em>this passed through here, on this date</em>.</p>
+    </div>
+    <div class="marks">
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Datestamp: a ring crossed by a band">
+          <circle class="mk" cx="32" cy="32" r="21"/>
+          <line class="mk" x1="6" y1="32" x2="58" y2="32"/>
+        </svg>
+        <figcaption>III·a  datestamp</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Cancellation: a ring with killer bars">
+          <circle class="mk" cx="22" cy="32" r="15"/>
+          <line class="mk" x1="42" y1="24" x2="60" y2="24"/>
+          <line class="mk" x1="42" y1="32" x2="60" y2="32"/>
+          <line class="mk" x1="42" y1="40" x2="60" y2="40"/>
+        </svg>
+        <figcaption>III·b  cancellation</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Datestamp at sixteen pixels">
+          <circle class="mk" cx="32" cy="32" r="20" stroke-width="8"/>
+          <line class="mk" x1="6" y1="32" x2="58" y2="32" stroke-width="8"/>
+        </svg>
+        <figcaption>III·a at 16px</figcaption>
+      </figure>
+    </div>
+    <div class="verdictbar">
+      <p><b>The most instantly readable of the six, and the most dangerous.</b> Everyone knows a
+      postmark, which is the strength. But a ring with a bar through it is also <b>the universal
+      &ldquo;no&rdquo; sign</b> — prohibition, blocked, forbidden. At small sizes III·a is a
+      no-entry glyph, and no amount of brand-building overrides a symbol that literal.</p>
+      <p>III·b avoids that but is two objects rather than one silhouette, and the killer bars read
+      as a menu icon or a signal meter.</p>
+      <p>It also <em>depicts</em> — a picture of a postmark on a product that forbids illustrating
+      its own metaphors (<code>07 §II.3</code>).</p>
+      <span class="tag cut">Rejected</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Family IV · Keepsake</span>
+  <h2>The object, contained</h2>
+  <div class="fam">
+    <div class="head">
+      <span class="fn">IV</span><h3>The Vessel</h3>
+      <p class="idea">What we hold is a physical thing in all but fact. The mark is nested
+      containment — a form inside a form — or a join: two halves that meet and stay met.</p>
+    </div>
+    <div class="marks">
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Nested squares">
+          <rect class="mk" x="8" y="8" width="48" height="48"/>
+          <rect class="mk-fill" x="22" y="22" width="20" height="20"/>
+        </svg>
+        <figcaption>IV·a  nested</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="A join: two forms meeting with an offset seam">
+          <path class="mk" d="M10 14 H32 V32 H54 V50 H32 V32 H10 Z"/>
+        </svg>
+        <figcaption>IV·b  the join</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Nested squares at sixteen pixels">
+          <rect class="mk" x="6" y="6" width="52" height="52" stroke-width="8"/>
+          <rect class="mk-fill" x="22" y="22" width="20" height="20"/>
+        </svg>
+        <figcaption>IV·a at 16px</figcaption>
+      </figure>
+    </div>
+    <div class="verdictbar">
+      <p><b>Rejected on collision, not on craft.</b> A filled square inside an outlined square is
+      already the stop button in every media player, the &ldquo;copy&rdquo; icon in every toolbar,
+      and the selection indicator in every design tool. It is one of the most occupied forms in
+      software.</p>
+      <p>IV·b is more distinctive but reads as a plumbing fitting or a Tetris piece, and its
+      meaning is opaque even <em>with</em> the briefing — which is the failure mode we are
+      explicitly trying to avoid.</p>
+      <span class="tag cut">Rejected</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Family V · Legacy</span>
+  <h2>Accumulation across generations</h2>
+  <div class="fam">
+    <div class="head">
+      <span class="fn">V</span><h3>The Strata</h3>
+      <p class="idea">Time deposits layers. Growth rings, sediment, the accumulating distance
+      between who wrote and who reads. The mark is not an instant but a stack of them.</p>
+    </div>
+    <div class="marks">
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Horizontal strata of varying weight">
+          <line class="mk-thin" x1="8" y1="14" x2="46" y2="14"/>
+          <line class="mk-thin" x1="8" y1="23" x2="54" y2="23"/>
+          <line class="mk" x1="8" y1="34" x2="56" y2="34" stroke-width="6"/>
+          <line class="mk-thin" x1="8" y1="45" x2="40" y2="45"/>
+          <line class="mk-thin" x1="8" y1="54" x2="50" y2="54"/>
+        </svg>
+        <figcaption>V·a  strata</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Concentric growth rings, one emphasised">
+          <path class="mk-thin" d="M46 8 A26 26 0 1 0 46 56"/>
+          <path class="mk-thin" d="M42 16 A18 18 0 1 0 42 48"/>
+          <path class="mk" d="M38 24 A10 10 0 1 0 38 40"/>
+        </svg>
+        <figcaption>V·b  growth rings</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Strata at sixteen pixels">
+          <line class="mk" x1="8" y1="16" x2="48" y2="16" stroke-width="6"/>
+          <line class="mk" x1="8" y1="32" x2="58" y2="32" stroke-width="9"/>
+          <line class="mk" x1="8" y1="48" x2="42" y2="48" stroke-width="6"/>
+        </svg>
+        <figcaption>V·a at 16px</figcaption>
+      </figure>
+    </div>
+    <div class="verdictbar">
+      <p><b>Rejected, decisively, at 16px.</b> Horizontal bars of varying length are a hamburger
+      menu, a text-align icon, or a signal meter. There is no size at which V·a is not one of
+      those things.</p>
+      <p>V·b is genuinely handsome at large sizes and is the only mark here that suggests
+      <em>accumulated duration</em> rather than a single instant. But concentric arcs are radar,
+      wifi, a loading indicator or a sound wave — and &ldquo;reads as loading&rdquo; is a
+      constitutional failure, not a matter of taste (<code>07 §VI.3</code>).</p>
+      <span class="tag cut">Rejected</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Family VI · Threshold</span>
+  <h2>The moment of opening</h2>
+  <div class="fam">
+    <div class="head">
+      <span class="fn">VI</span><h3>The Aperture</h3>
+      <p class="idea">The brand's single most emotional instant is the seal giving way. The mark is
+      a boundary that has just parted — an opening, a gap in something previously whole.</p>
+    </div>
+    <div class="marks">
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="A bounded form parted by a vertical opening">
+          <path class="mk" d="M28 8 H10 V56 H28"/><path class="mk" d="M36 8 H54 V56 H36"/>
+        </svg>
+        <figcaption>VI·a  parted</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="A form with a single vertical incision">
+          <rect class="mk" x="10" y="10" width="44" height="44"/>
+          <line class="mk" x1="32" y1="4" x2="32" y2="24"/>
+        </svg>
+        <figcaption>VI·b  incision</figcaption>
+      </figure>
+      <figure>
+        <svg width="76" height="76" viewBox="0 0 64 64" role="img" aria-label="Parted form at sixteen pixels">
+          <path class="mk" d="M26 10 H10 V54 H26" stroke-width="8"/><path class="mk" d="M38 10 H54 V54 H38" stroke-width="8"/>
+        </svg>
+        <figcaption>VI·a at 16px</figcaption>
+      </figure>
+    </div>
+    <div class="verdictbar">
+      <p><b>The closest challenger to The Keep, and it loses on one detail.</b> VI·a is
+      structurally the same containing form — but parted, and therefore <em>empty</em>. It says the
+      thing has already gone.</p>
+      <p>That is the Direction A error again in another costume: it depicts the moment
+      <em>after</em>. The brand lives in the years <em>before</em>, and an empty enclosure is a
+      picture of a wait that is over.</p>
+      <p>VI·b reads as a coin slot, a piggy bank, or a ballot box.</p>
+      <span class="tag cut">Rejected</span>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Part VII · The honest test</span>
+  <h2>All six at 16px, with no captions</h2>
+  <p>The size where most people will meet the brand, and the size at which philosophy is
+  invisible. Look at these before reading the table.</p>
+  <div class="silrow">
+    <figure><svg width="20" height="20" viewBox="0 0 64 64" aria-label="Family one at 16 pixels"><line class="mk" x1="46" y1="12" x2="46" y2="52" stroke-width="10"/><circle class="mk-fill" cx="19" cy="32" r="10"/></svg><figcaption>I</figcaption></figure>
+    <figure><svg width="20" height="20" viewBox="0 0 64 64" aria-label="Family two at 16 pixels"><path class="mk" d="M22 12 H12 V52 H22" stroke-width="7"/><path class="mk" d="M42 12 H52 V52 H42" stroke-width="7"/><circle class="mk-fill" cx="32" cy="32" r="7"/></svg><figcaption>II</figcaption></figure>
+    <figure><svg width="20" height="20" viewBox="0 0 64 64" aria-label="Family three at 16 pixels"><circle class="mk" cx="32" cy="32" r="20" stroke-width="8"/><line class="mk" x1="6" y1="32" x2="58" y2="32" stroke-width="8"/></svg><figcaption>III</figcaption></figure>
+    <figure><svg width="20" height="20" viewBox="0 0 64 64" aria-label="Family four at 16 pixels"><rect class="mk" x="6" y="6" width="52" height="52" stroke-width="8"/><rect class="mk-fill" x="22" y="22" width="20" height="20"/></svg><figcaption>IV</figcaption></figure>
+    <figure><svg width="20" height="20" viewBox="0 0 64 64" aria-label="Family five at 16 pixels"><line class="mk" x1="8" y1="16" x2="48" y2="16" stroke-width="6"/><line class="mk" x1="8" y1="32" x2="58" y2="32" stroke-width="9"/><line class="mk" x1="8" y1="48" x2="42" y2="48" stroke-width="6"/></svg><figcaption>V</figcaption></figure>
+    <figure><svg width="20" height="20" viewBox="0 0 64 64" aria-label="Family six at 16 pixels"><path class="mk" d="M26 10 H10 V54 H26" stroke-width="8"/><path class="mk" d="M38 10 H54 V54 H38" stroke-width="8"/></svg><figcaption>VI</figcaption></figure>
+  </div>
+  <p style="font-size:.88rem;color:var(--muted)">I is a bullet and a rule. III is a no-entry sign.
+  IV is a stop button. V is a menu icon. VI is an empty bracket pair. <b>II is the only one that is
+  not already something else</b> — and it is the only one whose meaning survives the reduction.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Criterion</th><th>I Transit</th><th>II Keep</th><th>III Postmark</th><th>IV Vessel</th><th>V Strata</th><th>VI Aperture</th></tr></thead>
+    <tbody>
+      <tr><td><b>Memorable with no briefing</b></td><td class="n s1">1</td><td class="n s5">5</td><td class="n s5">4</td><td class="n s1">2</td><td class="n s1">1</td><td class="n s3">3</td></tr>
+      <tr><td>Distinct from existing glyphs</td><td class="n s1">2</td><td class="n s5">5</td><td class="n s1">1</td><td class="n s1">1</td><td class="n s1">1</td><td class="n s3">3</td></tr>
+      <tr><td>Silhouette you can redraw</td><td class="n s3">3</td><td class="n s5">5</td><td class="n s5">4</td><td class="n s3">3</td><td class="n s3">2</td><td class="n s5">4</td></tr>
+      <tr><td>Holds at 16px</td><td class="n s5">4</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s5">4</td><td class="n s3">3</td><td class="n s5">4</td></tr>
+      <tr><td>App icon</td><td class="n s3">3</td><td class="n s5">5</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s1">2</td><td class="n s5">4</td></tr>
+      <tr><td>Engraves / embosses</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s5">4</td><td class="n s5">4</td><td class="n s3">3</td><td class="n s5">5</td></tr>
+      <tr><td>Timelessness</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s5">4</td><td class="n s3">3</td><td class="n s5">4</td><td class="n s5">4</td></tr>
+      <tr><td>Behaves, doesn't depict</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s1">1</td><td class="n s3">3</td><td class="n s3">3</td><td class="n s5">4</td></tr>
+      <tr><td>Tension, not completion</td><td class="n s5">5</td><td class="n s3">2</td><td class="n s1">1</td><td class="n s3">2</td><td class="n s3">2</td><td class="n s1">0</td></tr>
+      <tr><td>Fit with Meridian V2</td><td class="n s5">5</td><td class="n s5">5</td><td class="n s3">2</td><td class="n s3">3</td><td class="n s3">2</td><td class="n s5">4</td></tr>
+      <tr><td><b>Total / 50</b></td><td class="n">38</td><td class="n s5"><b>47</b></td><td class="n">27</td><td class="n">28</td><td class="n">23</td><td class="n">35</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <span class="snum">Part VIII · The recommendation</span>
+  <h2>II·a — The Keep, marker centred</h2>
+  <p>Two brackets and a marker. The brackets are a <b>custody</b>: something is inside them, and
+  they are closed on it. It is the brand's one word — <b>Kept</b> — as a drawing.</p>
+  <div class="note warn">
+    <p><b>I changed this recommendation after rendering it, and the change matters.</b> I first
+    proposed the marker <em>off-centre</em>, to smuggle the Transit idea — position, part-way
+    through — into a form that works as a logo.</p>
+    <p>Drawn at real sizes, the offset is <b>invisible</b>. Set beside the centred version it does
+    not read as a position; it reads as a printing error. It was a meaning only I could perceive,
+    which is precisely the failure you called out in the first exploration — philosophy doing work
+    the form is not doing.</p>
+    <p><b>So it is centred.</b> A symmetrical, confident enclosure is the better mark, and the
+    anticipation it gives up is carried by the Transit motif inside the product, where there is
+    room to say it properly.</p>
+  </div>
+
+  <div class="pairbox">
+    <div class="darkbox">
+      <svg width="120" height="120" viewBox="0 0 64 64" role="img" aria-label="The Keep in the instrument register">
+        <path class="mk" d="M22 10 H10 V54 H22"/><path class="mk" d="M42 10 H54 V54 H42"/>
+        <circle class="mk-fill" cx="32" cy="32" r="6"/>
+      </svg>
+    </div>
+    <div class="paperbox">
+      <svg width="120" height="120" viewBox="0 0 64 64" role="img" aria-label="The Keep in the record register">
+        <path class="mk" d="M22 10 H10 V54 H22"/><path class="mk" d="M42 10 H54 V54 H42"/>
+        <circle class="mk-fill" cx="32" cy="32" r="6"/>
+      </svg>
+    </div>
+  </div>
+
+  <h3>Why it beats Transit on your own test</h3>
+  <ul>
+    <li><b>It is a shape, not an arrangement.</b> You can draw it from memory after one look, and
+    what you draw is unmistakably it. A dot beside a line, redrawn from memory, is just a dot
+    beside a line.</li>
+    <li><b>It means something before it is explained.</b> Enclosure reads as protection in every
+    culture that has ever made a container. Transit means nothing until someone tells you the line
+    is a date.</li>
+    <li><b>It is the brand's one word.</b> <code>02</code> settled on <b>Kept</b>. This is that
+    word as a drawing — and the word came first, in a document written long before any mark.</li>
+    <li><b>It is symmetrical, which is why it holds still.</b> <code>07 §II.2</code> requires the
+    institution to never change while the instruments always do. A balanced enclosure is a
+    fundamentally static form; the moving parts live in the product, not the mark.</li>
+    <li><b>Nothing in software looks like it.</b> Brackets-with-contents is typographic territory,
+    not iconographic; it has been left alone because it is not a picture of anything.</li>
+  </ul>
+
+  <div class="note warn">
+    <p><b>The honest weakness.</b> Brackets are close to a <em>text-selection</em> or
+    <em>code</em> idiom, and there is a real chance a developer audience reads them as syntax
+    rather than custody. It is also the least <em>emotional</em> of the finalists — it says
+    <b>safe</b> more loudly than it says <b>waiting</b>, and the off-centre marker is doing a lot
+    of quiet work to fix that.</p>
+    <p>If that trade is wrong, the fallback is not Transit — it is <b>VI·a Aperture with the
+    marker restored inside it</b>, which I would draw next.</p>
+  </div>
+
+  <h3>Sizes</h3>
+  <div class="silrow">
+    <figure><svg width="88" height="88" viewBox="0 0 64 64" aria-label="Keep at 88 pixels"><path class="mk" d="M22 10 H10 V54 H22"/><path class="mk" d="M42 10 H54 V54 H42"/><circle class="mk-fill" cx="32" cy="32" r="6"/></svg><figcaption>88</figcaption></figure>
+    <figure><svg width="48" height="48" viewBox="0 0 64 64" aria-label="Keep at 48 pixels"><path class="mk" d="M22 10 H10 V54 H22" stroke-width="5"/><path class="mk" d="M42 10 H54 V54 H42" stroke-width="5"/><circle class="mk-fill" cx="32" cy="32" r="6.5"/></svg><figcaption>48</figcaption></figure>
+    <figure><svg width="32" height="32" viewBox="0 0 64 64" aria-label="Keep at 32 pixels"><path class="mk" d="M22 11 H11 V53 H22" stroke-width="6"/><path class="mk" d="M42 11 H53 V53 H42" stroke-width="6"/><circle class="mk-fill" cx="32" cy="32" r="7"/></svg><figcaption>32</figcaption></figure>
+    <figure><svg width="24" height="24" viewBox="0 0 64 64" aria-label="Keep at 24 pixels"><path class="mk" d="M22 12 H12 V52 H22" stroke-width="7"/><path class="mk" d="M42 12 H52 V52 H42" stroke-width="7"/><circle class="mk-fill" cx="32" cy="32" r="7"/></svg><figcaption>24</figcaption></figure>
+    <figure><svg width="16" height="16" viewBox="0 0 64 64" aria-label="Keep at 16 pixels"><path class="mk" d="M23 13 H13 V51 H23" stroke-width="9"/><path class="mk" d="M41 13 H51 V51 H41" stroke-width="9"/><circle class="mk-fill" cx="32" cy="32" r="8"/></svg><figcaption>16</figcaption></figure>
+  </div>
+  <p style="font-size:.86rem;color:var(--muted)">The only change across the ladder is stroke
+  weight: the brackets thicken as the mark shrinks so the counter between bracket and marker stays
+  open. Nothing is dropped, because there is nothing to drop — which is what a mark of three
+  elements buys you.</p>
+
+  <h3>App icon</h3>
+  <div class="icons">
+    <div class="icon"><div class="tile" style="width:110px;height:110px;background:#0b0e14;border:1px solid var(--rule)">
+      <svg width="66" height="66" viewBox="0 0 64 64" aria-label="App icon, large"><path d="M22 12 H12 V52 H22" stroke="#e6e8ec" stroke-width="4.5" fill="none"/><path d="M42 12 H52 V52 H42" stroke="#e6e8ec" stroke-width="4.5" fill="none"/><circle cx="32" cy="32" r="6" fill="#e6e8ec"/></svg>
+    </div><span class="cap">180</span></div>
+    <div class="icon"><div class="tile" style="width:64px;height:64px;background:#0b0e14;border:1px solid var(--rule)">
+      <svg width="40" height="40" viewBox="0 0 64 64" aria-label="App icon, medium"><path d="M22 12 H12 V52 H22" stroke="#e6e8ec" stroke-width="6" fill="none"/><path d="M42 12 H52 V52 H42" stroke="#e6e8ec" stroke-width="6" fill="none"/><circle cx="32" cy="32" r="7" fill="#e6e8ec"/></svg>
+    </div><span class="cap">64</span></div>
+    <div class="icon"><div class="tile" style="width:32px;height:32px;background:#0b0e14;border-radius:7px">
+      <svg width="20" height="20" viewBox="0 0 64 64" aria-label="Favicon"><path d="M23 13 H13 V51 H23" stroke="#e6e8ec" stroke-width="9" fill="none"/><path d="M41 13 H51 V51 H41" stroke="#e6e8ec" stroke-width="9" fill="none"/><circle cx="32" cy="32" r="8" fill="#e6e8ec"/></svg>
+    </div><span class="cap">32</span></div>
+    <div class="icon"><div class="tile" style="width:110px;height:110px;background:#e9eae6;border-radius:22%;display:grid;place-items:center">
+      <svg width="66" height="66" viewBox="0 0 64 64" aria-label="App icon, paper"><path d="M22 12 H12 V52 H22" stroke="#16181a" stroke-width="4.5" fill="none"/><path d="M42 12 H52 V52 H42" stroke="#16181a" stroke-width="4.5" fill="none"/><circle cx="32" cy="32" r="6" fill="#16181a"/></svg>
+    </div><span class="cap">inverted</span></div>
+  </div>
+
+  <h3 style="margin-top:26px">Lockups</h3>
+  <div class="lock">
+    <div class="lockrow">
+      <svg width="30" height="30" viewBox="0 0 64 64" aria-hidden="true"><path class="mk" d="M22 11 H11 V53 H22" stroke-width="5"/><path class="mk" d="M42 11 H53 V53 H42" stroke-width="5"/><circle class="mk-fill" cx="32" cy="32" r="6.5"/></svg>
+      <span class="wm">Timely<span class="thin">Capsule</span></span>
+    </div>
+    <div class="lockrow">
+      <div style="display:flex;flex-direction:column;gap:9px;align-items:flex-start">
+        <svg width="28" height="28" viewBox="0 0 64 64" aria-hidden="true"><path class="mk" d="M22 11 H11 V53 H22" stroke-width="5"/><path class="mk" d="M42 11 H53 V53 H42" stroke-width="5"/><circle class="mk-fill" cx="32" cy="32" r="6.5"/></svg>
+        <span class="wm" style="font-size:1.2rem">Timely<span class="thin">Capsule</span></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Part IX · What happens to Transit</span>
+  <h2>Demoted, and better for it</h2>
+  <div class="note good">
+    <p><b>Transit stays — as the product's geometry, not as the logo.</b> It is already the waiting
+    screen, the countdown axis and the Gate 1 reveal: a marker approaching a meridian. That is a
+    <em>motif</em>, and motifs are supposed to live inside a product and repeat.</p>
+    <p>Asking it to also be the identity was the mistake. A motif can be quiet and abstract because
+    it accumulates meaning over hundreds of exposures inside the app. A logo gets two seconds on a
+    home screen next to forty competitors and has to work cold.</p>
+    <p>So: <b>The Keep is the mark. The Transit is the motif.</b> They share a language — an
+    enclosure and a marker within it — so the app icon and the waiting screen are visibly the same
+    family without being the same drawing.</p>
+  </div>
+</section>
+
+<section>
+  <span class="snum">Part X · Still open</span>
+  <h2>What I have not settled</h2>
+  <ul>
+    <li><b>The wordmark still commits you to the name.</b> Unchanged from the first exploration and
+    unchanged by this one — <code>09 §XIV.1</code> remains open. The Keep is rename-proof; the
+    lockup is not.</li>
+    <li><b>The bracket-as-syntax risk is untested.</b> Worth showing II·b to five people who have
+    never heard of the product and asking only &ldquo;what is this?&rdquo; If two say
+    &ldquo;code&rdquo;, the offset marker needs to grow or the brackets need to lose their square
+    corners.</li>
+    <li><b>Bracket weight for physical emboss</b> — same open question as before; my instinct is
+    ~15% heavier than screen.</li>
+    <li><b>I have not drawn a monogram.</b> A seventh family — letterform-derived — is the one
+    territory still unexplored, and it is the most common solution for institutions. I left it out
+    because it hard-codes the name, and the name is unresolved. If the name settles, it should be
+    drawn before final sign-off.</li>
+  </ul>
+</section>
+
+<footer>Meridian V2 · logo exploration II. Six families, four rejected, one demoted to motif.
+Supersedes the recommendation in <code>15-logo-exploration.html</code>.</footer>
+</main>

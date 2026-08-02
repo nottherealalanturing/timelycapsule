@@ -62,7 +62,7 @@ export function SealMap({
           <Circle center={position} radius={radius} />
         </MapContainer>
       </div>
-      <label className="flex flex-col gap-1 text-xs text-secondary">
+      <label className="flex flex-col gap-1 text-[length:var(--text-caption)] text-secondary">
         Radius: {radius >= 1000 ? `${(radius / 1000).toFixed(1)} km` : `${radius} m`}
         <input
           type="range"

@@ -206,6 +206,52 @@ describe('recipients module (T-09)', () => {
     expect(missing.status).toBe(404);
   });
 
+  describe('sender velocity limit (T-22 hardening)', () => {
+    it('blocks a new account after 5 outbound recipients in a day, across capsules', async () => {
+      const { app, accessToken } = await createUser();
+      const capsuleA = await createDraftCapsule(app, accessToken);
+      const capsuleB = await createDraftCapsule(app, accessToken);
+
+      // 3 on capsule A (the free-plan per-capsule cap) + 2 on capsule B = 5.
+      for (let i = 0; i < 3; i++) {
+        const res = await authed(app, accessToken).post(`/v1/capsules/${capsuleA}/recipients`).send({ email: uniqueEmail() });
+        expect(res.status).toBe(201);
+      }
+      for (let i = 0; i < 2; i++) {
+        const res = await authed(app, accessToken).post(`/v1/capsules/${capsuleB}/recipients`).send({ email: uniqueEmail() });
+        expect(res.status).toBe(201);
+      }
+
+      const capsuleC = await createDraftCapsule(app, accessToken);
+      const sixth = await authed(app, accessToken).post(`/v1/capsules/${capsuleC}/recipients`).send({ email: uniqueEmail() });
+      expect(sixth.status).toBe(429);
+      expect(sixth.body.error.code).toBe('velocity_limit_exceeded');
+    });
+
+    it('does not restrict an account older than 7 days', async () => {
+      const { app, accessToken, userId } = await createUser();
+      await db
+        .update(users)
+        .set({ createdAt: new Date(Date.now() - 8 * 24 * 3_600_000) })
+        .where(eq(users.id, userId));
+
+      const capsuleA = await createDraftCapsule(app, accessToken);
+      const capsuleB = await createDraftCapsule(app, accessToken);
+      for (let i = 0; i < 3; i++) {
+        const res = await authed(app, accessToken).post(`/v1/capsules/${capsuleA}/recipients`).send({ email: uniqueEmail() });
+        expect(res.status).toBe(201);
+      }
+      for (let i = 0; i < 2; i++) {
+        const res = await authed(app, accessToken).post(`/v1/capsules/${capsuleB}/recipients`).send({ email: uniqueEmail() });
+        expect(res.status).toBe(201);
+      }
+
+      const capsuleC = await createDraftCapsule(app, accessToken);
+      const sixth = await authed(app, accessToken).post(`/v1/capsules/${capsuleC}/recipients`).send({ email: uniqueEmail() });
+      expect(sixth.status).toBe(201);
+    });
+  });
+
   describe('block suppression (DoD)', () => {
     it('masks success when the recipient has blocked the sender, but marks the row blocked_suppressed', async () => {
       const sender = await createUser();

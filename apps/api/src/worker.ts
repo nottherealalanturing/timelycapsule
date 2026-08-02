@@ -8,11 +8,21 @@ import { getQueue, QUEUE_NAMES, HANDLERS, runAction, type ActionJob } from './mo
 async function main(): Promise<void> {
   const queue = await getQueue();
 
+  /*
+   * T-22 load test: `.work()`'s own defaults are `batchSize: 1,
+   * localConcurrency: 1` — one job fetched, processed, and completed before
+   * the next fetch even starts. At that rate a mass-unlock event (T-22's DoD:
+   * "10k unlocks in 1 min... assert drain <10 min") does not drain in
+   * anything close to 10 minutes; it was measured, live, trickling through
+   * at roughly one job every few seconds. Each handler here is a handful of
+   * cheap, independent-per-job DB statements (no shared mutable state, no
+   * per-recipient ordering requirement), so processing many concurrently is
+   * safe — `FOR UPDATE SKIP LOCKED` in the promoter already establishes that
+   * concurrent workers are a supported case.
+   */
   for (const name of QUEUE_NAMES) {
-    await queue.work<ActionJob>(name, async (jobs) => {
-      for (const job of jobs) {
-        await runAction(db, systemClock, job.data, HANDLERS[name]);
-      }
+    await queue.work<ActionJob>(name, { batchSize: 20, localConcurrency: 10 }, async (jobs) => {
+      await Promise.all(jobs.map((job) => runAction(db, systemClock, job.data, HANDLERS[name])));
     });
   }
 

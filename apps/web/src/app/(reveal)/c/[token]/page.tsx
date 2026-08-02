@@ -1,12 +1,13 @@
 'use client';
 
 import { decodeCapsuleKeyFromLink, decryptBytes, fromBase64Url } from '@tc/crypto';
-import { Button } from '@tc/ui-web';
+import { Button, Hallmark, MeridianApproach, formatDuration } from '@tc/ui-web';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { RevealResponse } from '@tc/contracts';
 import { ApiClientError, revealApi } from '../../../../lib/api-client';
-import { CountdownDisplay } from '../../../../components/CountdownDisplay';
+import { useCorrectedNow } from '../../../../lib/use-corrected-now';
+import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
 import { SealStampsRow } from '../../../../components/reveal/SealStampsRow';
 import { PlaceGate } from '../../../../components/reveal/PlaceGate';
 import { PassphraseGate } from '../../../../components/reveal/PassphraseGate';
@@ -15,16 +16,168 @@ import { RevealCeremony } from '../../../../components/reveal/RevealCeremony';
 
 type PageState = 'loading' | 'locked' | 'unlocked' | 'withdrawn' | 'expired' | '404' | 'rate-limited';
 
+/**
+ * Terminal states on the recipient path.
+ *
+ * Rewritten to voice. V1 spoke in whimsy — *"Lost in time."*, *"Hold tight,
+ * time traveler"* — which `07 §VIII` rules out directly: the register is
+ * "closer to a shipping manifest or a land registry than to a greetings card",
+ * and `07 §VIII.2` forbids apologising for the wait or dramatising its end.
+ * These now state what happened, in the past tense (`09 §XVI`), and stop.
+ */
 function SystemPage({ headline, body, cta }: { headline: string; body: string; cta?: { label: string; href: string } }) {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="font-[var(--font-display)] text-2xl text-foreground">{headline}</h1>
-      <p className="max-w-md text-secondary">{body}</p>
+      <h1 className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">{headline}</h1>
+      <p className="max-w-md text-[length:var(--text-body-s)] text-secondary">{body}</p>
       {cta ? (
         <a href={cta.href}>
           <Button variant="secondary">{cta.label}</Button>
         </a>
       ) : null}
+    </main>
+  );
+}
+
+/**
+ * **The waiting screen.** `03 §V.3` makes this the primary screen of the
+ * product — "it gets the most craft in the product — more than the composer,
+ * more than the reveal. If the waiting state looks like a placeholder, we've
+ * said the wait is dead air."
+ *
+ * Four things carry it, and none of them is decoration:
+ *
+ * 1. **The Meridian** (`07 §III`, device 5) is the axis. The capsule sits at
+ *    its distance from the line it will cross, warming as it closes — position
+ *    and temperature, the two things `03 §V.5` names as having to be *visibly
+ *    different* if you come back in six months.
+ * 2. **The literal date leads** (`07 §VIII.1`, §VIII.4). V1's headline was
+ *    "Sealed until the right moment", which is precisely the greetings-card
+ *    register the voice rules exclude, and it withheld the one fact a person
+ *    waiting actually wants.
+ * 3. **The figure is stated in the Dual Clock's idiom** — mono, tabular,
+ *    hallmarked — so the numeral reads as an instrument reading rather than a
+ *    countdown timer.
+ * 4. **Silence.** `07 §II.5` treats it as a design material. There is no
+ *    reassurance copy, no progress language, nothing that fills the wait with
+ *    talk about the wait.
+ *
+ * **Known contract gap, deliberately not papered over:** `03 §V.1` wants
+ * elapsed shown as prominently as remaining, and the full `DualClock` is used
+ * everywhere the owner sees a capsule. `RevealLockedResponseSchema` carries no
+ * `sealedAt`, so the recipient's screen cannot state how long this has already
+ * been kept for them — the single most meaningful figure on this page. Faking
+ * it (elapsed = 0) would render exactly the demoralising day-one case
+ * `07 §XV.5` exists to prevent, so the figure is remaining-only here and the
+ * contract gap is reported rather than hidden.
+ */
+function LockedWait({
+  token,
+  data,
+  onPlaceGate,
+  onIdentityGate,
+}: {
+  token: string;
+  data: Extract<RevealResponse, { status: 'locked' }>;
+  onPlaceGate: (gateToken: string) => void;
+  onIdentityGate: (gateToken: string) => void;
+}) {
+  const [remindEnabled, setRemindEnabled] = useState(false);
+  const [remindBusy, setRemindBusy] = useState(false);
+
+  const unlockDate = data.unlockAt ? new Date(data.unlockAt) : null;
+  const nowMs = useCorrectedNow(unlockDate);
+  const remainingMs = unlockDate && nowMs !== null ? Math.max(0, unlockDate.getTime() - nowMs) : null;
+
+  const placeSeal = data.seals.find((s) => s.type === 'place' && !s.satisfied);
+  const identitySeal = data.seals.find((s) => s.type === 'identity' && !s.satisfied);
+
+  return (
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-10 px-6 py-16">
+      <header className="flex items-start justify-between gap-4">
+        <Hallmark>{data.publicId}</Hallmark>
+        <Hallmark>Sealed</Hallmark>
+      </header>
+
+      <div className="flex flex-col gap-3">
+        <p className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">
+          {data.senderName} sealed this for you.
+        </p>
+        {data.teaser ? (
+          <p className="text-[length:var(--text-body)] text-secondary">{data.teaser}</p>
+        ) : null}
+      </div>
+
+      {remainingMs !== null && unlockDate ? (
+        <section className="flex flex-col gap-5" aria-label="The wait">
+          <MeridianApproach remainingMs={remainingMs} />
+
+          <div className="flex flex-col gap-1">
+            {/* The ramp never carries text (05 §Two rules) — the date does. */}
+            <p className="text-[length:var(--text-body)] text-foreground">
+              Sealed until {formatAbsoluteDate(unlockDate.toISOString())}
+            </p>
+            <p className="text-[length:var(--text-body-s)] text-secondary">{horizonPhrase(remainingMs)}</p>
+          </div>
+
+          <div className="flex flex-col gap-0.5 border-t border-[var(--color-rule)] pt-4">
+            <Hallmark>Remaining</Hallmark>
+            <span className="whitespace-nowrap font-[family-name:var(--font-mono)] text-[length:var(--text-display-s)] leading-none tabular-nums text-foreground">
+              {formatDuration(remainingMs)}
+            </span>
+          </div>
+        </section>
+      ) : data.unlockLocal ? (
+        <section className="flex flex-col gap-1" aria-label="The wait">
+          <p className="text-[length:var(--text-body)] text-foreground">
+            Sealed until {formatAbsoluteDate(`${data.unlockLocal.date}T${data.unlockLocal.time}:00`)}
+          </p>
+          <p className="text-[length:var(--text-body-s)] text-secondary">Opens in your own timezone.</p>
+        </section>
+      ) : null}
+
+      <SealStampsRow seals={data.seals} passphraseUnlocked={false} />
+
+      {placeSeal && placeSeal.type === 'place' ? (
+        <PlaceGate token={token} name={placeSeal.name} radiusM={placeSeal.radiusM} onSatisfied={onPlaceGate} />
+      ) : identitySeal ? (
+        <IdentityGate token={token} onSatisfied={onIdentityGate} />
+      ) : null}
+
+      {/*
+        Recipient-requested, not re-engagement. `07 §XVI` bans anniversary
+        nudges and re-engagement notification; this is the sanctioned
+        "Approach" notification, asked for by the person waiting. Preserved
+        exactly — only the copy is brought into voice (no tick-mark flourish,
+        no exclamation).
+      */}
+      <div className="flex flex-wrap items-center gap-4 border-t border-[var(--color-rule)] pt-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          loading={remindBusy}
+          onClick={async () => {
+            setRemindBusy(true);
+            try {
+              await revealApi.remind(token, !remindEnabled);
+              setRemindEnabled((v) => !v);
+            } finally {
+              setRemindBusy(false);
+            }
+          }}
+        >
+          {remindEnabled ? 'You will be told when it opens' : 'Tell me when it opens'}
+        </Button>
+        {data.unlockAt ? (
+          <a
+            href={icsDataUrl(data.unlockAt, data.senderName)}
+            download="timelycapsule.ics"
+            className="text-[length:var(--text-body-s)] text-[var(--color-interactive)] underline underline-offset-4"
+          >
+            Add to calendar
+          </a>
+        ) : null}
+      </div>
     </main>
   );
 }
@@ -72,8 +225,12 @@ export default function RevealPage() {
   const [identityGate, setIdentityGate] = useState<string | null>(null);
   const [capsuleKey, setCapsuleKey] = useState<Uint8Array | null>(null);
   const [decryptedDoc, setDecryptedDoc] = useState<unknown>(undefined);
-  const [remindEnabled, setRemindEnabled] = useState(false);
-  const [remindBusy, setRemindBusy] = useState(false);
+  // Decryption can genuinely fail — a truncated or edited link carries a wrong
+  // key, and ciphertext can be corrupt. Without this the rejection was silent
+  // and `decryptedDoc` stayed `undefined`, parking the recipient on
+  // "Decrypting this capsule." forever: a loading state that never resolves,
+  // which `07 §VI.3` forbids outright.
+  const [decryptFailed, setDecryptFailed] = useState(false);
 
   async function load() {
     try {
@@ -117,7 +274,9 @@ export default function RevealPage() {
     if (state !== 'unlocked' || data?.status !== 'unlocked' || !data.contentDocEnc) return;
     if (data.requireIdentityVerification && !data.identityVerified) return;
     if (capsuleKey) {
-      void decryptContentDoc(data.contentDocEnc, capsuleKey).then(setDecryptedDoc);
+      void decryptContentDoc(data.contentDocEnc, capsuleKey)
+        .then(setDecryptedDoc)
+        .catch(() => setDecryptFailed(true));
       return;
     }
     if (data.passphraseSeal) return; // waiting on PassphraseGate to unwrap
@@ -125,16 +284,20 @@ export default function RevealPage() {
     if (!fragmentKey) return;
     const timer = setTimeout(() => {
       setCapsuleKey(fragmentKey);
-      void decryptContentDoc(data.contentDocEnc!, fragmentKey).then(setDecryptedDoc);
+      void decryptContentDoc(data.contentDocEnc!, fragmentKey)
+        .then(setDecryptedDoc)
+        .catch(() => setDecryptFailed(true));
     }, 0);
     return () => clearTimeout(timer);
   }, [state, data, capsuleKey]);
 
   if (state === 'loading') {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-2 px-6 text-center">
-        <p className="text-lg text-foreground">Retrieving your capsule from the timestream…</p>
-        <p className="text-sm text-secondary">Hold tight, time traveler — good moments are worth the wait.</p>
+      // `07 §II.8` — never simulate what we can state, and `07 §XVI` bans
+      // spinners and skeleton shimmer outright. A held line is the honest
+      // form: it says what is happening once, and then is quiet.
+      <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <p className="text-[length:var(--text-body-s)] text-secondary">Retrieving this capsule.</p>
       </main>
     );
   }
@@ -142,9 +305,9 @@ export default function RevealPage() {
   if (state === '404') {
     return (
       <SystemPage
-        headline="Lost in time."
-        body="This capsule doesn't exist in this timeline. The link may be mistyped — or the page has drifted somewhere we can't follow."
-        cta={{ label: 'Return to the present', href: '/' }}
+        headline="No capsule at this link."
+        body="The link may be incomplete or mistyped. Ask the sender for the full one."
+        cta={{ label: 'Go to TimelyCapsule', href: '/' }}
       />
     );
   }
@@ -152,9 +315,9 @@ export default function RevealPage() {
   if (state === 'withdrawn') {
     return (
       <SystemPage
-        headline="Lost in time."
-        body="The sender called this capsule back before it could open. Its contents remain unwritten history."
-        cta={{ label: 'Return to the present', href: '/' }}
+        headline="This capsule was withdrawn."
+        body="The sender withdrew it before it opened. Its contents were never shown."
+        cta={{ label: 'Go to TimelyCapsule', href: '/' }}
       />
     );
   }
@@ -162,59 +325,25 @@ export default function RevealPage() {
   if (state === 'expired') {
     return (
       <SystemPage
-        headline="This capsule has completed its journey."
-        body="Its moment came and went — what was inside belongs to the past now."
-        cta={{ label: 'Back to the present', href: '/' }}
+        headline="This capsule has expired."
+        body="It opened, and its contents were removed on the schedule the sender set."
+        cta={{ label: 'Go to TimelyCapsule', href: '/' }}
       />
     );
   }
 
   if (state === 'rate-limited') {
-    return <SystemPage headline="Even time travel needs a breather." body="Try again in a moment." />;
+    return <SystemPage headline="Too many attempts." body="Wait a moment, then try again." />;
   }
 
   if (state === 'locked' && data?.status === 'locked') {
-    const placeSeal = data.seals.find((s) => s.type === 'place' && !s.satisfied);
-    const identitySeal = data.seals.find((s) => s.type === 'identity' && !s.satisfied);
-
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
-        <p className="text-sm text-secondary">From {data.senderName}</p>
-        <h1 className="font-[var(--font-display)] text-3xl text-foreground">Sealed until the right moment</h1>
-        {data.teaser ? <p className="max-w-md text-secondary">{data.teaser}</p> : null}
-        {data.unlockAt ? <CountdownDisplay target={new Date(data.unlockAt)} className="text-4xl font-medium text-foreground" /> : null}
-        <SealStampsRow seals={data.seals} passphraseUnlocked={false} />
-
-        {placeSeal && placeSeal.type === 'place' ? (
-          <PlaceGate token={token} name={placeSeal.name} radiusM={placeSeal.radiusM} onSatisfied={(gateToken) => setPlaceGate(gateToken)} />
-        ) : identitySeal ? (
-          <IdentityGate token={token} onSatisfied={(gateToken) => setIdentityGate(gateToken)} />
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button
-            variant="ghost"
-            size="sm"
-            loading={remindBusy}
-            onClick={async () => {
-              setRemindBusy(true);
-              try {
-                await revealApi.remind(token, !remindEnabled);
-                setRemindEnabled((v) => !v);
-              } finally {
-                setRemindBusy(false);
-              }
-            }}
-          >
-            {remindEnabled ? 'Notifying you when it opens ✓' : 'Notify me when it opens'}
-          </Button>
-          {data.unlockAt ? (
-            <a href={icsDataUrl(data.unlockAt, data.senderName)} download="timelycapsule.ics" className="text-sm text-[var(--color-accent-gold)] underline">
-              Add to calendar
-            </a>
-          ) : null}
-        </div>
-      </main>
+      <LockedWait
+        token={token}
+        data={data}
+        onPlaceGate={(gateToken) => setPlaceGate(gateToken)}
+        onIdentityGate={(gateToken) => setIdentityGate(gateToken)}
+      />
     );
   }
 
@@ -239,18 +368,36 @@ export default function RevealPage() {
       );
     }
 
+    /*
+     * The likeliest failure on the whole recipient path: a link forwarded,
+     * copied out of a preview pane, or pasted by a mail client that dropped
+     * the `#k=` fragment. It was the only terminal state rendered as a bare
+     * sentence rather than through `SystemPage` — no headline, no way onward —
+     * despite being the one a real person is most likely to hit.
+     */
     if (!capsuleKey && !data.passphraseSeal) {
       return (
-        <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
-          <p className="text-secondary">This link is missing its key. Ask the sender for a fresh one.</p>
-        </main>
+        <SystemPage
+          headline="This link is missing its key."
+          body="The part after the # carries the key that opens this capsule, and some apps drop it when a link is forwarded. Ask the sender for the original link."
+        />
+      );
+    }
+
+    // A key was supplied and it did not open this capsule.
+    if (decryptFailed) {
+      return (
+        <SystemPage
+          headline="This link did not open the capsule."
+          body="The key it carries does not match. It may have been shortened or edited in transit. Ask the sender for the original link."
+        />
       );
     }
 
     if (decryptedDoc === undefined) {
       return (
-        <main className="flex min-h-screen flex-col items-center justify-center gap-2 px-6 text-center">
-          <p className="text-lg text-foreground">Retrieving your capsule from the timestream…</p>
+        <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+          <p className="text-[length:var(--text-body-s)] text-secondary">Decrypting this capsule.</p>
         </main>
       );
     }
@@ -258,6 +405,7 @@ export default function RevealPage() {
     return (
       <RevealCeremony
         token={token}
+        publicId={data.publicId}
         senderName={data.senderName}
         contentDoc={decryptedDoc}
         media={data.media}

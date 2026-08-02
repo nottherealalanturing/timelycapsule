@@ -12,46 +12,209 @@
 @source "../../../../packages/ui-web/src";
 
 /*
- * Tailwind v4 theme mapping onto Meridian tokens (packages/ui-web/src/tokens.css).
- * Semantic Tailwind utilities (bg-accent, text-secondary, rounded-card, ...)
- * read from these — never hardcode a hex value in a component.
+ * ── THEMED tokens: @theme, NOT @theme inline ───────────────────────────
+ *
+ * `inline` substitutes a token's value at BUILD time, so the utility is
+ * frozen to whatever `:root` held. That silently breaks every themed
+ * utility: `text-foreground` compiled to the dark ink and kept it in the
+ * light theme, and `--color-foreground` did not exist at runtime at all.
+ * The bug predates Meridian V2 — it has been in place since T-06 — and was
+ * invisible because V1's `:root` was the light theme, so only dark mode was
+ * wrong, and only for text.
+ *
+ * Plain `@theme` emits a real custom property holding a live `var()`
+ * reference, which re-resolves under `[data-theme]` and inside `.tc-record`.
+ *
+ * Keys here must NOT collide with a token name in tokens.css: `--x: var(--x)`
+ * is a cycle without `inline`. Where a collision exists, the token is
+ * consumed directly as `var(--color-danger)`, which is live anyway — that is
+ * why only the aliases actually used as utilities are declared.
  */
-@theme inline {
+@theme {
   --color-background: var(--color-bg-primary);
   --color-raised: var(--color-bg-raised);
   --color-foreground: var(--color-text-primary);
   --color-secondary: var(--color-text-secondary);
   --color-accent: var(--color-accent-gold);
-  --color-accent-violet: var(--color-accent-violet);
-  --color-success: var(--color-success);
-  --color-warning: var(--color-warning);
-  --color-danger: var(--color-danger);
-  --color-info: var(--color-info);
+  --color-overlay: var(--color-bg-overlay);
 
-  --color-state-draft: var(--color-state-draft);
-  --color-state-sealed: var(--color-state-sealed);
-  --color-state-unlocked: var(--color-state-unlocked);
-  --color-state-opened: var(--color-state-opened);
-  --color-state-legacy: var(--color-state-legacy);
-  --color-state-withdrawn: var(--color-state-withdrawn);
+  /* Elevation is themed too — the instrument barely lifts, the record always
+     casts. Sourced from --elev-* so these names do not cycle. */
+  --shadow-sm: var(--elev-sm);
+  --shadow-md: var(--elev-md);
+  --shadow-lg: var(--elev-lg);
+  --shadow-record: var(--elev-record);
+}
 
-  /* Self-hosted via next/font in layout.tsx — overrides tokens.css's plain
-     family-name strings, which only apply when a font is loaded via <link>. */
-  --font-sans: var(--font-inter), var(--font-ui), sans-serif;
-  --font-display: var(--font-fraunces), serif;
+/*
+ * ── NON-THEMED tokens: safe to inline ──────────────────────────────────
+ * Type, radius and motion are identical in both themes and both registers,
+ * so build-time substitution costs nothing here.
+ */
+@theme inline {
+  /* Pairing C. Loaded and self-hosted by next/font in layout.tsx; tokens.css
+     already resolves the generated family names, so these just expose them
+     as Tailwind utilities.
+       font-instrument → chrome, dense data      (IBM Plex Sans)
+       font-record     → letters, reveals, print (Source Serif 4)
+       font-mono       → hallmarks, durations    (IBM Plex Mono)
+     `--font-sans` stays mapped to the instrument face because Tailwind's
+     default `font-sans` is what unstyled text inherits. */
+  --font-sans: var(--font-instrument);
+  --font-instrument: var(--font-instrument);
+  --font-record: var(--font-record);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-record); /* @deprecated → font-record */
 
   --radius-input: var(--radius-input);
   --radius-card: var(--radius-card);
   --radius-modal: var(--radius-modal);
   --radius-pill: var(--radius-pill);
+  --radius-record: var(--radius-record);
 
-  --shadow-sm: var(--shadow-sm);
-  --shadow-md: var(--shadow-md);
-  --shadow-lg: var(--shadow-lg);
+  /* Motion — three tiers decided by consequence (design/07 §VI).
+     duration-instant / duration-considered / ease-instant / ... */
+  --ease-instant: var(--ease-instant);
+  --ease-considered: var(--ease-considered);
+  --ease-approach: var(--ease-approach);
+  --ease-record: var(--ease-record);
+
+  /* Type scale — utilities text-hallmark … text-clock. */
+  --text-hallmark: var(--text-hallmark);
+  --text-caption: var(--text-caption);
+  --text-body-s: var(--text-body-s);
+  --text-body: var(--text-body);
+  --text-body-l: var(--text-body-l);
+  --text-title-s: var(--text-title-s);
+  --text-title: var(--text-title);
+  --text-display-s: var(--text-display-s);
+  --text-display: var(--text-display);
+  --text-clock: var(--text-clock);
+
+  --leading-tight: var(--lh-tight);
+  --leading-heading: var(--lh-heading);
+  --leading-body: var(--lh-body);
+  --leading-record: var(--lh-record);
+
+  --tracking-hallmark: var(--tracking-hallmark);
+  --tracking-tight: var(--tracking-tight);
 }
 
 body {
   background: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
+}
+
+/*
+ * ── MOTION UTILITIES ───────────────────────────────────────────────────
+ * design/07 §VI. Three tiers, decided by consequence, never by aesthetics:
+ * if you can undo it, it is instant; if you cannot, it is held.
+ *
+ * Components should reach for one of these three rather than composing
+ * `transition duration-X ease-Y` by hand — that is how a fourth, unowned
+ * tempo gets invented.
+ */
+@layer components {
+  /* Reversible. Navigation, settings, typing, toggles, hover. */
+  .motion-instant {
+    transition-property: color, background-color, border-color, opacity, box-shadow;
+    transition-duration: var(--motion-instant);
+    transition-timing-function: var(--ease-instant);
+  }
+
+  /* Changes what you are looking at. Entering the composer, opening a capsule. */
+  .motion-considered {
+    transition-property: opacity, transform, clip-path;
+    transition-duration: var(--motion-considered);
+    transition-timing-function: var(--ease-considered);
+  }
+
+  /* The approach half of a held beat. CONSTANT VELOCITY — never eases out,
+     because easing out anticipates arrival and the whole point is that
+     arrival is not yet. The stop and the state change are orchestrated in
+     JS, not here; a pure CSS transition cannot express a dead stop. */
+  .motion-approach {
+    transition-property: transform, opacity;
+    transition-duration: var(--motion-approach);
+    transition-timing-function: var(--ease-approach);
+  }
+
+  /* A record arriving into an emptied frame (design/06 §Final timeline). */
+  .motion-record-arrive {
+    transition-property: clip-path, transform, opacity;
+    transition-duration: var(--motion-record-arrive);
+    transition-timing-function: var(--ease-record);
+  }
+}
+
+/*
+ * The banned-motion backstop. `07 §XVI` forbids spinners, progress bars and
+ * skeleton pulse outright, and `07 §VI.1` bans spring/overshoot. The lint
+ * rule in packages/eslint-config catches these at author time; this catches
+ * anything that arrives through a dependency's own stylesheet.
+ */
+@media screen {
+  .animate-spin,
+  .animate-ping,
+  .animate-bounce {
+    animation: none !important;
+  }
+}
+
+/*
+ * Reduced motion. Movement collapses; the HELD BEATS DO NOT — they are
+ * timing rather than motion, and they carry the meaning (design/07 §VI.3).
+ * The token layer already zeroes the durations; this stops any hand-rolled
+ * transition or keyframe from surviving the preference.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/*
+ * The Orbit Scrub's range input (T-21, design/07 §X.2). An instrument
+ * control: hairline track (a graduation rule, 04 §7), square 3px-radius
+ * thumb in the interactive steel — brass is reserved for waiting itself
+ * (design/05 "Two rules"), and the thumb is a control, not a capsule.
+ */
+.tc-scrub {
+  appearance: none;
+  height: 20px;
+  background: transparent;
+}
+.tc-scrub::-webkit-slider-runnable-track {
+  height: 1px;
+  background: var(--color-rule-strong);
+}
+.tc-scrub::-webkit-slider-thumb {
+  appearance: none;
+  margin-top: -5px;
+  height: 11px;
+  width: 11px;
+  border-radius: 3px;
+  background: var(--color-interactive);
+  border: none;
+}
+.tc-scrub::-moz-range-track {
+  height: 1px;
+  background: var(--color-rule-strong);
+}
+.tc-scrub::-moz-range-thumb {
+  height: 11px;
+  width: 11px;
+  border-radius: 3px;
+  background: var(--color-interactive);
+  border: none;
+}
+.tc-scrub:focus-visible {
+  outline: 1px solid var(--color-interactive);
+  outline-offset: 4px;
 }

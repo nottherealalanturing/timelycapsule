@@ -7,10 +7,11 @@ import {
   wrapMasterKeyWithPassword,
   wrapMasterKeyWithRecoveryCode,
 } from '@tc/crypto';
-import { Button, Dialog, Input } from '@tc/ui-web';
+import { Button, Checkbox, Dialog, Input } from '@tc/ui-web';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { authApi } from '../lib/api-client';
 import { useAuth } from '../lib/auth-context';
+import { RecoveryKit } from './RecoveryKit';
 import { useMasterKey } from '../lib/master-key-context';
 
 /**
@@ -49,26 +50,17 @@ export function MasterKeyGate({ children }: { children: ReactNode }) {
     return (
       <Dialog open onOpenChange={() => {}} title="Save your recovery code">
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-secondary">
+          <p className="text-[length:var(--text-body-s)] text-secondary">
             Your capsules are end-to-end encrypted — we never see their contents, which means we can&apos;t recover
             your account if you lose both your password and this code. Save it somewhere safe. This is the only
             time it will be shown.
           </p>
-          <div className="rounded-lg border border-[var(--color-text-secondary)]/20 bg-[var(--color-surface-raised)] p-4 text-center font-mono text-lg tracking-wider text-foreground">
-            {kit}
-          </div>
-          <Button type="button" variant="ghost" onClick={() => navigator.clipboard.writeText(kit)}>
-            Copy to clipboard
-          </Button>
-          <label className="flex items-start gap-2 text-sm text-secondary">
-            <input
-              type="checkbox"
-              checked={savedConfirmed}
-              onChange={(e) => setSavedConfirmed(e.target.checked)}
-              className="mt-0.5"
-            />
-            I&apos;ve saved this recovery code somewhere safe.
-          </label>
+          <RecoveryKit code={kit} />
+          <Checkbox
+            checked={savedConfirmed}
+            onChange={(e) => setSavedConfirmed(e.target.checked)}
+            label="I&apos;ve saved this recovery code somewhere safe."
+          />
           <Button type="button" fullWidth disabled={!savedConfirmed} onClick={() => setRecoveryKit(null)}>
             Continue
           </Button>

@@ -1,13 +1,53 @@
 'use client';
 
-import { Button, useToast } from '@tc/ui-web';
+import { Button, DualClock, Hallmark, MeridianApproach, useToast } from '@tc/ui-web';
 import type { GuestCapsuleResponse } from '@tc/contracts';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { CountdownDisplay } from '../../../../components/CountdownDisplay';
 import { guestApi } from '../../../../lib/api-client';
+import { useCorrectedNow } from '../../../../lib/use-corrected-now';
+import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
 import { getGuestCapsule, getGuestToken } from '../../../../lib/guest-store';
+
+/** The guest's view of their own wait — the same reading the owner gets, minus the account. */
+function GuestWait({
+  unlockAt,
+  sealedAt,
+  state,
+}: {
+  unlockAt: string | null;
+  sealedAt: string | null;
+  state: GuestCapsuleResponse['state'];
+}) {
+  const target = unlockAt ? new Date(unlockAt) : null;
+  const nowMs = useCorrectedNow(target);
+  const sealedMs = sealedAt ? new Date(sealedAt).getTime() : null;
+
+  if (state !== 'sealed' || !target || nowMs === null) {
+    return (
+      <div className="flex w-full flex-col gap-0.5 text-left">
+        <Hallmark>Status</Hallmark>
+        <span className="text-[length:var(--text-body-s)] text-secondary">{state}</span>
+      </div>
+    );
+  }
+
+  const remainingMs = Math.max(0, target.getTime() - nowMs);
+
+  return (
+    <section className="flex w-full flex-col gap-5 text-left" aria-label="The wait">
+      {sealedMs !== null ? <DualClock elapsedMs={nowMs - sealedMs} remainingMs={remainingMs} /> : null}
+      <MeridianApproach remainingMs={remainingMs} />
+      <div className="flex flex-col gap-0.5">
+        <p className="text-[length:var(--text-body-s)] text-foreground">
+          Sealed until {formatAbsoluteDate(target.toISOString())}
+        </p>
+        <p className="text-[length:var(--text-caption)] text-secondary">{horizonPhrase(remainingMs)}</p>
+      </div>
+    </section>
+  );
+}
 
 /** Device-local guest status page (01 §4.1b / 02 §5.2a) — no account, so this only works from the device that sealed it. */
 export default function GuestCapsuleStatusPage() {
@@ -63,8 +103,13 @@ export default function GuestCapsuleStatusPage() {
         <p className="pb-3 font-[var(--font-display)] text-lg text-white">{capsule.title ?? 'Your capsule'}</p>
       </div>
 
-      {capsule.unlockAt ? <CountdownDisplay target={new Date(capsule.unlockAt)} className="text-3xl font-medium text-foreground" /> : null}
-      <p className="text-sm text-secondary">State: {capsule.state}</p>
+      {/*
+        The guest contract *does* carry `sealedAt`, so this surface gets the
+        full Dual Clock — elapsed and remaining together, per `03 §V.1`. The
+        Meridian and the literal date complete the same waiting reading the
+        owner and recipient screens now share.
+      */}
+      <GuestWait unlockAt={capsule.unlockAt} sealedAt={capsule.sealedAt} state={capsule.state} />
 
       {shareUrl ? (
         <Button

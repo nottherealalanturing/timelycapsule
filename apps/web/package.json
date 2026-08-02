@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3001",
+    "dev": "next dev -p ${PORT:-3001}",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -38,6 +38,7 @@
   "devDependencies": {
     "@opennextjs/cloudflare": "^1.20.2",
     "@tailwindcss/postcss": "^4",
+    "@tc/eslint-config": "workspace:*",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
     "@types/react": "^19",

@@ -1,12 +1,13 @@
 'use client';
 
 import type { CapsuleListItem, CapsuleState, CapsuleType } from '@tc/contracts';
-import { Button, EmptyState, Skeleton } from '@tc/ui-web';
+import { Button, EmptyState, Hallmark, Skeleton } from '@tc/ui-web';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { CapsuleCard, resolveUnlockDate } from '../../../components/CapsuleCard';
-import { CountdownDisplay } from '../../../components/CountdownDisplay';
+import { CapsuleTimelineRow } from '../../../components/dashboard/CapsuleTimelineRow';
+import { DashboardFilters } from '../../../components/dashboard/DashboardFilters';
 import { capsulesApi, tagsApi } from '../../../lib/api-client';
 import { useAuth } from '../../../lib/auth-context';
 
@@ -16,25 +17,16 @@ const TEMPLATES: { label: string; type: CapsuleType }[] = [
   { label: 'A birthday surprise', type: 'birthday' },
 ];
 
-const STATE_FILTERS: { label: string; value: CapsuleState | undefined }[] = [
-  { label: 'All states', value: undefined },
-  { label: 'Draft', value: 'draft' },
-  { label: 'Sealed', value: 'sealed' },
-  { label: 'Unlocked', value: 'unlocked' },
-  { label: 'Expired', value: 'expired' },
-  { label: 'Withdrawn', value: 'withdrawn' },
-];
-
-function greeting(): string {
-  const hour = new Date().getHours();
+function greeting(atMs: number): string {
+  const hour = new Date(atMs).getHours();
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';
   return 'Good evening';
 }
 
-function timeBucket(capsule: CapsuleListItem): string {
+function timeBucket(capsule: CapsuleListItem, nowMs: number): string {
   const date = resolveUnlockDate(capsule) ?? new Date(capsule.createdAt);
-  const now = new Date();
+  const now = new Date(nowMs);
   if (date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()) return 'This month';
   return String(date.getFullYear());
 }
@@ -68,6 +60,11 @@ export default function HomePage() {
   // Date.now() is impure and can't be called during render (react-hooks/purity)
   // — a useState lazy initializer is the sanctioned escape hatch, same
   // pattern as ScheduleBlock's mountedAtMs in T-11.
+  //
+  // V1 additionally called `new Date()` inside `greeting()` and `timeBucket()`
+  // during render, which is the same impurity the mountedAtMs pattern exists to
+  // avoid and can disagree between server and client render. Both now read this
+  // single mount instant.
   const [mountedAtMs] = useState(() => Date.now());
 
   const openingSoon = useMemo(
@@ -82,11 +79,13 @@ export default function HomePage() {
   const grouped = useMemo(() => {
     const buckets = new Map<string, CapsuleListItem[]>();
     for (const capsule of capsules) {
-      const bucket = timeBucket(capsule);
+      const bucket = timeBucket(capsule, mountedAtMs);
       buckets.set(bucket, [...(buckets.get(bucket) ?? []), capsule]);
     }
-    return Array.from(buckets.entries()).sort(([a], [b]) => (a === 'This month' ? -1 : b === 'This month' ? 1 : a.localeCompare(b)));
-  }, [capsules]);
+    return Array.from(buckets.entries()).sort(([a], [b]) =>
+      a === 'This month' ? -1 : b === 'This month' ? 1 : a.localeCompare(b),
+    );
+  }, [capsules, mountedAtMs]);
 
   async function startTemplate(type: CapsuleType) {
     const { capsule } = await capsulesApi.create({ type });
@@ -96,12 +95,12 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
-        <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
+      <div className="flex flex-col gap-6 px-8 py-10">
+        <Skeleton className="h-7 w-64" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Skeleton className="h-36" />
+          <Skeleton className="h-36" />
+          <Skeleton className="h-36" />
         </div>
       </div>
     );
@@ -110,8 +109,11 @@ export default function HomePage() {
   if (capsules.length === 0 && !stateFilter && !typeFilter && !favoriteOnly && !tagFilter) {
     return (
       <div className="px-8 py-10">
+        {/* `07 §XI`: a genuinely empty account gets one line and one action —
+            no illustration, no mascot, no encouragement. V1's "Your future is
+            unwritten" sells; the voice states (`07 §VIII`). */}
         <EmptyState
-          title="Your future is unwritten. Seal your first capsule."
+          title="Nothing sealed yet."
           action={
             <div className="flex flex-wrap justify-center gap-2">
               {TEMPLATES.map((t) => (
@@ -127,16 +129,16 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 px-8 py-10">
-      <header className="flex items-center justify-between">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">
-          {greeting()}, {user?.displayName}
+    <div className="flex flex-col gap-9 px-8 py-10">
+      <header>
+        <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">
+          {greeting(mountedAtMs)}, {user?.displayName}
         </h1>
       </header>
 
       {openingSoon.length > 0 ? (
         <section aria-label="Opening soon" className="flex flex-col gap-3">
-          <h2 className="text-sm font-medium text-secondary">Opening soon</h2>
+          <Hallmark>Opening soon</Hallmark>
           <div className="flex gap-4 overflow-x-auto pb-2">
             {openingSoon.map((capsule) => (
               <CapsuleCard key={capsule.id} capsule={capsule} className="w-64 shrink-0" />
@@ -145,73 +147,25 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex gap-2">
-            <select
-              value={stateFilter ?? ''}
-              onChange={(e) => setStateFilter((e.target.value || undefined) as CapsuleState | undefined)}
-              className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-1.5 text-sm text-foreground"
-            >
-              {STATE_FILTERS.map((f) => (
-                <option key={f.label} value={f.value ?? ''}>
-                  {f.label}
-                </option>
-              ))}
-            </select>
-            <select
-              value={typeFilter ?? ''}
-              onChange={(e) => setTypeFilter((e.target.value || undefined) as CapsuleType | undefined)}
-              className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-1.5 text-sm text-foreground"
-            >
-              <option value="">All types</option>
-              <option value="self">Self</option>
-              <option value="personal">Someone else</option>
-            </select>
-            {allTags.length > 0 ? (
-              <select
-                value={tagFilter ?? ''}
-                onChange={(e) => setTagFilter(e.target.value || undefined)}
-                className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-1.5 text-sm text-foreground"
-              >
-                <option value="">All tags</option>
-                {allTags.map((tag) => (
-                  <option key={tag.id} value={tag.name}>
-                    {tag.name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setFavoriteOnly((v) => !v)}
-              className={`rounded-[var(--radius-input)] border px-3 py-1.5 text-sm ${
-                favoriteOnly ? 'border-[var(--color-accent-gold)] text-[var(--color-accent-gold)]' : 'border-[var(--color-text-secondary)]/20 text-secondary'
-              }`}
-            >
-              ★ Favorites
-            </button>
-          </div>
-          <div className="flex gap-1 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 p-1">
-            <button
-              type="button"
-              onClick={() => setView('timeline')}
-              className={`rounded-[var(--radius-input)] px-3 py-1 text-sm ${view === 'timeline' ? 'bg-[var(--color-bg-raised)] text-foreground' : 'text-secondary'}`}
-            >
-              Timeline
-            </button>
-            <button
-              type="button"
-              onClick={() => setView('grid')}
-              className={`rounded-[var(--radius-input)] px-3 py-1 text-sm ${view === 'grid' ? 'bg-[var(--color-bg-raised)] text-foreground' : 'text-secondary'}`}
-            >
-              Grid
-            </button>
-          </div>
-        </div>
+      <section className="flex flex-col gap-5">
+        <DashboardFilters
+          stateFilter={stateFilter}
+          typeFilter={typeFilter}
+          tagFilter={tagFilter}
+          favoriteOnly={favoriteOnly}
+          view={view}
+          tags={allTags}
+          onState={setStateFilter}
+          onType={setTypeFilter}
+          onTag={setTagFilter}
+          onFavorite={() => setFavoriteOnly((v) => !v)}
+          onView={setView}
+        />
 
         {capsules.length === 0 ? (
-          <p className="py-8 text-center text-sm text-secondary">No capsules match these filters.</p>
+          <p className="py-8 text-center text-[length:var(--text-body-s)] text-secondary">
+            No capsules match these filters.
+          </p>
         ) : view === 'grid' ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {capsules.map((capsule) => (
@@ -219,26 +173,13 @@ export default function HomePage() {
             ))}
           </div>
         ) : (
-          <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-7">
             {grouped.map(([bucket, items]) => (
               <div key={bucket} className="flex flex-col gap-2">
-                <h3 className="text-xs font-medium uppercase tracking-wide text-secondary">{bucket}</h3>
-                {items.map((capsule) => {
-                  const unlockDate = resolveUnlockDate(capsule);
-                  return (
-                    <button
-                      key={capsule.id}
-                      type="button"
-                      onClick={() => router.push(`/capsule/${capsule.id}`)}
-                      className="flex items-center justify-between gap-3 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/15 px-4 py-3 text-left hover:bg-[var(--color-bg-raised)]"
-                    >
-                      <span className="truncate text-sm text-foreground">{capsule.title || 'Untitled capsule'}</span>
-                      <span className="flex shrink-0 items-center gap-3 text-sm text-secondary">
-                        {capsule.state === 'sealed' && unlockDate ? <CountdownDisplay target={unlockDate} /> : capsule.state}
-                      </span>
-                    </button>
-                  );
-                })}
+                <Hallmark>{bucket}</Hallmark>
+                {items.map((capsule) => (
+                  <CapsuleTimelineRow key={capsule.id} capsule={capsule} />
+                ))}
               </div>
             ))}
           </div>

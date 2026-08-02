@@ -33,11 +33,13 @@ export function PasswordStrengthMeter({ password }: PasswordStrengthMeterProps) 
         {[0, 1, 2, 3].map((i) => (
           <div
             key={i}
-            className={`h-1 flex-1 rounded-full ${i < score ? barColor : 'bg-[var(--color-text-secondary)]/20'}`}
+            className={`h-1 flex-1 ${i < score ? barColor : 'bg-[var(--color-text-secondary)]/20'}`}
           />
         ))}
       </div>
-      <p className="text-xs text-secondary">{LABELS[score]}</p>
+      <p className="text-[length:var(--text-caption)] text-secondary" aria-live="polite">
+        {LABELS[score]}
+      </p>
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import type { Database } from '../../db/client.js';
 import { idempotency } from '../../middleware/idempotency.js';
+import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import {
@@ -37,14 +38,19 @@ export function capsulesRouter(db: Database): Router {
   const router = Router();
   router.use('/capsules', requireAuth());
 
-  router.post('/capsules', validate({ body: CreateCapsuleRequestSchema }), async (req, res, next) => {
-    try {
-      const capsule = await createCapsule(db, req.user!.id, req.body);
-      res.status(201).json({ capsule });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/capsules',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: CreateCapsuleRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const capsule = await createCapsule(db, req.user!.id, req.body);
+        res.status(201).json({ capsule });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.get('/capsules', validate({ query: ListCapsulesQuerySchema }), async (req, res, next) => {
     try {
@@ -67,6 +73,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.patch(
     '/capsules/:id/owner-key-wrap',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: SetOwnerKeyWrapRequestSchema }),
     async (req, res, next) => {
       try {
@@ -80,6 +87,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.patch(
     '/capsules/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     validate({ params: IdParamSchema, body: PatchCapsuleRequestSchema }),
     async (req, res, next) => {
       try {
@@ -93,6 +101,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/seal',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema }),
     async (req, res, next) => {
@@ -107,6 +116,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/duplicate',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema }),
     async (req, res, next) => {
@@ -119,26 +129,37 @@ export function capsulesRouter(db: Database): Router {
     },
   );
 
-  router.post('/capsules/:id/archive', validate({ params: IdParamSchema }), async (req, res, next) => {
-    try {
-      const capsule = await archiveCapsule(db, req.user!.id, req.params.id as string);
-      res.status(200).json({ capsule });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/capsules/:id/archive',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        const capsule = await archiveCapsule(db, req.user!.id, req.params.id as string);
+        res.status(200).json({ capsule });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
-  router.post('/capsules/:id/unarchive', validate({ params: IdParamSchema }), async (req, res, next) => {
-    try {
-      const capsule = await unarchiveCapsule(db, req.user!.id, req.params.id as string);
-      res.status(200).json({ capsule });
-    } catch (err) {
-      next(err);
-    }
-  });
+  router.post(
+    '/capsules/:id/unarchive',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        const capsule = await unarchiveCapsule(db, req.user!.id, req.params.id as string);
+        res.status(200).json({ capsule });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.post(
     '/capsules/:id/trash',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema }),
     async (req, res, next) => {
@@ -153,6 +174,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/restore',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema }),
     async (req, res, next) => {
@@ -167,6 +189,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/withdraw',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema }),
     async (req, res, next) => {
@@ -181,6 +204,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/extend',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema, body: ExtendCapsuleRequestSchema }),
     async (req, res, next) => {
@@ -195,6 +219,7 @@ export function capsulesRouter(db: Database): Router {
 
   router.post(
     '/capsules/:id/purge',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
     idempotency(db),
     validate({ params: IdParamSchema }),
     async (req, res, next) => {

@@ -25,7 +25,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+      <label htmlFor={inputId} className="text-[length:var(--text-body-s)] font-medium text-foreground">
         {label}
       </label>
       <input
@@ -34,9 +34,13 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         aria-invalid={Boolean(error)}
         aria-describedby={errorId ?? hintId}
         className={cn(
-          'h-10 rounded-[var(--radius-input)] border px-3 text-sm text-foreground',
-          'bg-[var(--color-bg-raised)] border-[var(--color-text-secondary)]/30',
-          'outline-none focus:ring-2 focus:ring-[var(--color-accent-violet)] focus:border-transparent',
+          'motion-instant h-10 rounded-[var(--radius-input)] border px-3 text-sm text-foreground',
+          'bg-[var(--color-bg-raised)] border-[var(--color-rule-strong)]',
+          // V1 focused with a dusk-violet ring that V2 does not have. Focus is
+          // now the interactive token, via focus-visible so it appears for
+          // keyboard users without firing on every mouse click.
+          'outline-none focus-visible:outline-2 focus-visible:outline-offset-2',
+          'focus-visible:outline-[var(--color-interactive)]',
           error && 'border-[var(--color-danger)]',
           className,
         )}

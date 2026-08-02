@@ -59,7 +59,7 @@ export default function CollectionsPage() {
             <Link
               key={collection.id}
               href={`/collections/${collection.id}`}
-              className="flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 transition hover:shadow-[var(--shadow-md)]"
+              className="flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 transition hover:shadow-md"
             >
               <div className="h-24 shrink-0" style={coverStyle(collection.cover)} />
               <div className="flex flex-col gap-1 p-4">

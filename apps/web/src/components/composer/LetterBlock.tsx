@@ -82,20 +82,20 @@ export function LetterBlock({ draft }: { draft: CapsuleDraft }) {
   return (
     <section aria-label="Letter" className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium text-secondary">Letter</h2>
+        <h2 className="text-[length:var(--text-body-s)] font-medium text-secondary">Letter</h2>
         <Button type="button" variant="ghost" size="sm" onClick={() => setPromptsOpen((v) => !v)}>
           Prompts
         </Button>
       </div>
 
       {promptsOpen ? (
-        <div className="flex flex-col gap-1 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-2">
+        <div className="flex flex-col gap-1 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-2">
           {PROMPTS.map((prompt) => (
             <button
               key={prompt}
               type="button"
               onClick={() => insertPrompt(prompt)}
-              className="rounded-[var(--radius-input)] px-3 py-2 text-left text-sm text-secondary hover:bg-[var(--color-bg-raised)]"
+              className="rounded-[var(--radius-input)] px-3 py-2 text-left text-[length:var(--text-body-s)] text-secondary hover:bg-[var(--color-bg-raised)]"
             >
               {prompt}
             </button>
@@ -107,18 +107,18 @@ export function LetterBlock({ draft }: { draft: CapsuleDraft }) {
         <EditorContent
           editor={editor}
           className={cn(
-            'min-h-[240px] rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 px-4 py-3',
-            'prose prose-sm max-w-none text-foreground focus-within:border-accent',
+            'min-h-[240px] rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-3',
+            'prose prose-sm max-w-none text-foreground focus-within:border-[var(--color-interactive)]',
           )}
         />
         {commands.length > 0 ? (
-          <div className="absolute left-4 top-full z-20 mt-1 w-48 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-1 shadow-[var(--shadow-md)]">
+          <div className="absolute left-4 top-full z-20 mt-1 w-48 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] p-1 shadow-md">
             {commands.map((cmd) => (
               <button
                 key={cmd.label}
                 type="button"
                 onClick={() => runSlashCommand(cmd)}
-                className="w-full rounded-[var(--radius-input)] px-3 py-2 text-left text-sm text-foreground hover:bg-[var(--color-bg)]"
+                className="w-full rounded-[var(--radius-input)] px-3 py-2 text-left text-[length:var(--text-body-s)] text-foreground hover:bg-[var(--color-bg-primary)]"
               >
                 {cmd.label}
               </button>
