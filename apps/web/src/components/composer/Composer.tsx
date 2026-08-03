@@ -79,6 +79,8 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
       }
       setConfirmOpen(false);
       setCeremonyOpen(true);
+    } catch {
+      show("Couldn't seal the capsule. Please try again.");
     } finally {
       setSealing(false);
     }

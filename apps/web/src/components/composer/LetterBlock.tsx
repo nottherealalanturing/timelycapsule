@@ -103,12 +103,16 @@ export function LetterBlock({ draft }: { draft: CapsuleDraft }) {
         </div>
       ) : null}
 
-      <div className="relative">
+      <div
+        className="relative"
+        onClick={() => editor.chain().focus().run()}
+      >
         <EditorContent
           editor={editor}
           className={cn(
             'min-h-[240px] rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-3',
             'prose prose-sm max-w-none text-foreground focus-within:border-[var(--color-interactive)]',
+            '[&_.ProseMirror]:min-h-[calc(240px-1.5rem)] [&_.ProseMirror]:outline-none',
           )}
         />
         {commands.length > 0 ? (
