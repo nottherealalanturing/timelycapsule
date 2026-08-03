@@ -14,6 +14,9 @@ const EXPIRY_OPTIONS = [
   { label: '30 days', value: '30 days' },
   { label: '7 days', value: '7 days' },
   { label: '24 hours', value: '24 hours' },
+  { label: '1 hour', value: '1 hour' },
+  { label: '30 minutes', value: '30 minutes' },
+  { label: '5 minutes', value: '5 minutes' },
   { label: 'Ephemeral (one viewing)', value: '0 seconds', ephemeral: true },
 ] as const;
 
