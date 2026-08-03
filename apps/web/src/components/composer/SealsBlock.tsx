@@ -159,8 +159,12 @@ export function SealsBlock({ draft }: { draft: CapsuleDraft }) {
                     name="expiry"
                     checked={capsule.expiresAfter === opt.value}
                     onChange={() => {
-                      if ('ephemeral' in opt && opt.ephemeral && !ephemeralConfirmed) return;
-                      draft.patch({ expiresAfter: opt.value, expiryStrict: 'ephemeral' in opt ? Boolean(opt.ephemeral) : false });
+                      if ('ephemeral' in opt && opt.ephemeral) {
+                        setEphemeralConfirmed(false);
+                        draft.patch({ expiresAfter: opt.value, expiryStrict: false });
+                        return;
+                      }
+                      draft.patch({ expiresAfter: opt.value, expiryStrict: false });
                     }}
                   />
                   {opt.label}

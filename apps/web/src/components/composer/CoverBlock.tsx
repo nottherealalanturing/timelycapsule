@@ -69,7 +69,7 @@ export function CoverBlock({ draft }: { draft: CapsuleDraft }) {
             disabled
             title="Type is set at creation"
             className={cn(
-              'rounded-full border px-4 py-1.5 text-[length:var(--text-body-s)]',
+              'cursor-not-allowed rounded-full border px-4 py-1.5 text-[length:var(--text-body-s)] opacity-60',
               capsule.type === chip.type
                 ? 'border-[var(--color-interactive)] text-foreground'
                 : 'border-[var(--color-rule-strong)] text-secondary',
