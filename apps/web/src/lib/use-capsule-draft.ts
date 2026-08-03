@@ -110,6 +110,14 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
   // recipient's magic link without the server ever holding the capsule key.
   const recipientTokensRef = useRef<Map<string, string>>(new Map());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against overlapping autosave requests: without this, a slow
+  // in-flight PATCH (e.g. from an earlier radio click) can resolve after a
+  // newer one and unconditionally overwrite local state with its stale
+  // response, silently reverting fields the user just changed. Chaining
+  // behind the current save — then re-running once it clears, to pick up
+  // whatever landed in pendingPatchRef meanwhile — keeps requests strictly
+  // serialized instead of racing.
+  const savePromiseRef = useRef<Promise<void> | null>(null);
   // TipTap's useEditor only binds `onUpdate` once (its options aren't
   // re-read every render), so anything that callback reaches only ever
   // sees whatever closure existed at that first bind. setContentDocState
@@ -174,25 +182,42 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
     };
   }, [capsuleId, masterKey]);
 
-  const runAutosave = useCallback(async () => {
-    if (!capsuleId || !capsuleKeyRef.current) return;
-    const patchToSend = pendingPatchRef.current;
-    const hasFieldChanges = Object.keys(patchToSend).length > 0;
-    setAutosaveStatus('saving');
-    try {
-      const doc = new TextEncoder().encode(JSON.stringify(contentDocRef.current));
-      const { iv, ciphertext } = await encryptBytes(capsuleKeyRef.current, doc);
-      const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
-
-      const { capsule: updated } = await capsulesApi.patch(capsuleId, { ...patchToSend, contentDocEnc });
-      setCapsule(updated);
-      pendingPatchRef.current = {};
-      clearCache(capsuleId);
-      setAutosaveStatus('saved');
-      void hasFieldChanges;
-    } catch {
-      setAutosaveStatus('error');
+  const runAutosave = useCallback((): Promise<void> => {
+    if (!capsuleId || !capsuleKeyRef.current) return Promise.resolve();
+    // A save is already in flight — chain behind it rather than firing a
+    // second overlapping request, then re-run to flush whatever patch()
+    // calls arrived while we waited.
+    if (savePromiseRef.current) {
+      return savePromiseRef.current.then(() => runAutosave());
     }
+
+    const run = (async () => {
+      const patchToSend = pendingPatchRef.current;
+      setAutosaveStatus('saving');
+      try {
+        const doc = new TextEncoder().encode(JSON.stringify(contentDocRef.current));
+        const { iv, ciphertext } = await encryptBytes(capsuleKeyRef.current!, doc);
+        const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
+
+        const { capsule: updated } = await capsulesApi.patch(capsuleId, { ...patchToSend, contentDocEnc });
+        setCapsule(updated);
+        // Only clear the fields this request actually sent — anything
+        // patch() merged in after we captured patchToSend stays pending
+        // for the next run rather than being dropped.
+        for (const key of Object.keys(patchToSend)) {
+          delete (pendingPatchRef.current as Record<string, unknown>)[key];
+        }
+        clearCache(capsuleId);
+        setAutosaveStatus('saved');
+      } catch {
+        setAutosaveStatus('error');
+      } finally {
+        savePromiseRef.current = null;
+      }
+    })();
+
+    savePromiseRef.current = run;
+    return run;
   }, [capsuleId]);
 
   const scheduleAutosave = useCallback(() => {
