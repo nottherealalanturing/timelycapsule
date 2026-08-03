@@ -185,35 +185,39 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
   const runAutosave = useCallback((): Promise<void> => {
     if (!capsuleId || !capsuleKeyRef.current) return Promise.resolve();
     // A save is already in flight — chain behind it rather than firing a
-    // second overlapping request, then re-run to flush whatever patch()
-    // calls arrived while we waited.
+    // second overlapping request; the in-flight run's own loop below picks
+    // up whatever patch() calls arrive while we wait.
     if (savePromiseRef.current) {
-      return savePromiseRef.current.then(() => runAutosave());
+      return savePromiseRef.current;
     }
 
     const run = (async () => {
-      const patchToSend = pendingPatchRef.current;
-      setAutosaveStatus('saving');
-      try {
-        const doc = new TextEncoder().encode(JSON.stringify(contentDocRef.current));
-        const { iv, ciphertext } = await encryptBytes(capsuleKeyRef.current!, doc);
-        const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
+      let rerun = true;
+      while (rerun) {
+        rerun = false;
+        const patchToSend = pendingPatchRef.current;
+        setAutosaveStatus('saving');
+        try {
+          const doc = new TextEncoder().encode(JSON.stringify(contentDocRef.current));
+          const { iv, ciphertext } = await encryptBytes(capsuleKeyRef.current!, doc);
+          const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
 
-        const { capsule: updated } = await capsulesApi.patch(capsuleId, { ...patchToSend, contentDocEnc });
-        setCapsule(updated);
-        // Only clear the fields this request actually sent — anything
-        // patch() merged in after we captured patchToSend stays pending
-        // for the next run rather than being dropped.
-        for (const key of Object.keys(patchToSend)) {
-          delete (pendingPatchRef.current as Record<string, unknown>)[key];
+          const { capsule: updated } = await capsulesApi.patch(capsuleId, { ...patchToSend, contentDocEnc });
+          setCapsule(updated);
+          // Only clear the fields this request actually sent — anything
+          // patch() merged in after we captured patchToSend stays pending
+          // for the next iteration rather than being dropped.
+          for (const key of Object.keys(patchToSend)) {
+            delete (pendingPatchRef.current as Record<string, unknown>)[key];
+          }
+          clearCache(capsuleId);
+          setAutosaveStatus('saved');
+          rerun = Object.keys(pendingPatchRef.current).length > 0;
+        } catch {
+          setAutosaveStatus('error');
         }
-        clearCache(capsuleId);
-        setAutosaveStatus('saved');
-      } catch {
-        setAutosaveStatus('error');
-      } finally {
-        savePromiseRef.current = null;
       }
+      savePromiseRef.current = null;
     })();
 
     savePromiseRef.current = run;
