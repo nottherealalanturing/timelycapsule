@@ -27,6 +27,19 @@ import type { NextConfig } from "next";
  *   page-by-page pass across a live instance. Every other directive is
  *   'self'-only, which is the actual XSS vector this ticket cares about: a
  *   malicious upload being treated as same-origin script.
+ * - `script-src` also carries `'wasm-unsafe-eval'` — missed in the original
+ *   audit and a real production incident, not a hypothetical: `packages/
+ *   crypto`'s `deriveKeyFromPassword` runs Argon2id via `hash-wasm`, which
+ *   compiles a WebAssembly module. Without this directive Chrome throws
+ *   `CompileError: ... 'unsafe-eval' is not an allowed source` on every
+ *   password-derived operation — signup, OAuth-initial-password, and
+ *   password login all call it — and `MasterKeyGate`'s/`auth-context.tsx`'s
+ *   catch blocks swallow that into a generic "Something went wrong" with no
+ *   network request ever firing, which is what made this hard to see from
+ *   the server side. `'wasm-unsafe-eval'` is the scoped, WASM-only carve-out
+ *   (not the much broader `'unsafe-eval'`, which also permits `eval()`/
+ *   `new Function()` and would reopen the actual XSS vector this CSP exists
+ *   to close).
  *
  * `Permissions-Policy` allows exactly the device APIs this app actually uses
  * — `geolocation` (`PlaceGate.tsx`'s place-seal check) and
@@ -35,7 +48,7 @@ import type { NextConfig } from "next";
  */
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' https://accounts.google.com",
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://accounts.google.com",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://usercontent.timelycapsule.com https://*.r2.cloudflarestorage.com",
   "media-src 'self' blob: https://usercontent.timelycapsule.com https://*.r2.cloudflarestorage.com",
