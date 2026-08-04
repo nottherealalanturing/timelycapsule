@@ -16,6 +16,7 @@ type CapsuleRow = typeof capsules.$inferSelect;
 
 /** Draft-editable field set — what's copyable on duplicate, and what a version snapshot captures. */
 const DRAFT_FIELDS = [
+  'type',
   'title',
   'cover',
   'teaser',

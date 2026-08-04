@@ -62,7 +62,7 @@ Semantic tokens only in code (`--color-bg-primary`, never raw hex in components)
 - **Input/TextArea:** filled surface, 1px border, focus = 2px dusk-violet ring; inline error below in danger + icon; label always visible (no placeholder-as-label); character counters where limits exist.
 - **CapsuleCard:** cover (image/gradient) + state chip + title (Fraunces) + meta row (unlock date, recipients avatars stack) + countdown (live for <24h, static otherwise). Sizes: grid tile, timeline row, mini (widget/search).
 - **CountdownDisplay:** adaptive granularity — ">1 yr: '2 years, 3 months'", "<30 d: days+hours", "<1 h: mm:ss live". Never shows scary precision at long ranges.
-- **DateTimeSchedulePicker** (custom, critical component): calendar month grid + year fast-jump (type a year), time wheel/dropdown (15-min steps + custom), timezone selector with search + "recipient's local time" option, natural-language input parsed live ("in 18 months" → highlights date), summary sentence always rendered: *"Unlocks Saturday, June 1, 2027 at 9:00 AM (recipient's local time)."* Validation inline: min +5 min, max +50 yr.
+- **The Horizon + ExactMoment + ZonePicker** (custom, critical, composer-specific) — superseded the originally-planned DateTimeSchedulePicker; see `design/21-CAPSULE-CREATION-V2.md §III`. Not a calendar grid: a log-scale line offering *moments* (a birthday, the turn of a year) ahead of *lengths* (a number of years), with exact date/time/zone controls always present beneath rather than the primary control. Timezone selector is a curated, searchable city list ("Lagos · GMT+1") over full IANA search, not a ~430-entry alphabetical `<select>`; "recipient's local time" is one of its options. Summary sentence always rendered, and states *why* a chosen moment matters ("Amara will be 10") rather than restating its distance. Validation inline: min +5 min, max +50 yr (account) / +1 yr (guest).
 - **MediaUploader:** drag-drop zone (web) / source sheet (mobile: camera, library, record voice, record video, files, scan document). Per-file progress ring, pause/resume, retry, error chip; grid preview with drag reorder; caption field per item.
 - **MediaViewer:** full-screen gallery, pinch-zoom, swipe, video player (custom controls, captions track), audio player with waveform + 15s skip, PDF pager, download button (if permitted).
 - **Toast:** bottom-center web / top mobile, 4s auto-dismiss, action slot ("Undo"), max 1 visible, queued.
@@ -91,9 +91,10 @@ Semantic tokens only in code (`--color-bg-primary`, never raw hex in components)
 - Recipient magic-link landing: skips all of this — see 5.10.
 
 #### 5.2a Guest mode (`/try`, mobile: "Continue without an account" on onboarding) — per 01 §4.1b
-- **Entry:** landing hero CTA, `/try` deep link, or mobile onboarding skip. No interstitials — the guest lands **directly in a slimmed composer** (cover picker, title, letter block only; media/recipients/seals sections rendered as locked rows with a one-line "Sign up free to add photos & email delivery" affordance, not hidden).
-- **Schedule:** same DateTimeSchedulePicker, capped at +1 year with inline copy ("Guests can travel up to a year — accounts go to 50").
-- **Seal:** same ceremony, then a **link handoff sheet**: the capsule link (with `#k=` fragment) + copy button + "This link is the only key. We can't recover it — save it somewhere safe." + optional "email me my own link" is NOT offered (no verified email); instead the primary post-seal CTA is **"Keep it safe with a free account"** (claims the capsule per F11).
+- **Entry:** landing hero CTA, `/try` deep link, or mobile onboarding skip. No interstitials — the guest lands directly in **the same three-movement composer §5.5 describes**, backed by session storage instead of the API. There is one Capsule Creation experience, not a slimmed second one; see `design/21-CAPSULE-CREATION-V2.md §VII`.
+- **What's unavailable, and how it's shown:** enclosures, place-as-memory, named recipients and delivery conditions are switched off for this entry point. Unavailable capabilities are **omitted from the UI entirely**, not shown disabled with an upgrade label — a locked row reads as a paywall inside the writing surface. Where an account adds something, that is surfaced at the moment of creating one (the seal handoff below), not as a persistent affordance beside the letter.
+- **Schedule:** the same Horizon and exact-moment controls Movement I offers, capped at +1 year (`GUEST_CAPABILITIES.maxHorizonMs`) — candidates beyond the cap are never offered, so a guest cannot choose a moment that would then fail validation.
+- **Seal:** the same Movement III review — the record held up to be read once more — then a **link handoff screen**: the capsule link (with `#k=` fragment) + copy button + "This link is the only key. We can't recover it — save it somewhere safe." No "email me my own link" (no verified email); the primary post-seal action is continuing to `/try/capsule` or claiming the capsule via signup (F11).
 - **Guest status page** (`/try/capsule`, device-local): cover, countdown, re-copy link, signup CTA. One capsule only — trying to start a second routes to signup ("One per traveler — free accounts get five").
 - Voice: same warm time-travel register; guest limits always phrased as invitations upward, never as scolding.
 
@@ -112,22 +113,25 @@ Semantic tokens only in code (`--color-bg-primary`, never raw hex in components)
 - Mobile: same sections stacked; pull-to-refresh; FAB (gold, wax-seal icon) bottom-right for New Capsule.
 - Loading: skeleton cards. Error: inline retry banner, cached content still shown (stale-while-revalidate).
 
-### 5.5 Capsule Composer (`/capsule/new`, full-screen takeover both platforms)
-The most important creation surface. **Single scrolling document, not a wizard** (wizards kill emotional flow), with a persistent footer bar advancing through completeness.
+### 5.5 Capsule Composer — Capsule Creation V2 (`/capsule/[id]/edit`, `/try`)
 
-- **Top bar:** Close (autosaves → toast "Draft saved"), draft status ("Saved just now"), overflow menu (Save as template, Preview as recipient, Delete draft).
-- **Cover block:** tap to set cover — color gradients, seasonal themes, or upload image; capsule title (Fraunces, large, placeholder "Name this capsule…"); type selector chip row (Self / Someone else / Group / Legacy) — switching adjusts subsequent sections.
-- **Letter block:** rich text editor (bold, italic, lists, headings, quote, divider — deliberately minimal; markdown shortcuts supported; slash menu web). Writing prompts drawer (contextual to type/occasion): tapping a prompt inserts it as a styled question the user answers beneath.
-- **Media block:** MediaUploader (above). Voice recorder inline: hold-or-tap to record, live waveform, pause/resume, review before attach.
-- **Recipients block** (hidden for Self): recipient chips + add field (email/phone/contacts autocomplete from saved contacts); per-recipient row → options popover (verify identity toggle, remove); global options: shared vs private recipient list, allow downloads, announce now vs surprise.
-- **Schedule block:** DateTimeSchedulePicker + occasion shortcuts (Next New Year / birthday auto-detected / +1 year / +5 / +10 / custom). Recurrence toggle (yearly series) where applicable. Seal-deadline sub-option for group capsules.
-- **Seals & Expiry block (collapsed accordion, per 06 §B–C):** stacked "Seal" chips — Time (always, from Schedule block), + add Place Seal (map pin picker, radius slider 100 m–50 km, place nickname), + Passphrase Seal (passphrase + required hint field, strength meter), + Identity Seal (OTP toggle). Max 3 beyond Time; each added seal renders as a wax stamp on the capsule preview. Expiry selector: forever (default) / 1 yr / 30 d / 7 d / 24 h / ephemeral ("self-destructs after one viewing" — strict mode implied, confirmation sheet). Also here: break-glass allowance (self capsules), reply-requested prompt, fallback recipient, location attach.
-- **Footer bar:** completeness hints ("Add an unlock date to seal") → when valid, gold **"Seal capsule"** button.
-- **Seal confirmation sheet:** summary card (title, recipients, unlock date sentence, storage size), immutability warning ("After sealing you can't edit the contents. You can still withdraw it before it unlocks."), checkbox-free single confirm → **Seal ceremony animation** → lands on timeline with toast "Sealed. See you on June 1, 2027."
-- Autosave every 3s of idle + on blur; drafts recoverable from crash (local persistence + server sync).
-- Upload-in-progress at seal time: seal button becomes "Sealing when uploads finish (2 remaining)…" — capsule enters `sealing` interim state, completes automatically, push confirms.
-- Validation errors surface inline at the offending block and the footer hint names the first blocker.
-- Accessibility: every block a labeled region; editor fully keyboard-driven; recorder has non-hold tap mode.
+> **Superseded, not described here.** The composer originally specified in
+> this section (single-scroll document, cover-first, Fraunces/gradient
+> styling, wax-seal "Seals & Expiry" accordion) was replaced in full by
+> **Capsule Creation V2**. The authoritative specification is
+> `design/21-CAPSULE-CREATION-V2.md` — read it, not the paragraph this
+> replaces, for anything composer-related.
+>
+> One line of orientation for anyone landing here first: the composer is
+> **three movements** (Address → Compose → Seal), not one scrolling document
+> — who and when, then the letter and what travels with it, then a
+> read-it-once-more review that *is* the record rather than a summary of it.
+> The same three movements render at both entry points (`Composer.tsx` for
+> the authenticated flow, `/try/page.tsx` for guests), backed by the same
+> `CapsuleDraft` interface with different data underneath and different
+> capabilities switched on — there is one Capsule Creation experience, not
+> two. `design/21 §I` records why the original spec had to go and `§X` lists
+> everything it removed.
 
 ### 5.6 Capsule Detail — Owner view (`/capsule/:id`)
 - Header: cover art large, title, state chip, countdown hero (sealed) or "Opened by 3 of 4" (post-unlock).
@@ -180,7 +184,7 @@ Layout: dark sidebar (Dashboard, Users, Capsules, Reports, Legacy queue, Billing
 
 ## 7. Key User Flows (step-by-step)
 
-**F1 First capsule (activation):** Signup → onboarding intent → composer w/ template → write ≥50 chars or add media → schedule via shortcut → Seal → ceremony → timeline. Target: < 4 min median. Instrument every step.
+**F1 First capsule (activation):** Signup → onboarding intent → composer, Address movement (who + when) → Compose movement, write ≥50 chars or add media → Seal movement, review and confirm → ceremony → timeline. Target: < 4 min median. Instrument every step.
 
 **F2 Send to non-user:** Compose → add recipient email → announce-now ON → seal → recipient gets "Something is waiting" email (sender name, cover, countdown link) → recipient opts into reminder → unlock day: email + (if subscribed) push → magic link → reveal → reaction → sender push "Amara opened your capsule ❤️" → recipient sees save-CTA → converts (F2b: signup with same email auto-claims ghost identity, capsule now in Inbox).
 
@@ -198,7 +202,7 @@ Layout: dark sidebar (Dashboard, Users, Capsules, Reports, Legacy queue, Billing
 
 **F9 Group capsule:** Organizer creates Group type → sets seal deadline + unlock date → invites contributors (link/email) → contributors add entries (each sees own + optionally others', organizer setting) → reminder cadence to non-contributors → seal deadline: auto-seals with whatever's in (organizer warned 48h/24h before if pending invites) → unlocks to recipient(s).
 
-**F11 Guest → account conversion:** Visitor hits landing → "Create your first capsule" → guest composer (no signup) → writes text note → schedules (≤1 yr) → seal ceremony → link handoff sheet (copies link) → post-seal CTA "Keep it safe with a free account" → signup (guest token sent along) → capsule **claimed** into the new account, appears on `/home` timeline with full abilities (announce email can now be added pre-unlock, withdraw/extend available) → normal F1 upsell path continues. If the guest never converts: capsule still delivers on schedule (hard rule 5).
+**F11 Guest → account conversion:** Visitor hits landing → "Create your first capsule" → guest composer at `/try` (no signup, same three movements as the authenticated composer per `design/21 §VII`) → Address (when, ≤1 yr) → Compose (the letter) → Seal (review, then commit) → seal ceremony → link handoff sheet (copies link) → post-seal CTA "Keep it safe with a free account" → signup (guest token sent along) → capsule **claimed** into the new account, appears on `/home` timeline with full abilities (recipients, enclosures, conditions and the 50-year horizon all become available; announce email can now be added pre-unlock, withdraw/extend available) → normal F1 upsell path continues. If the guest never converts: capsule still delivers on schedule (hard rule 5).
 
 **F10 Timezone-sensitive delivery:** Sender picks "recipient's local 9:00 AM" → recipient tz unknown until they first open the locked link or have an account → fallback chain: recipient profile tz → tz inferred at first link-visit (stored) → sender's tz (sender told: "We'll use your timezone unless Amara visits the capsule page first").
 

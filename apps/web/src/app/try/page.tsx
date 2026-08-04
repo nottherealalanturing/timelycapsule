@@ -1,24 +1,23 @@
 'use client';
 
 import { encryptBytes, generateCapsuleKey, toBase64Url } from '@tc/crypto';
-import { Button, Input, useToast } from '@tc/ui-web';
+import { Button, useToast } from '@tc/ui-web';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { guestApi } from '../../lib/api-client';
 import { encodeIvCiphertext } from '../../lib/capsule-crypto';
 import { getGuestToken, setGuestCapsule, setGuestToken } from '../../lib/guest-store';
 import { DRAFT_KEY } from '../../components/marketing/WriteAndSeal';
-
-const GRADIENT_PRESETS: { value: string; theme: string }[] = [
-  { value: 'linear-gradient(135deg, #F4A261, #E76F51)', theme: 'sunset' },
-  { value: 'linear-gradient(135deg, #2A9D8F, #264653)', theme: 'deep-sea' },
-  { value: 'linear-gradient(135deg, #E9C46A, #F4A261)', theme: 'golden-hour' },
-  { value: 'linear-gradient(135deg, #8E7CC3, #4A4E69)', theme: 'twilight' },
-];
-
-const MAX_CHARS = 5000;
-const MIN_HORIZON_MS = 5 * 60 * 1000;
-const MAX_HORIZON_MS = 365 * 24 * 60 * 60 * 1000;
+import { AddressMovement } from '../../components/composer/v2/AddressMovement';
+import { ComposeMovement } from '../../components/composer/v2/ComposeMovement';
+import { MovementNav, type Movement } from '../../components/composer/v2/MovementNav';
+import { SealMovement } from '../../components/composer/v2/SealMovement';
+import { GUEST_CAPABILITIES } from '../../components/composer/v2/capabilities';
+import { noEnclosures } from '../../components/composer/v2/use-enclosures';
+import { firstCompletenessBlocker } from '../../components/composer/completeness';
+import { envelopeText } from '../../lib/letter-envelope';
+import { clearGuestDraft, useGuestDraft } from '../../lib/use-guest-draft';
+import { browserZone } from '../../lib/zoned-time';
 
 function textToDoc(text: string): object {
   return {
@@ -30,20 +29,23 @@ function textToDoc(text: string): object {
   };
 }
 
-function defaultUnlockLocal(): { date: string; time: string } {
-  const d = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  return { date: d.toISOString().slice(0, 10), time: d.toISOString().slice(11, 16) };
-}
-
+/**
+ * The guest entry point to Capsule Creation V2 — the same three movements the
+ * authenticated composer renders, backed by session storage instead of the
+ * API. This used to be its own page: the letter first, the Horizon and a bare
+ * title field stacked underneath, then a plain "Seal it" button with no
+ * review. That put guests through a different, shorter product and skipped
+ * the one thing Movement III exists for — meeting the finished capsule once
+ * before it leaves. There is one Capsule Creation experience; this renders it.
+ */
 export default function GuestComposerPage() {
   const router = useRouter();
   const { show } = useToast();
+  const draft = useGuestDraft();
   const [guestToken, setGuestTokenState] = useState<string | null>(null);
-  const [cover, setCover] = useState(GRADIENT_PRESETS[3]);
-  const [title, setTitle] = useState('');
-  const [letter, setLetter] = useState('');
-  const [{ date, time }, setDateTime] = useState(defaultUnlockLocal());
+  const [movement, setMovement] = useState<Movement>('address');
   const [sealing, setSealing] = useState(false);
+  const [sessionError, setSessionError] = useState(false);
   const [handoff, setHandoff] = useState<{ url: string; capsuleId: string } | null>(null);
   const [mountedAtMs] = useState(() => Date.now());
   const sealedHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -59,21 +61,28 @@ export default function GuestComposerPage() {
   // Carry over anything written on the landing page, so the words survive the
   // handoff instead of the visitor retyping them. Deferred like every other
   // effect here — an effect body must not call setState synchronously.
+  const { setContentDoc, patch } = draft;
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
         const raw = sessionStorage.getItem(DRAFT_KEY);
         if (!raw) return;
         sessionStorage.removeItem(DRAFT_KEY);
-        const draft = JSON.parse(raw) as { recipient?: string; letter?: string };
-        if (draft.letter) setLetter(draft.letter);
-        if (draft.recipient) setTitle(`For ${draft.recipient}`);
+        const carried = JSON.parse(raw) as { recipient?: string; letter?: string };
+        if (carried.letter) {
+          setContentDoc({ doc: textToDoc(carried.letter), writtenAt: null });
+        }
+        // Guests have no addressee beat (no account to hold recipients
+        // against), so what the landing page called "who is it for" becomes
+        // the capsule's own filing name — the same field Movement III's
+        // "Called" row edits.
+        if (carried.recipient) patch({ title: `For ${carried.recipient}` });
       } catch {
         // Malformed or unavailable storage is not worth surfacing.
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, []);
+  }, [setContentDoc, patch]);
 
   useEffect(() => {
     const existing = getGuestToken();
@@ -82,32 +91,49 @@ export default function GuestComposerPage() {
         setGuestTokenState(existing);
         return;
       }
-      void guestApi.createSession().then((res) => {
-        setGuestToken(res.guestToken);
-        setGuestTokenState(res.guestToken);
-      });
+      // Without a catch this rejected silently and left "Seal it" disabled with
+      // nothing said — the writer would finish a letter and find no way to send
+      // it. Interaction Constitution 10: state what happened and what happens
+      // next.
+      void guestApi
+        .createSession()
+        .then((res) => {
+          setGuestToken(res.guestToken);
+          setGuestTokenState(res.guestToken);
+        })
+        .catch(() => setSessionError(true));
     }, 0);
     return () => clearTimeout(timer);
   }, []);
 
-  const unlockAt = date && time ? new Date(`${date}T${time}`) : null;
+  const tz = browserZone();
+  // The Horizon writes the chosen instant onto the draft; validation of it
+  // lives there too, so this only needs to know whether one has been chosen.
+  const unlockAt = draft.capsule?.unlockAt ? new Date(draft.capsule.unlockAt) : null;
   const horizonMs = unlockAt ? unlockAt.getTime() - mountedAtMs : null;
-  const horizonError =
-    horizonMs === null
-      ? null
-      : horizonMs < MIN_HORIZON_MS
-        ? 'Unlock time must be at least 5 minutes from now'
-        : horizonMs > MAX_HORIZON_MS
-          ? 'Guests can travel up to a year — accounts go to 50'
-          : null;
+  const withinRange =
+    horizonMs !== null && horizonMs >= 5 * 60 * 1000 && horizonMs <= GUEST_CAPABILITIES.maxHorizonMs;
+
+  const written = envelopeText(draft.contentDoc).trim();
+  const blocker = draft.capsule ? firstCompletenessBlocker(draft.capsule, written.length > 0) : 'Loading';
+  const hasMoment = Boolean(draft.capsule?.unlockAt);
+
+  const reachable: Movement[] = ['address'];
+  if (hasMoment) reachable.push('compose');
+  if (!blocker) reachable.push('seal');
 
   async function seal() {
-    if (!guestToken || !unlockAt || horizonError || letter.trim().length === 0) return;
+    if (!guestToken || !unlockAt || !withinRange || written.length === 0) return;
     setSealing(true);
     try {
-      const created = await guestApi.createCapsule(guestToken, { title: title || undefined, cover: { kind: 'gradient', value: cover.value, theme: cover.theme } });
+      const created = await guestApi.createCapsule(guestToken, { title: draft.capsule?.title || undefined });
       const capsuleKey = generateCapsuleKey();
-      const { iv, ciphertext } = await encryptBytes(capsuleKey, new TextEncoder().encode(JSON.stringify(textToDoc(letter))));
+      // The guest's letter is encrypted here rather than continuously, because
+      // a guest has no master key to wrap a capsule key under until this point.
+      const { iv, ciphertext } = await encryptBytes(
+        capsuleKey,
+        new TextEncoder().encode(JSON.stringify(draft.envelope)),
+      );
       const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
 
       await guestApi.patchCapsule(guestToken, created.id, { contentDocEnc, unlockAt: unlockAt.toISOString() });
@@ -115,6 +141,10 @@ export default function GuestComposerPage() {
 
       const capsuleKeyB64 = toBase64Url(capsuleKey);
       setGuestCapsule({ capsuleId: created.id, recipientToken: created.recipientToken!, capsuleKeyB64 });
+
+      // The draft has become a sealed capsule; leaving it in session storage
+      // would re-open the composer with a letter that has already gone.
+      clearGuestDraft();
 
       const url = `${window.location.origin}/c/${created.recipientToken}#k=${capsuleKeyB64}`;
       setHandoff({ url, capsuleId: created.id });
@@ -155,82 +185,88 @@ export default function GuestComposerPage() {
     );
   }
 
+  if (draft.loading || !draft.capsule) {
+    // Held back rather than mounting empty: TipTap reads `content` once at
+    // initialisation, so mounting before session storage has been read would
+    // give the editor a document it can never be handed the real one for.
+    return <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-12" aria-hidden />;
+  }
+
   return (
-    <main className="mx-auto flex max-w-2xl flex-col gap-8 px-6 py-12">
-      <div>
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">Write something for later</h1>
-        <p className="text-sm text-secondary">No account needed. One capsule, up to a year out.</p>
-      </div>
+    <div className="flex min-h-screen flex-col">
+      {/* Grid rather than `justify-between`: at narrow widths "No account
+          needed" wrapped to three lines and ran straight into the movement
+          nav below it. A fixed three-column track keeps the nav centred
+          whether or not the side labels have room to show themselves. */}
+      <header className="sticky top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-4 py-3 backdrop-blur sm:gap-4 sm:px-6">
+        <p className="hidden truncate font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary sm:block">
+          No account needed
+        </p>
+        <MovementNav current={movement} available={reachable} onGo={setMovement} className="col-start-2 justify-self-center" />
+        <div aria-hidden />
+      </header>
 
-      <section className="flex flex-col gap-4">
-        <div className="flex h-32 items-end rounded-[var(--radius-card)] p-4" style={{ background: cover.value }}>
-          <div className="flex gap-2">
-            {GRADIENT_PRESETS.map((preset) => (
-              <button
-                key={preset.theme}
-                type="button"
-                aria-label={`Use ${preset.theme} cover`}
-                onClick={() => setCover(preset)}
-                className={`h-7 w-7 rounded-full border-2 ${cover.value === preset.value ? 'border-white' : 'border-white/40'}`}
-                style={{ background: preset.value }}
-              />
-            ))}
-          </div>
-        </div>
-        <Input label="Title (optional)" placeholder="Name this capsule…" value={title} onChange={(e) => setTitle(e.target.value)} />
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-secondary">Letter</label>
-        <textarea
-          value={letter}
-          onChange={(e) => setLetter(e.target.value.slice(0, MAX_CHARS))}
-          placeholder="Write what you want them to know…"
-          rows={10}
-          className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 px-4 py-3 text-foreground"
-        />
-        <p className="text-right text-xs text-secondary">{letter.length} / {MAX_CHARS}</p>
-      </section>
-
-      <section className="flex flex-col gap-2">
-        <label htmlFor="try-unlock-date" className="text-sm font-medium text-secondary">
-          When it opens
-        </label>
-        <div className="flex gap-3">
-          <input
-            id="try-unlock-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDateTime((s) => ({ ...s, date: e.target.value }))}
-            className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 px-3 py-2 text-foreground"
+      {/* `w-full` is load-bearing: `mx-auto` inside a flex-column body turns off
+          cross-axis stretch, so without it this shrinks to its content width. */}
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-10">
+        {movement === 'address' ? (
+          <AddressMovement
+            draft={draft}
+            capabilities={GUEST_CAPABILITIES}
+            recipients={[]}
+            contacts={[]}
+            onAddRecipient={async () => {}}
+            onRemoveRecipient={() => {}}
+            footer={
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setMovement('compose')} disabled={!hasMoment}>
+                  Compose
+                </Button>
+              </div>
+            }
           />
-          <input
-            type="time"
-            aria-label="Unlock time"
-            value={time}
-            onChange={(e) => setDateTime((s) => ({ ...s, time: e.target.value }))}
-            className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 px-3 py-2 text-foreground"
+        ) : null}
+
+        {movement === 'compose' ? (
+          <ComposeMovement
+            draft={draft}
+            capabilities={GUEST_CAPABILITIES}
+            enclosures={noEnclosures()}
+            addressee={null}
+            opensAt={unlockAt}
+            tz={tz}
+            footer={
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setMovement('seal')} disabled={Boolean(blocker)}>
+                  {blocker ?? 'Review'}
+                </Button>
+              </div>
+            }
           />
-        </div>
-        <p className="text-xs text-secondary">Guests can travel up to a year — accounts go to 50.</p>
-        {horizonError ? <p className="text-sm text-[var(--color-danger)]">{horizonError}</p> : null}
-      </section>
+        ) : null}
 
-      <section className="flex flex-col gap-2 opacity-60">
-        {['Photos & media', 'Send by email', 'Place, passphrase & identity seals'].map((label) => (
-          <div
-            key={label}
-            className="flex items-center justify-between rounded-[var(--radius-card)] border border-dashed border-[var(--color-text-secondary)]/20 px-4 py-3"
-          >
-            <span className="text-sm text-foreground">{label}</span>
-            <span className="text-xs text-secondary">Sign up free to unlock</span>
-          </div>
-        ))}
-      </section>
-
-      <Button size="lg" onClick={() => void seal()} loading={sealing} disabled={!guestToken || !!horizonError || letter.trim().length === 0}>
-        Seal it
-      </Button>
-    </main>
+        {movement === 'seal' ? (
+          <>
+            <SealMovement
+              draft={draft}
+              capabilities={GUEST_CAPABILITIES}
+              enclosures={[]}
+              addressee={null}
+              opensAt={unlockAt}
+              tz={tz}
+              hasRecipients={false}
+              sealing={sealing}
+              onSeal={() => void seal()}
+            />
+            {sessionError ? (
+              <p role="alert" className="pt-4 text-[length:var(--text-body-s)] text-[var(--color-danger)]">
+                This capsule cannot be started right now — the connection did not go through. Your letter is kept on
+                this device; reload the page to try again.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </main>
+    </div>
   );
 }

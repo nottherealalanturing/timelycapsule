@@ -95,6 +95,12 @@ export const PatchCapsuleRequestSchema = z
     // now because T-11's composer needs the "break-glass for self" toggle.
     // The actual early-open request flow (F3, 48h delay) is a later ticket.
     breakGlass: z.enum(['disabled', 'allowed']),
+    // Exposed for Capsule Creation V2's Address movement, where "who is this
+    // for" is the first question asked rather than something settled before
+    // the composer opens. Safe because patching is gated to drafts
+    // (`state-machine.ts` assertCanPatch) — a sealed capsule's type is as
+    // immutable as its contents.
+    type: CapsuleTypeSchema,
   })
   .partial();
 export type PatchCapsuleRequest = z.infer<typeof PatchCapsuleRequestSchema>;
