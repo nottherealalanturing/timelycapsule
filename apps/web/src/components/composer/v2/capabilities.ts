@@ -11,9 +11,12 @@
  * available. That keeps the guest flow from drifting into a second composer,
  * which is exactly what happened the first time.
  *
- * Unavailable does not mean hidden. `01 §4.1b` phrases guest limits as
- * invitations upward rather than absences, and a capability the writer cannot
- * see cannot be a reason to sign up.
+ * Unavailable means omitted, not disabled-with-a-label. A row that exists to
+ * advertise what a capability requires reads as a paywall inside the writing
+ * surface, and the guest flow should feel complete on its own rather than a
+ * preview of a better product. Where an account genuinely adds something, that
+ * is surfaced naturally at the moment of creating one — the seal handoff, the
+ * signup screen — not as a persistent locked row beside the letter.
  */
 export interface ComposerCapabilities {
   /** Files and voice notes. Guests have no media pipeline. */
@@ -26,8 +29,6 @@ export interface ComposerCapabilities {
   conditions: boolean;
   /** How far out this entry point may schedule. */
   maxHorizonMs: number;
-  /** Shown against anything unavailable. */
-  upgradeHint: string;
 }
 
 const YEAR_MS = 365 * 24 * 60 * 60 * 1000;
@@ -38,7 +39,6 @@ export const ACCOUNT_CAPABILITIES: ComposerCapabilities = {
   recipients: true,
   conditions: true,
   maxHorizonMs: 50 * 365.25 * 24 * 60 * 60 * 1000,
-  upgradeHint: '',
 };
 
 export const GUEST_CAPABILITIES: ComposerCapabilities = {
@@ -47,5 +47,4 @@ export const GUEST_CAPABILITIES: ComposerCapabilities = {
   recipients: false,
   conditions: false,
   maxHorizonMs: YEAR_MS,
-  upgradeHint: 'Free account',
 };

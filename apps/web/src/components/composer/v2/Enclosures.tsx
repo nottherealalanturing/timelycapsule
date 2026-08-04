@@ -53,6 +53,12 @@ function formatBytes(n: number | null): string {
  * Enclosures sit outside the record, in the instrument register. They are
  * attached to the letter rather than part of it, and keeping them off the paper
  * leaves the writing surface clean.
+ *
+ * Unavailable kinds are omitted rather than shown disabled with an upgrade
+ * label. A row that exists to advertise what a plan cannot do reads as a
+ * paywall inside the writing surface, and the guest flow should feel complete
+ * on its own rather than a preview of a better product — the natural moment
+ * to learn what an account adds is at account creation, not mid-letter.
  */
 export function Enclosures({
   items,
@@ -85,6 +91,10 @@ export function Enclosures({
 
   const nothingAvailable = !capabilities.enclosures && !capabilities.placeMemory;
   const isEmpty = items.length === 0 && uploading.length === 0 && !writtenAt;
+
+  // Nothing enclosed and nothing enclosable — the whole section is omitted
+  // rather than left as an empty shell announcing a limit.
+  if (nothingAvailable && isEmpty) return null;
 
   return (
     <section aria-label="Enclosures" className={cn('flex flex-col gap-3', className)}>
@@ -181,14 +191,7 @@ export function Enclosures({
         </ul>
       )}
 
-      {nothingAvailable ? (
-        <div className="flex items-center justify-between gap-3 rounded-[var(--radius-input)] border border-dashed border-[var(--color-rule-strong)] px-3 py-2.5">
-          <span className="text-[length:var(--text-body-s)] text-secondary">Photographs, voice notes and places</span>
-          <span className="shrink-0 font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary">
-            {capabilities.upgradeHint}
-          </span>
-        </div>
-      ) : (
+      {nothingAvailable ? null : (
         <div ref={menuRef} className="relative self-start">
           <button
             type="button"
@@ -205,36 +208,39 @@ export function Enclosures({
               role="menu"
               className="absolute left-0 top-full z-20 mt-1 w-64 rounded-[var(--radius-input)] border border-[var(--color-rule-strong)] bg-[var(--color-bg-raised)] p-1 shadow-md"
             >
-              <MenuItem
-                glyph="▣"
-                label="A photograph, video or file"
-                available={capabilities.enclosures}
-                hint={capabilities.upgradeHint}
-                onSelect={() => {
-                  setMenuOpen(false);
-                  fileRef.current?.click();
-                }}
-              />
-              <MenuItem
-                glyph="♪"
-                label={recording ? 'Stop recording' : 'A voice note'}
-                available={capabilities.enclosures}
-                hint={capabilities.upgradeHint}
-                onSelect={() => {
-                  setMenuOpen(false);
-                  onRecord();
-                }}
-              />
-              <MenuItem
-                glyph="⌖"
-                label={writtenAt ? 'Change where this was written' : 'Where this was written'}
-                available={capabilities.placeMemory}
-                hint={capabilities.upgradeHint}
-                onSelect={() => {
-                  setMenuOpen(false);
-                  onAddPlace();
-                }}
-              />
+              {/* Only offered kinds this entry point actually supports —
+                  see the note above on why an unavailable kind is omitted
+                  rather than shown disabled. */}
+              {capabilities.enclosures ? (
+                <>
+                  <MenuItem
+                    glyph="▣"
+                    label="A photograph, video or file"
+                    onSelect={() => {
+                      setMenuOpen(false);
+                      fileRef.current?.click();
+                    }}
+                  />
+                  <MenuItem
+                    glyph="♪"
+                    label={recording ? 'Stop recording' : 'A voice note'}
+                    onSelect={() => {
+                      setMenuOpen(false);
+                      onRecord();
+                    }}
+                  />
+                </>
+              ) : null}
+              {capabilities.placeMemory ? (
+                <MenuItem
+                  glyph="⌖"
+                  label={writtenAt ? 'Change where this was written' : 'Where this was written'}
+                  onSelect={() => {
+                    setMenuOpen(false);
+                    onAddPlace();
+                  }}
+                />
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -311,45 +317,26 @@ function RowAction({
   );
 }
 
-/**
- * Unavailable, not absent. `01 §4.1b` phrases guest limits as invitations
- * upward — a capability the writer never sees cannot be a reason to sign up,
- * and hiding it also means the two entry points stop looking like one product.
- */
 function MenuItem({
   glyph,
   label,
-  available,
-  hint,
   onSelect,
 }: {
   glyph: string;
   label: string;
-  available: boolean;
-  hint: string;
   onSelect: () => void;
 }) {
   return (
     <button
       type="button"
       role="menuitem"
-      disabled={!available}
-      title={available ? undefined : `${hint} required`}
       onClick={onSelect}
-      className={cn(
-        'flex w-full items-center gap-3 rounded-[var(--radius-input)] px-3 py-2 text-left text-[length:var(--text-body-s)]',
-        available ? 'text-foreground hover:bg-[var(--color-bg-primary)]' : 'cursor-not-allowed text-secondary',
-      )}
+      className="flex w-full items-center gap-3 rounded-[var(--radius-input)] px-3 py-2 text-left text-[length:var(--text-body-s)] text-foreground hover:bg-[var(--color-bg-primary)]"
     >
       <span aria-hidden className="w-4 shrink-0 text-center font-[var(--font-mono)] text-secondary">
         {glyph}
       </span>
       <span className="flex-1">{label}</span>
-      {!available ? (
-        <span className="shrink-0 font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary">
-          {hint}
-        </span>
-      ) : null}
     </button>
   );
 }

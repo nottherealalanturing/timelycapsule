@@ -239,18 +239,6 @@ export default function GuestComposerPage() {
         <p className="text-xs text-secondary">For your own reference. Recipients never see it.</p>
       </section>
 
-      <section className="flex flex-col gap-2">
-        {['Send by email', 'Place, passphrase and identity seals'].map((label) => (
-          <div
-            key={label}
-            className="flex items-center justify-between rounded-[var(--radius-card)] border border-dashed border-[var(--color-rule-strong)] px-4 py-3"
-          >
-            <span className="text-sm text-secondary">{label}</span>
-            <span className="font-[var(--font-mono)] text-xs uppercase tracking-[0.1em] text-secondary">Free account</span>
-          </div>
-        ))}
-      </section>
-
       {sessionError ? (
         <p role="alert" className="text-sm text-[var(--color-danger)]">
           This capsule cannot be started right now — the connection did not go through. Your letter is kept on this
