@@ -6,14 +6,16 @@ import { Button, Record, useToast } from '@tc/ui-web';
 import { zipSync } from 'fflate';
 import { useEffect, useRef, useState } from 'react';
 import { revealApi } from '../../lib/api-client';
+import { envelopeText } from '../../lib/letter-envelope';
 import { TransitStage } from './TransitStage';
 import { segment, useTransit } from './use-transit';
 
-function renderDoc(doc: unknown): string {
-  const node = doc as { content?: { content?: { text?: string }[] }[] } | null;
-  if (!node?.content) return '';
-  return node.content.map((block) => (block.content ?? []).map((leaf) => leaf.text ?? '').join('')).join('\n\n');
-}
+/**
+ * Accepts both the V2 letter envelope and the bare document older capsules
+ * hold — a recipient must never meet a blank screen because the shape changed
+ * after their capsule was sealed.
+ */
+const renderDoc = envelopeText;
 
 /**
  * Named reactions, not emoji. `07 §VIII.5` bans emoji absolutely, with no

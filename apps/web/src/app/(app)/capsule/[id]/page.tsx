@@ -11,19 +11,18 @@ import { resolveUnlockDate } from '../../../../components/CapsuleCard';
 import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
 import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, mediaApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
 import { decodeIvCiphertext } from '../../../../lib/capsule-crypto';
+import { envelopeText } from '../../../../lib/letter-envelope';
 import { useMasterKey } from '../../../../lib/master-key-context';
 import { MasterKeyGate } from '../../../../components/MasterKeyGate';
 
 type Tab = 'overview' | 'recipients' | 'activity' | 'contents';
 
-/** Minimal read-only rendering of a TipTap JSON doc — plain paragraphs, not a full rich-text renderer (the letter only ever uses minimal marks, see T-11). */
-function renderDoc(doc: unknown): string {
-  const node = doc as { content?: { content?: { text?: string }[] }[] } | null;
-  if (!node?.content) return '';
-  return node.content
-    .map((block) => (block.content ?? []).map((leaf) => leaf.text ?? '').join(''))
-    .join('\n\n');
-}
+/**
+ * Minimal read-only rendering — plain paragraphs, not a full rich-text
+ * renderer, since the letter only ever uses minimal marks (T-11). Reads both
+ * the V2 letter envelope and the bare document older capsules hold.
+ */
+const renderDoc = envelopeText;
 
 function coverStyle(cover: Capsule['cover']): React.CSSProperties {
   if (cover?.kind === 'gradient') return { background: cover.value };

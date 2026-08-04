@@ -13,17 +13,10 @@ import {
   wallClockIn,
   zoneOffsetLabel,
 } from '../../lib/zoned-time';
+import { RECIPIENT_LOCAL, ZonePicker } from './v2/ZonePicker';
 
 const MIN_MS = 5 * 60 * 1000;
 const MAX_MS = 50 * 365.25 * 24 * 60 * 60 * 1000;
-
-const TIMEZONES: string[] = (() => {
-  try {
-    return Intl.supportedValuesOf('timeZone');
-  } catch {
-    return [browserZone()];
-  }
-})();
 
 /**
  * Every reading below goes through `lib/zoned-time`, so the field, the summary
@@ -192,12 +185,12 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
           }}
           className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         />
-        <select
-          aria-label="Time zone"
-          value={recipientLocal ? '__recipient_local__' : tz}
-          onChange={(e) => {
-            const chosen = e.target.value;
-            if (chosen === '__recipient_local__') {
+        <ZonePicker
+          className="min-w-[16rem] flex-1"
+          value={recipientLocal ? RECIPIENT_LOCAL : tz}
+          at={currentDate ?? new Date()}
+          onChange={(chosen) => {
+            if (chosen === RECIPIENT_LOCAL) {
               draft.patch({
                 unlockMode: 'recipient_local',
                 unlockLocal: currentDate
@@ -219,15 +212,7 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
               unlockAt: moved ? moved.toISOString() : null,
             });
           }}
-          className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
-        >
-          <option value="__recipient_local__">Recipient&apos;s local time</option>
-          {TIMEZONES.map((z) => (
-            <option key={z} value={z}>
-              {z}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       <label className="flex items-center gap-2 text-[length:var(--text-body-s)] text-secondary">

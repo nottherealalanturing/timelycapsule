@@ -16,8 +16,15 @@ import { capsulesApi, recipientsApi } from './api-client';
 import { decodeIvCiphertext, encodeIvCiphertext } from './capsule-crypto';
 import { useMasterKey } from './master-key-context';
 
-/** Empty TipTap document — the shape TipTap's JSON export always has at minimum. */
-const EMPTY_DOC = { type: 'doc', content: [{ type: 'paragraph' }] };
+import { emptyEnvelope, readEnvelope } from './letter-envelope';
+
+/**
+ * `contentDoc` holds a `LetterEnvelope` — the TipTap document plus anything
+ * else that is *content* and therefore has to be encrypted with it, currently
+ * place-as-memory. Capsules written before V2 hold a bare document here;
+ * `readEnvelope` accepts both, so there is nothing to migrate.
+ */
+const EMPTY_DOC = emptyEnvelope();
 
 function draftCacheKey(capsuleId: string): string {
   return `tc:draft:${capsuleId}`;
@@ -163,10 +170,10 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
       } else if (loaded.contentDocEnc) {
         const { iv, ciphertext } = decodeIvCiphertext(loaded.contentDocEnc);
         const plaintext = await decryptBytes(capsuleKey, iv, ciphertext);
-        const doc = JSON.parse(new TextDecoder().decode(plaintext));
+        const envelope = readEnvelope(JSON.parse(new TextDecoder().decode(plaintext)));
         setCapsule(loaded);
-        contentDocRef.current = doc;
-        setContentDocState(doc);
+        contentDocRef.current = envelope;
+        setContentDocState(envelope);
       } else {
         setCapsule(loaded);
         contentDocRef.current = EMPTY_DOC;
@@ -253,7 +260,10 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
 
   const setContentDoc = useCallback(
     (doc: unknown) => {
-      if (!contentAddedFiredRef.current && JSON.stringify(doc) !== JSON.stringify(EMPTY_DOC)) {
+      const written = readEnvelope(doc);
+      const isBlank =
+        JSON.stringify(written.doc) === JSON.stringify(EMPTY_DOC.doc) && written.writtenAt === null;
+      if (!contentAddedFiredRef.current && !isBlank) {
         contentAddedFiredRef.current = true;
         track('content_added');
       }
