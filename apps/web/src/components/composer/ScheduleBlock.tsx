@@ -3,6 +3,16 @@
 import * as chrono from 'chrono-node';
 import { useMemo, useState } from 'react';
 import type { CapsuleDraft } from '../../lib/use-capsule-draft';
+import {
+  browserZone,
+  dateInputValue,
+  instantFrom,
+  parseWallClock,
+  reanchor,
+  timeInputValue,
+  wallClockIn,
+  zoneOffsetLabel,
+} from '../../lib/zoned-time';
 
 const MIN_MS = 5 * 60 * 1000;
 const MAX_MS = 50 * 365.25 * 24 * 60 * 60 * 1000;
@@ -11,21 +21,26 @@ const TIMEZONES: string[] = (() => {
   try {
     return Intl.supportedValuesOf('timeZone');
   } catch {
-    return [Intl.DateTimeFormat().resolvedOptions().timeZone];
+    return [browserZone()];
   }
 })();
 
-function toDateInputValue(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-function toTimeInputValue(d: Date): string {
-  return d.toISOString().slice(11, 16);
-}
-
-function summarySentence(date: Date, tz: string, recipientLocal: boolean): string {
-  const dateStr = date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: tz });
-  const timeStr = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tz });
-  return `Unlocks ${dateStr} at ${timeStr}${recipientLocal ? " (recipient's local time)" : ` (${tz})`}.`;
+/**
+ * Every reading below goes through `lib/zoned-time`, so the field, the summary
+ * sentence and the stored instant cannot disagree — see that module's header
+ * for what went wrong when they were computed independently.
+ */
+function summarySentence(instant: Date, tz: string, recipientLocal: boolean): string {
+  const dateStr = instant.toLocaleDateString(undefined, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: tz,
+  });
+  const timeStr = instant.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', timeZone: tz });
+  const where = recipientLocal ? "recipient's local time" : `${tz}, ${zoneOffsetLabel(instant, tz)}`;
+  return `Unlocks ${dateStr} at ${timeStr} (${where}).`;
 }
 
 export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
@@ -34,8 +49,28 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
   const [nlError, setNlError] = useState<string | null>(null);
 
   const recipientLocal = capsule.unlockMode === 'recipient_local';
-  const tz = capsule.unlockLocal?.tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const currentDate = useMemo(() => (capsule.unlockAt ? new Date(capsule.unlockAt) : null), [capsule.unlockAt]);
+
+  // In absolute mode the zone is an *entry and display* preference, not capsule
+  // data: once an instant is fixed, the capsule opens at that instant whatever
+  // zone you read it in. It deliberately isn't persisted to `unlockLocal` —
+  // the scheduler keys DST re-resolution off that column being non-null rather
+  // than off `unlockMode` (`scheduler/resolver.ts`), so writing it here would
+  // quietly opt absolute capsules into wall-clock rescheduling.
+  const [zone, setZone] = useState(() => capsule.unlockLocal?.tz ?? browserZone());
+  const tz = recipientLocal ? (capsule.unlockLocal?.tz ?? zone) : zone;
+
+  // Recipient-local capsules carry no `unlockAt` — the instant genuinely isn't
+  // determined until we know where the recipient is. The controls still need
+  // something to render, so the stored wall clock is resolved against the
+  // sender's chosen zone for display purposes only; nothing is written back.
+  const currentDate = useMemo(() => {
+    if (capsule.unlockAt) return new Date(capsule.unlockAt);
+    if (capsule.unlockLocal) {
+      const wall = parseWallClock(capsule.unlockLocal.date, capsule.unlockLocal.time);
+      if (wall) return instantFrom(wall, capsule.unlockLocal.tz);
+    }
+    return null;
+  }, [capsule.unlockAt, capsule.unlockLocal]);
 
   // Date.now() is impure and can't be called during render — a useState
   // lazy initializer is React's sanctioned escape hatch for exactly this
@@ -55,11 +90,16 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
   function setDateTime(next: Date) {
     if (recipientLocal) {
       draft.patch({
-        unlockLocal: { date: toDateInputValue(next), time: toTimeInputValue(next), tz },
+        unlockLocal: { date: dateInputValue(next, tz), time: timeInputValue(next, tz), tz },
       });
     } else {
       draft.patch({ unlockAt: next.toISOString() });
     }
+  }
+
+  /** Writes a wall-clock reading, resolved against the selected zone. */
+  function setWallClock(next: { year: number; month: number; day: number; hour: number; minute: number }) {
+    setDateTime(instantFrom(next, tz));
   }
 
   function handleNaturalLanguage(value: string) {
@@ -71,30 +111,34 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
     const parsed = chrono.parseDate(value);
     if (parsed) {
       setNlError(null);
-      setDateTime(parsed);
+      // chrono resolves against the browser's own zone. What the person meant
+      // was a reading — "next New Year at 9am" is 9am wherever they said the
+      // capsule opens — so the wall clock it produced is re-resolved against
+      // the selected zone rather than its instant being taken literally.
+      const local = browserZone();
+      setWallClock(wallClockIn(parsed, local));
     } else {
       setNlError("Couldn't parse that — try \"in 18 months\" or a specific date");
     }
   }
 
   function shortcut(kind: 'next-new-year' | '+1y' | '+5y' | '+10y') {
-    const now = new Date();
-    let next: Date;
+    const here = wallClockIn(new Date(), tz);
+    const at9 = { hour: 9, minute: 0 };
     switch (kind) {
       case 'next-new-year':
-        next = new Date(now.getFullYear() + 1, 0, 1, 9, 0);
+        setWallClock({ year: here.year + 1, month: 1, day: 1, ...at9 });
         break;
       case '+1y':
-        next = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate(), 9, 0);
+        setWallClock({ ...here, year: here.year + 1, ...at9 });
         break;
       case '+5y':
-        next = new Date(now.getFullYear() + 5, now.getMonth(), now.getDate(), 9, 0);
+        setWallClock({ ...here, year: here.year + 5, ...at9 });
         break;
       case '+10y':
-        next = new Date(now.getFullYear() + 10, now.getMonth(), now.getDate(), 9, 0);
+        setWallClock({ ...here, year: here.year + 10, ...at9 });
         break;
     }
-    setDateTime(next);
   }
 
   return (
@@ -129,13 +173,10 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
         <input
           type="date"
           aria-label="Unlock date"
-          value={currentDate ? toDateInputValue(currentDate) : ''}
+          value={currentDate ? dateInputValue(currentDate, tz) : ''}
           onChange={(e) => {
-            const base = currentDate ?? new Date();
-            const [y, m, d] = e.target.value.split('-').map(Number);
-            const next = new Date(base);
-            next.setFullYear(y!, m! - 1, d);
-            setDateTime(next);
+            const wall = parseWallClock(e.target.value, currentDate ? timeInputValue(currentDate, tz) : '09:00');
+            if (wall) setWallClock(wall);
           }}
           className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         />
@@ -143,13 +184,11 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
           type="time"
           aria-label="Unlock time"
           step={900}
-          value={currentDate ? toTimeInputValue(currentDate) : ''}
+          value={currentDate ? timeInputValue(currentDate, tz) : ''}
           onChange={(e) => {
             const base = currentDate ?? new Date();
-            const [h, min] = e.target.value.split(':').map(Number);
-            const next = new Date(base);
-            next.setHours(h!, min!, 0, 0);
-            setDateTime(next);
+            const wall = parseWallClock(dateInputValue(base, tz), e.target.value);
+            if (wall) setWallClock(wall);
           }}
           className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         />
@@ -157,14 +196,28 @@ export function ScheduleBlock({ draft }: { draft: CapsuleDraft }) {
           aria-label="Time zone"
           value={recipientLocal ? '__recipient_local__' : tz}
           onChange={(e) => {
-            if (e.target.value === '__recipient_local__') {
+            const chosen = e.target.value;
+            if (chosen === '__recipient_local__') {
               draft.patch({
                 unlockMode: 'recipient_local',
-                unlockLocal: currentDate ? { date: toDateInputValue(currentDate), time: toTimeInputValue(currentDate), tz } : null,
+                unlockLocal: currentDate
+                  ? { date: dateInputValue(currentDate, tz), time: timeInputValue(currentDate, tz), tz }
+                  : null,
               });
-            } else {
-              draft.patch({ unlockMode: 'absolute', unlockLocal: null, unlockAt: currentDate?.toISOString() ?? null });
+              return;
             }
+            // Choosing a zone re-anchors: the reading stays put and the instant
+            // moves under it, because "09:00 in New York" is a different moment
+            // from "09:00 in Lagos". Previously this rewrote only the label, so
+            // the capsule kept opening at the old instant while claiming the
+            // new zone.
+            const moved = currentDate ? reanchor(currentDate, tz, chosen) : null;
+            setZone(chosen);
+            draft.patch({
+              unlockMode: 'absolute',
+              unlockLocal: null,
+              unlockAt: moved ? moved.toISOString() : null,
+            });
           }}
           className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
         >
