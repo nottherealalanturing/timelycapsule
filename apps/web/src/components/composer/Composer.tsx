@@ -12,11 +12,11 @@ import { useAuth } from '../../lib/auth-context';
 import { type AutosaveStatus, useCapsuleDraft } from '../../lib/use-capsule-draft';
 import { AddressMovement } from './v2/AddressMovement';
 import { ComposeMovement } from './v2/ComposeMovement';
+import { MovementNav, type Movement } from './v2/MovementNav';
+import { SealMovement } from './v2/SealMovement';
 import { ACCOUNT_CAPABILITIES } from './v2/capabilities';
 import { useEnclosures } from './v2/use-enclosures';
-import { SealsBlock } from './SealsBlock';
 import { SealCeremony } from './SealCeremony';
-import { SealConfirmSheet } from './SealConfirmSheet';
 import { firstCompletenessBlocker } from './completeness';
 
 function statusText(status: AutosaveStatus): string {
@@ -32,6 +32,24 @@ function statusText(status: AutosaveStatus): string {
     default:
       return '';
   }
+}
+
+/**
+ * The way onward, at the end of a movement rather than pinned to the frame.
+ *
+ * `07 §IX` asks that sealing never be a side-effect of finishing a sentence,
+ * and a sticky advance button is exactly that side-effect: always in view,
+ * always one distracted tap away. Placing it after the work means reaching the
+ * next movement is something a writer travels to.
+ */
+function Advance({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-end pt-2">
+      <Button onClick={onClick} disabled={disabled}>
+        {children}
+      </Button>
+    </div>
+  );
 }
 
 export interface InitialRecipient {
@@ -88,7 +106,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
     void addRecipient(initialRecipient);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRecipient, recipients.length]);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [movement, setMovement] = useState<Movement>('address');
   const [ceremonyOpen, setCeremonyOpen] = useState(false);
   const [sealing, setSealing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -124,7 +142,6 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
       if (draft.capsule?.announceOnSeal) {
         await draft.sendAnnounceToAll(capsuleId);
       }
-      setConfirmOpen(false);
       setCeremonyOpen(true);
     } catch {
       show("Couldn't seal the capsule. Please try again.");
@@ -153,17 +170,28 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
   }
 
   const blocker = firstCompletenessBlocker(draft.capsule, envelopeText(draft.contentDoc).trim().length > 0);
+  const hasMoment = Boolean(draft.capsule.unlockAt || draft.capsule.unlockLocal);
+  const opensAt = draft.capsule.unlockAt ? new Date(draft.capsule.unlockAt) : null;
+  const tz = draft.capsule.unlockLocal?.tz ?? browserZone();
+  const recipientLocal = draft.capsule.unlockMode === 'recipient_local';
+
+  // Movements ahead of the work stay unlit rather than gated: you cannot review
+  // a capsule with no letter, but nothing stops you going back for one.
+  const reachable: Movement[] = ['address'];
+  if (hasMoment) reachable.push('compose');
+  if (!blocker) reachable.push('seal');
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-6 py-3 backdrop-blur">
         <Button variant="ghost" size="sm" onClick={handleClose}>
           Close
         </Button>
+        <MovementNav current={movement} available={reachable} onGo={setMovement} />
         {/* Autosave state is announced, not just shown — a draft silently
             failing to save is exactly the kind of thing a sighted user
             notices in the corner and a screen-reader user never learns. */}
-        <span aria-live="polite" className="text-[length:var(--text-caption)] text-secondary">
+        <span aria-live="polite" className="hidden text-[length:var(--text-caption)] text-secondary sm:block">
           {statusText(draft.autosaveStatus)}
         </span>
         <div className="relative">
@@ -192,45 +220,59 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-14 px-6 py-10">
-        <AddressMovement
-          draft={draft}
-          capabilities={ACCOUNT_CAPABILITIES}
-          recipients={recipients}
-          contacts={contacts}
-          onAddRecipient={addRecipient}
-          onRemoveRecipient={(id) => void removeRecipient(id)}
-          recipientError={recipientError}
-          selfBirthday={user?.birthday ?? null}
-        />
-        <ComposeMovement
-          draft={draft}
-          capabilities={ACCOUNT_CAPABILITIES}
-          enclosures={enclosures}
-          addressee={addressee}
-          opensAt={draft.capsule.unlockAt ? new Date(draft.capsule.unlockAt) : null}
-          tz={draft.capsule.unlockLocal?.tz ?? browserZone()}
-          recipientLocal={draft.capsule.unlockMode === 'recipient_local'}
-        />
-        <SealsBlock draft={draft} />
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-10">
+        {movement === 'address' ? (
+          <AddressMovement
+            draft={draft}
+            capabilities={ACCOUNT_CAPABILITIES}
+            recipients={recipients}
+            contacts={contacts}
+            onAddRecipient={addRecipient}
+            onRemoveRecipient={(id) => void removeRecipient(id)}
+            recipientError={recipientError}
+            selfBirthday={user?.birthday ?? null}
+            footer={
+              <Advance onClick={() => setMovement('compose')} disabled={!hasMoment}>
+                Compose
+              </Advance>
+            }
+          />
+        ) : null}
+
+        {movement === 'compose' ? (
+          <ComposeMovement
+            draft={draft}
+            capabilities={ACCOUNT_CAPABILITIES}
+            enclosures={enclosures}
+            addressee={addressee}
+            opensAt={opensAt}
+            tz={tz}
+            recipientLocal={recipientLocal}
+            footer={
+              <Advance onClick={() => setMovement('seal')} disabled={Boolean(blocker)}>
+                {blocker ?? 'Review'}
+              </Advance>
+            }
+          />
+        ) : null}
+
+        {movement === 'seal' ? (
+          <SealMovement
+            draft={draft}
+            capabilities={ACCOUNT_CAPABILITIES}
+            enclosures={enclosures.items}
+            addressee={addressee}
+            opensAt={opensAt}
+            tz={tz}
+            recipientLocal={recipientLocal}
+            hasRecipients={recipients.length > 0}
+            uploadsInFlight={enclosures.uploading.length}
+            sealing={sealing}
+            onSeal={handleConfirmSeal}
+          />
+        ) : null}
       </main>
 
-      <footer className="sticky bottom-0 border-t border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-6 py-4 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center justify-between gap-4">
-          <span className="text-[length:var(--text-body-s)] text-secondary">{blocker ?? 'Ready to seal'}</span>
-          <Button disabled={Boolean(blocker)} onClick={() => setConfirmOpen(true)}>
-            Seal capsule
-          </Button>
-        </div>
-      </footer>
-
-      <SealConfirmSheet
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        capsule={draft.capsule}
-        loading={sealing}
-        onConfirm={handleConfirmSeal}
-      />
       <SealCeremony open={ceremonyOpen} onDone={handleCeremonyDone} />
     </div>
   );
