@@ -37,6 +37,7 @@ function toUserResponse(user: UserRow): User {
     displayName: user.displayName,
     handle: user.handle,
     avatarKey: user.avatarKey,
+    birthday: user.birthday,
     timezone: user.timezone,
     locale: user.locale,
     status: user.status,

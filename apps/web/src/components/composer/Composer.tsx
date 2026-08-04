@@ -8,6 +8,7 @@ import { track } from '../../lib/analytics';
 import { capsulesApi, contactsApi, recipientsApi } from '../../lib/api-client';
 import { envelopeText } from '../../lib/letter-envelope';
 import { browserZone } from '../../lib/zoned-time';
+import { useAuth } from '../../lib/auth-context';
 import { type AutosaveStatus, useCapsuleDraft } from '../../lib/use-capsule-draft';
 import { AddressMovement } from './v2/AddressMovement';
 import { ComposeMovement } from './v2/ComposeMovement';
@@ -42,6 +43,7 @@ export interface InitialRecipient {
 export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; initialRecipient?: InitialRecipient }) {
   const router = useRouter();
   const { show } = useToast();
+  const { user } = useAuth();
   const draft = useCapsuleDraft(capsuleId);
   const enclosures = useEnclosures(capsuleId, draft);
   const queryClient = useQueryClient();
@@ -199,6 +201,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
           onAddRecipient={addRecipient}
           onRemoveRecipient={(id) => void removeRecipient(id)}
           recipientError={recipientError}
+          selfBirthday={user?.birthday ?? null}
         />
         <ComposeMovement
           draft={draft}

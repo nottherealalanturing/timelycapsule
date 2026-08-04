@@ -2,7 +2,7 @@
 
 import { approachTemperature, cn } from '@tc/ui-web';
 import { useState } from 'react';
-import { gapPhrase, type HorizonChoice } from '../../../lib/horizons';
+import type { HorizonChoice } from '../../../lib/horizons';
 import { zoneOffsetLabel } from '../../../lib/zoned-time';
 import { zoneChoice } from '../../../lib/zones';
 
@@ -13,9 +13,8 @@ export interface HorizonProps {
   onSelect: (at: Date) => void;
   tz: string;
   recipientLocal?: boolean;
-  /** Age the recipient will be at the selected moment, where a birthday is known. */
-  ageAtUnlock?: number | null;
-  recipientName?: string | null;
+  /** Why the capsule opens at a given instant — see `reasonFor`. */
+  reason: (at: Date) => string;
   className?: string;
 }
 
@@ -87,8 +86,7 @@ export function Horizon({
   onSelect,
   tz,
   recipientLocal = false,
-  ageAtUnlock,
-  recipientName,
+  reason,
   className,
 }: HorizonProps) {
   const [previewing, setPreviewing] = useState<string | null>(null);
@@ -131,14 +129,7 @@ export function Horizon({
         <span className="absolute right-0 top-0 h-full w-px bg-[var(--color-rule-strong)]" />
       </div>
 
-      <Reading
-        now={now}
-        at={shown}
-        tz={tz}
-        recipientLocal={recipientLocal}
-        ageAtUnlock={previewed ? null : ageAtUnlock}
-        recipientName={recipientName}
-      />
+      <Reading at={shown} tz={tz} recipientLocal={recipientLocal} reason={shown ? reason(shown) : null} />
 
       <ul className="flex flex-col gap-px">
         {candidates.map((c) => {
@@ -160,10 +151,12 @@ export function Horizon({
                 )}
               >
                 <span className="flex items-baseline gap-2">
+                  {/* An occasion is the thing worth choosing, so it carries
+                      the weight; a length is a fallback and reads as one. */}
                   <span
                     className={cn(
                       'text-[length:var(--text-body-s)]',
-                      isSelected ? 'text-foreground' : 'text-foreground',
+                      c.kind === 'moment' ? 'text-foreground' : 'text-secondary',
                     )}
                   >
                     {c.label}
@@ -193,19 +186,15 @@ export function Horizon({
  * and it is the reason to choose one moment over another.
  */
 function Reading({
-  now,
   at,
   tz,
   recipientLocal,
-  ageAtUnlock,
-  recipientName,
+  reason,
 }: {
-  now: Date;
   at: Date | null;
   tz: string;
   recipientLocal: boolean;
-  ageAtUnlock?: number | null;
-  recipientName?: string | null;
+  reason: string | null;
 }) {
   if (!at) {
     return (
@@ -232,15 +221,12 @@ function Reading({
       <p className="font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary">
         {recipientLocal ? "Wherever they are · exact instant set when they're known" : `${zoneChoice(tz).city} · ${zoneOffsetLabel(at, tz)}`}
       </p>
-      {/* Not coloured with the ramp. `05 §Two rules` restricts temperature to a
-          marker and a rule — never text, never a text-bearing surface — and
-          the arithmetic carries its own weight without help. */}
-      <p className="text-[length:var(--text-body-s)] text-foreground">
-        {gapPhrase(now.getTime(), at.getTime())}
-        {ageAtUnlock !== null && ageAtUnlock !== undefined && recipientName ? (
-          <> {recipientName} will be {ageAtUnlock}.</>
-        ) : null}
-      </p>
+      {/* The occasion, not the measurement. Having chosen "when Amara turns
+          ten", restating that it is ten years away tells the writer something
+          they already know — and the full date is directly above. Not coloured
+          with the ramp either: `05 §Two rules` restricts temperature to a
+          marker and a rule, never text. */}
+      <p className="text-[length:var(--text-body-s)] text-foreground">{reason}</p>
     </div>
   );
 }

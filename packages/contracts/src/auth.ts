@@ -19,6 +19,13 @@ export const UserSchema = z.object({
   displayName: z.string(),
   handle: z.string().nullable(),
   avatarKey: z.string().nullable(),
+  /**
+   * `YYYY-MM-DD`, or null. The column has existed since T-02 and
+   * `PatchMeRequest` has always accepted it; nothing read it back until
+   * Capsule Creation V2's Horizon, which uses it to offer a writer moments in
+   * their own life ("When you turn 40") rather than only lengths of time.
+   */
+  birthday: z.string().nullable(),
   timezone: z.string(),
   locale: z.string(),
   status: z.enum(['unverified', 'active', 'suspended', 'pending_deletion', 'deleted', 'ghost']),

@@ -2,8 +2,8 @@
 
 import type { Contact, Recipient } from '@tc/contracts';
 import { cn } from '@tc/ui-web';
-import { useMemo, useState, type ReactNode } from 'react';
-import { ageAt, horizonCandidates } from '../../../lib/horizons';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { horizonCandidates, reasonFor, type HorizonPerson } from '../../../lib/horizons';
 import type { CapsuleDraft } from '../../../lib/use-capsule-draft';
 import { browserZone, dateInputValue, instantFrom, reanchor, timeInputValue, type WallClock } from '../../../lib/zoned-time';
 import { AddresseeBeat } from './AddresseeBeat';
@@ -22,6 +22,8 @@ export interface AddressMovementProps {
   onAddRecipient: (input: { email?: string; phone?: string; displayName?: string }) => Promise<void>;
   onRemoveRecipient: (id: string) => void;
   recipientError?: string | null;
+  /** The writer's own birthday, so a capsule to yourself can offer your own milestones. */
+  selfBirthday?: string | null;
   footer?: ReactNode;
   className?: string;
 }
@@ -49,6 +51,7 @@ export function AddressMovement({
   onAddRecipient,
   onRemoveRecipient,
   recipientError,
+  selfBirthday = null,
   footer,
   className,
 }: AddressMovementProps) {
@@ -76,10 +79,18 @@ export function AddressMovement({
     return null;
   }, [capsule.unlockAt, capsule.unlockLocal]);
 
-  // The first named recipient anchors the milestone horizons. A capsule to
-  // several people still gets one set of moments; offering a separate ladder
-  // per recipient would turn a decision into a comparison.
-  const anchor = useMemo(() => {
+  /**
+   * Whose life the moments are anchored to.
+   *
+   * For a capsule to someone else, the first named recipient — a capsule to
+   * several people still gets one set of moments, because offering a separate
+   * ladder per recipient turns a decision into a comparison. For a capsule to
+   * yourself, you.
+   */
+  const person = useMemo<HorizonPerson | null>(() => {
+    if (isSelf) {
+      return selfBirthday ? { name: 'you', birthday: selfBirthday, self: true } : null;
+    }
     const first = recipients[0];
     if (!first) return null;
     const contact = contacts.find(
@@ -87,18 +98,18 @@ export function AddressMovement({
     );
     const name = first.displayName || contact?.name || first.email || first.phone || null;
     if (!name) return null;
-    return { name: name.split(/[\s@]/)[0]!, birthday: contact?.birthday ?? null };
-  }, [recipients, contacts]);
+    return { name: name.split(/[\s@]/)[0]!, birthday: contact?.birthday ?? null, self: false };
+  }, [isSelf, selfBirthday, recipients, contacts]);
 
   const candidates = useMemo(
-    () => horizonCandidates(now, tz, isSelf ? null : anchor, { maxHorizonMs: capabilities.maxHorizonMs }),
-    [now, tz, isSelf, anchor, capabilities.maxHorizonMs],
+    () => horizonCandidates(now, tz, person, { maxHorizonMs: capabilities.maxHorizonMs }),
+    [now, tz, person, capabilities.maxHorizonMs],
   );
 
-  const ageAtUnlock = useMemo(() => {
-    if (!selected || !anchor?.birthday) return null;
-    return ageAt(anchor.birthday, selected, tz);
-  }, [selected, anchor, tz]);
+  const reason = useCallback(
+    (at: Date) => reasonFor(at, candidates, person, tz, now),
+    [candidates, person, tz, now],
+  );
 
   const validationError = useMemo(() => {
     if (!selected) return null;
@@ -173,8 +184,7 @@ export function AddressMovement({
             onSelect={commit}
             tz={tz}
             recipientLocal={recipientLocal}
-            ageAtUnlock={ageAtUnlock}
-            recipientName={anchor?.name ?? null}
+            reason={reason}
           />
 
           <ExactMoment

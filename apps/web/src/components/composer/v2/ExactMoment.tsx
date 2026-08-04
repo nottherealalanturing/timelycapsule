@@ -1,7 +1,6 @@
 'use client';
 
 import { cn } from '@tc/ui-web';
-import { useState } from 'react';
 import { dateInputValue, parseWallClock, timeInputValue } from '../../../lib/zoned-time';
 import { RECIPIENT_LOCAL, ZonePicker } from './ZonePicker';
 
@@ -18,14 +17,15 @@ export interface ExactMomentProps {
 }
 
 /**
- * The exact instant, for when none of the offered moments is the one.
+ * The exact instant — second in the order, but never hidden.
  *
- * Deliberately second. Leading with a date field would make this a scheduling
- * form, and someone who knows they want *the spring she turns eighteen* would
- * have to work out which day that is before the interface would accept it. But
- * plenty of moments are specific and personal — an anniversary, a court date,
- * the morning after an exam — and none of those can be generated, so precision
- * has to remain one disclosure away rather than absent.
+ * Leading with a date field would make this a scheduling form, and someone who
+ * knows they want *the spring she turns eighteen* would have to work out which
+ * day that is before the interface would accept it. So the occasions come
+ * first. But plenty of moments are specific and personal — an anniversary, a
+ * court date, the morning after an exam — and none of those can be generated,
+ * so the precise controls stay on the surface rather than behind a disclosure:
+ * anyone who arrives already knowing the date should see somewhere to put it.
  *
  * Every control reads and writes through the selected zone (`lib/zoned-time`),
  * so the field, the reading above and the stored instant cannot disagree.
@@ -40,21 +40,13 @@ export function ExactMoment({
   error,
   className,
 }: ExactMomentProps) {
-  const [open, setOpen] = useState(false);
-
   return (
-    <div className={cn('flex flex-col gap-3', className)}>
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="self-start text-[length:var(--text-body-s)] text-[var(--color-interactive)] underline-offset-2 hover:underline"
-      >
-        {open ? 'Hide the exact moment' : 'Choose an exact moment'}
-      </button>
+    <div className={cn('flex flex-col gap-3 border-t border-[var(--color-rule)] pt-5', className)}>
+      <p className="font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary">
+        Or a particular day
+      </p>
 
-      {open ? (
-        <div className="flex flex-col gap-3 border-l border-[var(--color-rule)] pl-4">
+      <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
             <div className="flex flex-col gap-1">
               <label htmlFor="exact-date" className="text-[length:var(--text-caption)] font-medium text-secondary">
@@ -107,8 +99,7 @@ export function ExactMoment({
               {error}
             </p>
           ) : null}
-        </div>
-      ) : null}
+      </div>
     </div>
   );
 }
