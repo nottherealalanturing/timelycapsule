@@ -13,7 +13,8 @@ import { GUEST_CAPABILITIES } from '../../components/composer/v2/capabilities';
 import { noEnclosures } from '../../components/composer/v2/use-enclosures';
 import { envelopeText } from '../../lib/letter-envelope';
 import { clearGuestDraft, useGuestDraft } from '../../lib/use-guest-draft';
-import { browserZone, dateInputValue, instantFrom, parseWallClock, timeInputValue } from '../../lib/zoned-time';
+import { AddressMovement } from '../../components/composer/v2/AddressMovement';
+import { browserZone } from '../../lib/zoned-time';
 
 function textToDoc(text: string): object {
   return {
@@ -25,22 +26,12 @@ function textToDoc(text: string): object {
   };
 }
 
-const MIN_HORIZON_MS = 5 * 60 * 1000;
-
-/** A day out, in the writer's own zone — not UTC, which the old default sliced. */
-function defaultUnlock(): { date: string; time: string } {
-  const at = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  const tz = browserZone();
-  return { date: dateInputValue(at, tz), time: timeInputValue(at, tz) };
-}
-
 export default function GuestComposerPage() {
   const router = useRouter();
   const { show } = useToast();
   const draft = useGuestDraft();
   const [guestToken, setGuestTokenState] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [{ date, time }, setDateTime] = useState(defaultUnlock());
   const [sealing, setSealing] = useState(false);
   const [sessionError, setSessionError] = useState(false);
   const [handoff, setHandoff] = useState<{ url: string; capsuleId: string } | null>(null);
@@ -99,23 +90,17 @@ export default function GuestComposerPage() {
     return () => clearTimeout(timer);
   }, []);
 
-  const tz = browserZone();
-  const wall = parseWallClock(date, time);
-  const unlockAt = wall ? instantFrom(wall, tz) : null;
+  // The Horizon writes the chosen instant onto the draft; validation of it
+  // lives there too, so this only needs to know whether one has been chosen.
+  const unlockAt = draft.capsule?.unlockAt ? new Date(draft.capsule.unlockAt) : null;
   const horizonMs = unlockAt ? unlockAt.getTime() - mountedAtMs : null;
-  const horizonError =
-    horizonMs === null
-      ? null
-      : horizonMs < MIN_HORIZON_MS
-        ? 'Unlock time must be at least 5 minutes from now'
-        : horizonMs > GUEST_CAPABILITIES.maxHorizonMs
-          ? 'Guests can travel up to a year — accounts go to 50'
-          : null;
+  const withinRange =
+    horizonMs !== null && horizonMs >= 5 * 60 * 1000 && horizonMs <= GUEST_CAPABILITIES.maxHorizonMs;
 
   const written = envelopeText(draft.contentDoc).trim();
 
   async function seal() {
-    if (!guestToken || !unlockAt || horizonError || written.length === 0) return;
+    if (!guestToken || !unlockAt || !withinRange || written.length === 0) return;
     setSealing(true);
     try {
       const created = await guestApi.createCapsule(guestToken, { title: title || undefined });
@@ -202,37 +187,23 @@ export default function GuestComposerPage() {
           enclosures={noEnclosures()}
           addressee={null}
           opensAt={unlockAt}
-          tz={tz}
+          tz={browserZone()}
         />
       )}
 
-      <section className="flex flex-col gap-2">
-        <label htmlFor="try-unlock-date" className="text-sm font-medium text-secondary">
-          When it opens
-        </label>
-        <div className="flex gap-3">
-          <input
-            id="try-unlock-date"
-            type="date"
-            value={date}
-            onChange={(e) => setDateTime((s) => ({ ...s, date: e.target.value }))}
-            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2 text-foreground"
-          />
-          <input
-            type="time"
-            aria-label="Unlock time"
-            value={time}
-            onChange={(e) => setDateTime((s) => ({ ...s, time: e.target.value }))}
-            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2 text-foreground"
-          />
-        </div>
-        <p className="text-xs text-secondary">Guests can travel up to a year — accounts go to 50.</p>
-        {horizonError ? (
-          <p role="alert" className="text-sm text-[var(--color-danger)]">
-            {horizonError}
-          </p>
-        ) : null}
-      </section>
+      {/* The same Horizon the signed-in composer offers, with the addressee
+          beat switched off — a guest hands the link over themselves, so there
+          is no recipient to name. */}
+      {draft.loading ? null : (
+        <AddressMovement
+          draft={draft}
+          capabilities={GUEST_CAPABILITIES}
+          recipients={[]}
+          contacts={[]}
+          onAddRecipient={async () => {}}
+          onRemoveRecipient={() => {}}
+        />
+      )}
 
       <section className="flex flex-col gap-2">
         <Input label="Title (optional)" placeholder="Name this capsule…" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -246,7 +217,7 @@ export default function GuestComposerPage() {
         </p>
       ) : null}
 
-      <Button size="lg" onClick={() => void seal()} loading={sealing} disabled={!guestToken || !!horizonError || written.length === 0}>
+      <Button size="lg" onClick={() => void seal()} loading={sealing} disabled={!guestToken || !withinRange || written.length === 0}>
         Seal it
       </Button>
     </main>

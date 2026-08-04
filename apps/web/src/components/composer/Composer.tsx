@@ -1,19 +1,18 @@
 'use client';
 
 import { Button, Skeleton, useToast } from '@tc/ui-web';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { track } from '../../lib/analytics';
-import { capsulesApi, recipientsApi } from '../../lib/api-client';
+import { capsulesApi, contactsApi, recipientsApi } from '../../lib/api-client';
+import { envelopeText } from '../../lib/letter-envelope';
 import { browserZone } from '../../lib/zoned-time';
 import { type AutosaveStatus, useCapsuleDraft } from '../../lib/use-capsule-draft';
-import { CoverBlock } from './CoverBlock';
+import { AddressMovement } from './v2/AddressMovement';
 import { ComposeMovement } from './v2/ComposeMovement';
 import { ACCOUNT_CAPABILITIES } from './v2/capabilities';
 import { useEnclosures } from './v2/use-enclosures';
-import { RecipientsBlock } from './RecipientsBlock';
-import { ScheduleBlock } from './ScheduleBlock';
 import { SealsBlock } from './SealsBlock';
 import { SealCeremony } from './SealCeremony';
 import { SealConfirmSheet } from './SealConfirmSheet';
@@ -45,16 +44,48 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
   const { show } = useToast();
   const draft = useCapsuleDraft(capsuleId);
   const enclosures = useEnclosures(capsuleId, draft);
-  // The addressee is what makes the blank page survivable (`07 §IX`), so the
-  // hallmark above the record needs it here as well as in RecipientsBlock.
-  // React Query dedupes the two subscriptions to one request.
+  const queryClient = useQueryClient();
+
+  const recipientsKey = ['recipients', capsuleId] as const;
   const { data: recipients = [] } = useQuery({
-    queryKey: ['recipients', capsuleId],
+    queryKey: recipientsKey,
     queryFn: async () => (await recipientsApi.list(capsuleId)).data,
   });
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts'],
+    queryFn: async () => (await contactsApi.list()).data,
+  });
+  const [recipientError, setRecipientError] = useState<string | null>(null);
+
   const first = recipients[0];
   const addressee =
     draft.capsule?.type === 'self' ? null : (first?.displayName || first?.email || first?.phone || null);
+
+  async function addRecipient(input: { email?: string; phone?: string; displayName?: string }) {
+    setRecipientError(null);
+    try {
+      const { recipient, accessToken } = await recipientsApi.create(capsuleId, input);
+      draft.registerRecipientToken(recipient.id, accessToken);
+      await queryClient.invalidateQueries({ queryKey: recipientsKey });
+    } catch {
+      setRecipientError('That recipient could not be added.');
+    }
+  }
+
+  async function removeRecipient(id: string) {
+    await recipientsApi.delete(capsuleId, id);
+    await queryClient.invalidateQueries({ queryKey: recipientsKey });
+  }
+
+  // "Start a capsule" from /people's birthday-upcoming section (02 §5.9) — add
+  // the suggested contact once, if nothing has been added yet.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !initialRecipient || recipients.length > 0) return;
+    prefilled.current = true;
+    void addRecipient(initialRecipient);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialRecipient, recipients.length]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [ceremonyOpen, setCeremonyOpen] = useState(false);
   const [sealing, setSealing] = useState(false);
@@ -119,7 +150,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
     );
   }
 
-  const blocker = firstCompletenessBlocker(draft.capsule);
+  const blocker = firstCompletenessBlocker(draft.capsule, envelopeText(draft.contentDoc).trim().length > 0);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -159,8 +190,16 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
         </div>
       </header>
 
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-10">
-        <CoverBlock draft={draft} />
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-14 px-6 py-10">
+        <AddressMovement
+          draft={draft}
+          capabilities={ACCOUNT_CAPABILITIES}
+          recipients={recipients}
+          contacts={contacts}
+          onAddRecipient={addRecipient}
+          onRemoveRecipient={(id) => void removeRecipient(id)}
+          recipientError={recipientError}
+        />
         <ComposeMovement
           draft={draft}
           capabilities={ACCOUNT_CAPABILITIES}
@@ -170,8 +209,6 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
           tz={draft.capsule.unlockLocal?.tz ?? browserZone()}
           recipientLocal={draft.capsule.unlockMode === 'recipient_local'}
         />
-        <RecipientsBlock capsuleId={capsuleId} capsuleType={draft.capsule.type} draft={draft} initialRecipient={initialRecipient} />
-        <ScheduleBlock draft={draft} />
         <SealsBlock draft={draft} />
       </main>
 
