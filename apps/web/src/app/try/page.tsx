@@ -1,19 +1,22 @@
 'use client';
 
 import { encryptBytes, generateCapsuleKey, toBase64Url } from '@tc/crypto';
-import { Button, Input, useToast } from '@tc/ui-web';
+import { Button, useToast } from '@tc/ui-web';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { guestApi } from '../../lib/api-client';
 import { encodeIvCiphertext } from '../../lib/capsule-crypto';
 import { getGuestToken, setGuestCapsule, setGuestToken } from '../../lib/guest-store';
 import { DRAFT_KEY } from '../../components/marketing/WriteAndSeal';
+import { AddressMovement } from '../../components/composer/v2/AddressMovement';
 import { ComposeMovement } from '../../components/composer/v2/ComposeMovement';
+import { MovementNav, type Movement } from '../../components/composer/v2/MovementNav';
+import { SealMovement } from '../../components/composer/v2/SealMovement';
 import { GUEST_CAPABILITIES } from '../../components/composer/v2/capabilities';
 import { noEnclosures } from '../../components/composer/v2/use-enclosures';
+import { firstCompletenessBlocker } from '../../components/composer/completeness';
 import { envelopeText } from '../../lib/letter-envelope';
 import { clearGuestDraft, useGuestDraft } from '../../lib/use-guest-draft';
-import { AddressMovement } from '../../components/composer/v2/AddressMovement';
 import { browserZone } from '../../lib/zoned-time';
 
 function textToDoc(text: string): object {
@@ -26,12 +29,21 @@ function textToDoc(text: string): object {
   };
 }
 
+/**
+ * The guest entry point to Capsule Creation V2 — the same three movements the
+ * authenticated composer renders, backed by session storage instead of the
+ * API. This used to be its own page: the letter first, the Horizon and a bare
+ * title field stacked underneath, then a plain "Seal it" button with no
+ * review. That put guests through a different, shorter product and skipped
+ * the one thing Movement III exists for — meeting the finished capsule once
+ * before it leaves. There is one Capsule Creation experience; this renders it.
+ */
 export default function GuestComposerPage() {
   const router = useRouter();
   const { show } = useToast();
   const draft = useGuestDraft();
   const [guestToken, setGuestTokenState] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
+  const [movement, setMovement] = useState<Movement>('address');
   const [sealing, setSealing] = useState(false);
   const [sessionError, setSessionError] = useState(false);
   const [handoff, setHandoff] = useState<{ url: string; capsuleId: string } | null>(null);
@@ -49,7 +61,7 @@ export default function GuestComposerPage() {
   // Carry over anything written on the landing page, so the words survive the
   // handoff instead of the visitor retyping them. Deferred like every other
   // effect here — an effect body must not call setState synchronously.
-  const { setContentDoc } = draft;
+  const { setContentDoc, patch } = draft;
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
@@ -60,13 +72,17 @@ export default function GuestComposerPage() {
         if (carried.letter) {
           setContentDoc({ doc: textToDoc(carried.letter), writtenAt: null });
         }
-        if (carried.recipient) setTitle(`For ${carried.recipient}`);
+        // Guests have no addressee beat (no account to hold recipients
+        // against), so what the landing page called "who is it for" becomes
+        // the capsule's own filing name — the same field Movement III's
+        // "Called" row edits.
+        if (carried.recipient) patch({ title: `For ${carried.recipient}` });
       } catch {
         // Malformed or unavailable storage is not worth surfacing.
       }
     }, 0);
     return () => clearTimeout(timer);
-  }, [setContentDoc]);
+  }, [setContentDoc, patch]);
 
   useEffect(() => {
     const existing = getGuestToken();
@@ -90,6 +106,7 @@ export default function GuestComposerPage() {
     return () => clearTimeout(timer);
   }, []);
 
+  const tz = browserZone();
   // The Horizon writes the chosen instant onto the draft; validation of it
   // lives there too, so this only needs to know whether one has been chosen.
   const unlockAt = draft.capsule?.unlockAt ? new Date(draft.capsule.unlockAt) : null;
@@ -98,12 +115,18 @@ export default function GuestComposerPage() {
     horizonMs !== null && horizonMs >= 5 * 60 * 1000 && horizonMs <= GUEST_CAPABILITIES.maxHorizonMs;
 
   const written = envelopeText(draft.contentDoc).trim();
+  const blocker = draft.capsule ? firstCompletenessBlocker(draft.capsule, written.length > 0) : 'Loading';
+  const hasMoment = Boolean(draft.capsule?.unlockAt);
+
+  const reachable: Movement[] = ['address'];
+  if (hasMoment) reachable.push('compose');
+  if (!blocker) reachable.push('seal');
 
   async function seal() {
     if (!guestToken || !unlockAt || !withinRange || written.length === 0) return;
     setSealing(true);
     try {
-      const created = await guestApi.createCapsule(guestToken, { title: title || undefined });
+      const created = await guestApi.createCapsule(guestToken, { title: draft.capsule?.title || undefined });
       const capsuleKey = generateCapsuleKey();
       // The guest's letter is encrypted here rather than continuously, because
       // a guest has no master key to wrap a capsule key under until this point.
@@ -162,64 +185,88 @@ export default function GuestComposerPage() {
     );
   }
 
+  if (draft.loading || !draft.capsule) {
+    // Held back rather than mounting empty: TipTap reads `content` once at
+    // initialisation, so mounting before session storage has been read would
+    // give the editor a document it can never be handed the real one for.
+    return <main className="mx-auto min-h-screen w-full max-w-2xl px-6 py-12" aria-hidden />;
+  }
+
   return (
-    // `w-full` is load-bearing: `mx-auto` inside the flex-column body turns off
-    // cross-axis stretch, so without it this shrinks to its content width.
-    <main className="mx-auto flex w-full max-w-2xl flex-col gap-8 px-6 py-12">
-      <div>
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">Write something for later</h1>
-        <p className="text-sm text-secondary">No account needed. One capsule, up to a year out.</p>
-      </div>
-
-      {/* The same movement the signed-in composer renders. Only the
-          capabilities differ — see components/composer/v2/capabilities.ts.
-
-          Held back until the draft has been restored, because TipTap reads
-          `content` once at initialisation: mounting before session storage has
-          been read gives the editor an empty document it will never replace,
-          and a guest who reloads mid-letter loses the letter. */}
-      {draft.loading ? (
-        <div className="min-h-[22rem] rounded-[var(--radius-record)] bg-[var(--color-bg-primary)]" aria-hidden />
-      ) : (
-        <ComposeMovement
-          draft={draft}
-          capabilities={GUEST_CAPABILITIES}
-          enclosures={noEnclosures()}
-          addressee={null}
-          opensAt={unlockAt}
-          tz={browserZone()}
-        />
-      )}
-
-      {/* The same Horizon the signed-in composer offers, with the addressee
-          beat switched off — a guest hands the link over themselves, so there
-          is no recipient to name. */}
-      {draft.loading ? null : (
-        <AddressMovement
-          draft={draft}
-          capabilities={GUEST_CAPABILITIES}
-          recipients={[]}
-          contacts={[]}
-          onAddRecipient={async () => {}}
-          onRemoveRecipient={() => {}}
-        />
-      )}
-
-      <section className="flex flex-col gap-2">
-        <Input label="Title (optional)" placeholder="Name this capsule…" value={title} onChange={(e) => setTitle(e.target.value)} />
-        <p className="text-xs text-secondary">For your own reference. Recipients never see it.</p>
-      </section>
-
-      {sessionError ? (
-        <p role="alert" className="text-sm text-[var(--color-danger)]">
-          This capsule cannot be started right now — the connection did not go through. Your letter is kept on this
-          device; reload the page to try again.
+    <div className="flex min-h-screen flex-col">
+      {/* Grid rather than `justify-between`: at narrow widths "No account
+          needed" wrapped to three lines and ran straight into the movement
+          nav below it. A fixed three-column track keeps the nav centred
+          whether or not the side labels have room to show themselves. */}
+      <header className="sticky top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-4 py-3 backdrop-blur sm:gap-4 sm:px-6">
+        <p className="hidden truncate font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary sm:block">
+          No account needed
         </p>
-      ) : null}
+        <MovementNav current={movement} available={reachable} onGo={setMovement} className="col-start-2 justify-self-center" />
+        <div aria-hidden />
+      </header>
 
-      <Button size="lg" onClick={() => void seal()} loading={sealing} disabled={!guestToken || !withinRange || written.length === 0}>
-        Seal it
-      </Button>
-    </main>
+      {/* `w-full` is load-bearing: `mx-auto` inside a flex-column body turns off
+          cross-axis stretch, so without it this shrinks to its content width. */}
+      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-10">
+        {movement === 'address' ? (
+          <AddressMovement
+            draft={draft}
+            capabilities={GUEST_CAPABILITIES}
+            recipients={[]}
+            contacts={[]}
+            onAddRecipient={async () => {}}
+            onRemoveRecipient={() => {}}
+            footer={
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setMovement('compose')} disabled={!hasMoment}>
+                  Compose
+                </Button>
+              </div>
+            }
+          />
+        ) : null}
+
+        {movement === 'compose' ? (
+          <ComposeMovement
+            draft={draft}
+            capabilities={GUEST_CAPABILITIES}
+            enclosures={noEnclosures()}
+            addressee={null}
+            opensAt={unlockAt}
+            tz={tz}
+            footer={
+              <div className="flex justify-end pt-2">
+                <Button onClick={() => setMovement('seal')} disabled={Boolean(blocker)}>
+                  {blocker ?? 'Review'}
+                </Button>
+              </div>
+            }
+          />
+        ) : null}
+
+        {movement === 'seal' ? (
+          <>
+            <SealMovement
+              draft={draft}
+              capabilities={GUEST_CAPABILITIES}
+              enclosures={[]}
+              addressee={null}
+              opensAt={unlockAt}
+              tz={tz}
+              hasRecipients={false}
+              sealing={sealing}
+              onSeal={() => void seal()}
+            />
+            {sessionError ? (
+              <p role="alert" className="pt-4 text-[length:var(--text-body-s)] text-[var(--color-danger)]">
+                This capsule cannot be started right now — the connection did not go through. Your letter is kept on
+                this device; reload the page to try again.
+              </p>
+            ) : null}
+          </>
+        ) : null}
+      </main>
+    </div>
   );
 }

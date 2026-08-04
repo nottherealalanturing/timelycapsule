@@ -17,7 +17,16 @@ import { useState } from 'react';
  * no access to the editor at all.
  */
 
-const QUESTIONS = [
+/**
+ * Two banks rather than one templated with a pronoun swap. `{name}` filled
+ * with a fallback like "them" reads as addressed to a third party no matter
+ * what the fallback says, and by the time this renders a null addressee
+ * always means a self capsule — Address requires either a recipient or
+ * "Myself" before Compose is reachable. A capsule to yourself asking what you
+ * want *them* to know, directly under a hallmark reading "FOR YOURSELF", was
+ * the kind of small disagreement that makes a surface feel unconsidered.
+ */
+const QUESTIONS_FOR_OTHERS = [
   'What do you want {name} to know that you might not say out loud?',
   'What is true today that you expect to have forgotten?',
   'Describe this exact moment — the room, the weather, the noise.',
@@ -26,8 +35,17 @@ const QUESTIONS = [
   'What is a promise you are making, to them or to yourself?',
 ];
 
+const QUESTIONS_FOR_SELF = [
+  'What do you want your future self to know that you might not say out loud?',
+  'What is true today that you expect to have forgotten?',
+  'Describe this exact moment — the room, the weather, the noise.',
+  'What are you hoping will have changed by the time this opens?',
+  'What would you want to remember, if nothing else survived but this?',
+  'What is a promise you are making to yourself?',
+];
+
 export interface MarginPromptProps {
-  /** Addressee's name, folded into the question where one is known. */
+  /** Addressee's name. Null means a self capsule — Address never reaches Compose otherwise. */
   addressee: string | null;
   className?: string;
 }
@@ -38,7 +56,8 @@ export function MarginPrompt({ addressee, className }: MarginPromptProps) {
 
   if (dismissed) return null;
 
-  const question = QUESTIONS[index % QUESTIONS.length]!.replace('{name}', addressee ?? 'them');
+  const bank = addressee ? QUESTIONS_FOR_OTHERS : QUESTIONS_FOR_SELF;
+  const question = bank[index % bank.length]!.replace('{name}', addressee ?? '');
 
   return (
     <aside
