@@ -210,6 +210,27 @@ export default function GuestComposerPage() {
           cross-axis stretch, so without it this shrinks to its content width. */}
       <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-6 py-10">
         {movement === 'address' ? (
+          // A stranger arriving here cold — via a landing-page CTA, not
+          // mid-session — met "When does it open?" as the very first line on
+          // the page, with nothing above it saying what they were making. The
+          // authenticated composer can skip this: by the time someone reaches
+          // it they have already signed up and know what a capsule is. A
+          // guest hasn't. Kept outside AddressMovement rather than added as a
+          // prop on it — this is a guest-page concern, not a change to what
+          // the shared movement itself does — and shown once, on Address
+          // only: the header's own "No account needed" already carries the
+          // constraint on Compose and Seal, so repeating a headline there
+          // would be the duplicated-decision kind of noise this pass was
+          // asked to remove.
+          <div className="flex flex-col gap-1 pb-8">
+            <h1 className="font-[var(--font-display)] text-2xl text-foreground">Write something for later</h1>
+            <p className="text-[length:var(--text-body-s)] text-secondary">
+              No account needed. Up to a year out — accounts go to fifty.
+            </p>
+          </div>
+        ) : null}
+
+        {movement === 'address' ? (
           <AddressMovement
             draft={draft}
             capabilities={GUEST_CAPABILITIES}
