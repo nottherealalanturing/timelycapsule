@@ -210,9 +210,21 @@ async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOp
   }
 
   if (!res.ok) {
-    const parsed = ApiErrorSchema.safeParse(await res.json().catch(() => null));
+    const raw = await res.json().catch(() => null);
+    const parsed = ApiErrorSchema.safeParse(raw);
     if (parsed.success) {
       throw new ApiClientError(parsed.data.error.code, parsed.data.error.message, res.status);
+    }
+    // Strict parsing alone was too brittle to be the only path. `requestId`
+    // was going out as a number against a schema declaring a string, which
+    // failed the whole envelope and erased the `code`/`message` from every
+    // error in the app — the fault is fixed at the source, but a single
+    // unrelated field drifting should never again cost us the two fields the
+    // interface actually speaks to people with. So: if the parts we need are
+    // present and well-typed, use them, whatever else the envelope carries.
+    const loose = raw as { error?: { code?: unknown; message?: unknown } } | null;
+    if (typeof loose?.error?.code === 'string' && typeof loose.error.message === 'string') {
+      throw new ApiClientError(loose.error.code, loose.error.message, res.status);
     }
     throw new ApiClientError('internal_error', 'Something went wrong', res.status);
   }

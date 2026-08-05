@@ -15,6 +15,7 @@ import { SealMovement } from '../../components/composer/v2/SealMovement';
 import { GUEST_CAPABILITIES } from '../../components/composer/v2/capabilities';
 import { noEnclosures } from '../../components/composer/v2/use-enclosures';
 import { firstCompletenessBlocker } from '../../components/composer/completeness';
+import { describeSealFailure, type SealProblem } from '../../components/composer/v2/seal-errors';
 import { envelopeText } from '../../lib/letter-envelope';
 import { clearGuestDraft, useGuestDraft } from '../../lib/use-guest-draft';
 import { browserZone } from '../../lib/zoned-time';
@@ -46,6 +47,7 @@ export default function GuestComposerPage() {
   const [movement, setMovement] = useState<Movement>('address');
   const [sealing, setSealing] = useState(false);
   const [sessionError, setSessionError] = useState(false);
+  const [sealProblem, setSealProblem] = useState<SealProblem | null>(null);
   const [handoff, setHandoff] = useState<{ url: string; capsuleId: string } | null>(null);
   const [mountedAtMs] = useState(() => Date.now());
   const sealedHeadingRef = useRef<HTMLHeadingElement>(null);
@@ -125,6 +127,7 @@ export default function GuestComposerPage() {
   async function seal() {
     if (!guestToken || !unlockAt || !withinRange || written.length === 0) return;
     setSealing(true);
+    setSealProblem(null);
     try {
       const created = await guestApi.createCapsule(guestToken, { title: draft.capsule?.title || undefined });
       const capsuleKey = generateCapsuleKey();
@@ -148,8 +151,11 @@ export default function GuestComposerPage() {
 
       const url = `${window.location.origin}/c/${created.recipientToken}#k=${capsuleKeyB64}`;
       setHandoff({ url, capsuleId: created.id });
-    } catch {
-      show('Something went wrong sealing your capsule. Try again.');
+    } catch (error) {
+      // Stated on the surface rather than thrown as a toast: the most common
+      // real failure here (the one-capsule guest limit) carries the only way
+      // forward the writer has, and a toast leaves before it can be followed.
+      setSealProblem(describeSealFailure(error));
     } finally {
       setSealing(false);
     }
@@ -278,6 +284,7 @@ export default function GuestComposerPage() {
               hasRecipients={false}
               sealing={sealing}
               onSeal={() => void seal()}
+              problem={sealProblem}
             />
             {sessionError ? (
               <p role="alert" className="pt-4 text-[length:var(--text-body-s)] text-[var(--color-danger)]">
