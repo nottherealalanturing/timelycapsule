@@ -93,7 +93,19 @@ export function RecordLetter({ doc, onChange, onSlashQuery, editorRef, className
       {/* Not `flat`: the cast shadow is what lifts paper off the bed, and in
           the light theme the two grounds are close enough in value that
           without it the record stops reading as an object at all. */}
-      <Record as="article">
+      {/* The focus ring belongs to the paper, not to the contenteditable
+          inside it: an outline on `.ProseMirror` would be a square drawn
+          within a rounded sheet, and `[&_.ProseMirror]:outline-none` below
+          left the letter — the one surface a keyboard user most needs to
+          find — with no focus indicator at all.
+          `focus-within` rather than `:focus-visible`: an editing host always
+          matches `:focus-visible`, so the two are identical here, and this
+          says plainly that the ring is present whenever the caret is in the
+          letter. One indicator, on the object that actually has focus. */}
+      <Record
+        as="article"
+        className="focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-[var(--color-interactive)]"
+      >
         <EditorContent
           editor={editor}
           className={cn(

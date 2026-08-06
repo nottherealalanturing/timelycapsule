@@ -96,12 +96,17 @@ export default function GuestCapsuleStatusPage() {
 
   return (
     <main className="mx-auto flex max-w-lg flex-col items-center gap-6 px-6 py-16 text-center">
+      {/* The band is decorative only — never carries text — matching
+          `coverStyle` everywhere else it's used (received, collections, the
+          authenticated capsule page). It used to hold the title directly in
+          `text-white`, which read fine against a cover gradient but went
+          invisible against the plain `--color-bg-raised` fallback every
+          guest capsule actually has, since cover gradients were removed. */}
       <div
-        className="flex h-32 w-full items-end justify-center rounded-[var(--radius-card)]"
+        className="h-32 w-full rounded-[var(--radius-card)]"
         style={capsule.cover?.kind === 'gradient' ? { background: capsule.cover.value } : { background: 'var(--color-bg-raised)' }}
-      >
-        <p className="pb-3 font-[var(--font-display)] text-lg text-white">{capsule.title ?? 'Your capsule'}</p>
-      </div>
+      />
+      <p className="font-[var(--font-display)] text-lg text-foreground">{capsule.title ?? 'Your capsule'}</p>
 
       {/*
         The guest contract *does* carry `sealedAt`, so this surface gets the

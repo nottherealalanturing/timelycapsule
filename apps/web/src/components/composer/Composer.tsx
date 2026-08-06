@@ -18,6 +18,7 @@ import { ACCOUNT_CAPABILITIES } from './v2/capabilities';
 import { useEnclosures } from './v2/use-enclosures';
 import { SealCeremony } from './SealCeremony';
 import { firstCompletenessBlocker } from './completeness';
+import { describeSealFailure, type SealProblem } from './v2/seal-errors';
 
 function statusText(status: AutosaveStatus): string {
   switch (status) {
@@ -109,6 +110,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
   const [movement, setMovement] = useState<Movement>('address');
   const [ceremonyOpen, setCeremonyOpen] = useState(false);
   const [sealing, setSealing] = useState(false);
+  const [sealProblem, setSealProblem] = useState<SealProblem | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const openedFiredRef = useRef(false);
 
@@ -132,6 +134,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
 
   async function handleConfirmSeal() {
     setSealing(true);
+    setSealProblem(null);
     try {
       await draft.flush();
       await capsulesApi.seal(capsuleId);
@@ -143,8 +146,11 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
         await draft.sendAnnounceToAll(capsuleId);
       }
       setCeremonyOpen(true);
-    } catch {
-      show("Couldn't seal the capsule. Please try again.");
+    } catch (error) {
+      // Named on the surface instead of a generic toast — an upload still in
+      // flight, a plan limit reached and a genuine fault each need a different
+      // response from the writer, and "please try again" fits only the last.
+      setSealProblem(describeSealFailure(error));
     } finally {
       setSealing(false);
     }
@@ -232,8 +238,15 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             recipientError={recipientError}
             selfBirthday={user?.birthday ?? null}
             footer={
+              // Says why it cannot advance, the same way the Compose footer
+              // does with `blocker`. It was previously just dead and silent —
+              // a first-time writer presses it, nothing happens, and nothing
+              // anywhere says a moment is what is missing (`07 §V.10`: state
+              // what happened and what to do next). Phrase borrowed verbatim
+              // from `firstCompletenessBlocker` so the two footers speak with
+              // one voice.
               <Advance onClick={() => setMovement('compose')} disabled={!hasMoment}>
-                Compose
+                {hasMoment ? 'Compose' : 'Choose when it opens'}
               </Advance>
             }
           />
@@ -269,6 +282,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             uploadsInFlight={enclosures.uploading.length}
             sealing={sealing}
             onSeal={handleConfirmSeal}
+            problem={sealProblem}
           />
         ) : null}
       </main>

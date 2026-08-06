@@ -2,12 +2,14 @@
 
 import type { MediaItem } from '@tc/contracts';
 import { Button, cn, Input, Record } from '@tc/ui-web';
+import Link from 'next/link';
 import { useState } from 'react';
 import { readEnvelope } from '../../../lib/letter-envelope';
 import type { CapsuleDraft } from '../../../lib/use-capsule-draft';
 import { zoneOffsetLabel } from '../../../lib/zoned-time';
 import { zoneChoice } from '../../../lib/zones';
 import { ConditionsPanel } from './ConditionsPanel';
+import type { SealProblem } from './seal-errors';
 import type { ComposerCapabilities } from './capabilities';
 
 export interface SealMovementProps {
@@ -23,6 +25,8 @@ export interface SealMovementProps {
   uploadsInFlight?: number;
   sealing: boolean;
   onSeal: () => void;
+  /** Why the last seal attempt did not happen, if one did not. */
+  problem?: SealProblem | null;
   className?: string;
 }
 
@@ -71,6 +75,7 @@ export function SealMovement({
   uploadsInFlight = 0,
   sealing,
   onSeal,
+  problem = null,
   className,
 }: SealMovementProps) {
   const capsule = draft.capsule!;
@@ -201,11 +206,33 @@ export function SealMovement({
           Once sealed, what is inside cannot be changed. You can withdraw it at any time before it opens.
         </p>
 
+        {/* Stated where the decision is made, not thrown as a toast that
+            leaves before it can be acted on — some of these carry the only
+            way forward the writer has. */}
+        {problem ? (
+          <div
+            role="alert"
+            className="flex flex-col items-start gap-2 border-l-2 border-[var(--color-danger)] pl-4 text-[length:var(--text-body-s)]"
+          >
+            <p className="text-foreground">{problem.message}</p>
+            {problem.action ? (
+              <Link
+                href={problem.action.href}
+                className="text-[var(--color-interactive)] underline underline-offset-2"
+              >
+                {problem.action.label}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+
         <Button
           size="lg"
           fullWidth
           loading={sealing}
-          disabled={uploadsInFlight > 0}
+          // A limit already reached does not become unreached by pressing the
+          // button again; leaving it live would invite a retry that cannot work.
+          disabled={uploadsInFlight > 0 || problem?.retryable === false}
           onClick={onSeal}
         >
           Seal capsule

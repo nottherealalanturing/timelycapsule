@@ -1,8 +1,11 @@
 'use client';
 
-import { Button, DualClock, DurationStamp, Hallmark, Input, MeridianApproach, Record, Select } from '@tc/ui-web';
+import { Button, DualClock, DurationStamp, Hallmark, Input, MeridianApproach, Record } from '@tc/ui-web';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { Horizon } from '../composer/v2/Horizon';
+import { gapPhrase, horizonCandidates, reasonFor } from '../../lib/horizons';
+import { browserZone } from '../../lib/zoned-time';
 import { SealCeremony } from '../composer/SealCeremony';
 import { TransitStage } from '../reveal/TransitStage';
 import { TRANSIT_END, useTransit } from '../reveal/use-transit';
@@ -16,46 +19,34 @@ import { formatAbsoluteDate } from '../../lib/waiting';
  * composition; this puts a working composer in front of a stranger while their
  * motivation is highest.
  *
- * ── Why this is not the real composer's blocks ────────────────────────
- * `LetterBlock`/`ScheduleBlock` are coupled to `useCapsuleDraft`, which needs a
- * capsule id and a live API. Using them here would mean either creating data
- * for every visitor who scrolls, or faking a draft. Instead this is built from
- * the same **primitives** the composer uses — `Input`, `Select`, `Button` — so
- * it is the same design system rendering the same controls, and it runs
- * entirely client-side. Nothing is written to any server until the visitor
- * chooses to continue.
+ * ── How much of the real composer this is ─────────────────────────────
+ * As much as a marketing page can hold. `SealCeremony` and `Horizon` are the
+ * composer's own components, imported unmodified, and the moments in the
+ * Horizon come from `lib/horizons`' generator rather than a list written to
+ * look like it. The letter sits in a `Record`, the same paper object Compose
+ * writes on.
  *
- * ── Why the seal is the real ceremony ─────────────────────────────────
- * `SealCeremony` is imported directly from the composer, unmodified. The held
- * beat is the one thing `07 §I` says we are recognised by, and a reimplemented
- * copy would drift. This is the only place a stranger can feel it.
+ * What is *not* shared is `RecordLetter` itself, which binds the record to a
+ * TipTap editor: this page needs neither the editor nor `useCapsuleDraft`'s
+ * capsule id and live API, and putting them on the marketing path would buy a
+ * visitor nothing they can see while costing all of them the bundle. A plain
+ * textarea inside a real `Record` is the same register and the same object
+ * with a tenth of the machinery — a shorter demonstration of the same thing,
+ * which is this section's whole job.
+ *
+ * The line that matters: this is a *subset* of Capsule Creation V2, never a
+ * parallel version of it. Anything that would drift — the ceremony, the
+ * scheduling instrument, the moments, the record — is imported, not rebuilt.
  *
  * ── The horizon rule ──────────────────────────────────────────────────
- * Guest capsules are capped at 365 days (`/try`'s `MAX_HORIZON_MS`). Offering
- * "eighteen years" here and then handing off to a one-year cap would be a
- * promise we break in the next click, so anything beyond a year routes to
- * signup instead. `09 §IV`'s long durations are the emotional point of the
- * product, so they stay on the menu — the destination changes, not the offer.
+ * Guest capsules are capped at 365 days (`/try`'s guest ceiling). The Horizon
+ * still offers moments beyond that, because `09 §IV`'s long durations are the
+ * emotional point of the product — but anything past a year routes to signup
+ * rather than to `/try`, so the offer stands and only the destination changes.
  */
 
 const DAY = 24 * 3_600_000;
 const GUEST_MAX_DAYS = 365;
-
-/*
- * Real guest capsules allow anything from five minutes to a year (`/try`'s
- * MIN/MAX_HORIZON_MS), so the short options here are not a marketing fiction —
- * they are the product's own range. Starting the menu at one year was what
- * made the demonstration unsatisfying: a visitor could seal something and
- * then had nothing to look forward to within the session.
- */
-const HORIZONS = [
-  { label: 'tomorrow', days: 1 },
-  { label: 'in a month', days: 30 },
-  { label: 'in one year', days: 365 },
-  { label: 'in five years', days: Math.round(5 * 365.25) },
-  { label: 'in ten years', days: Math.round(10 * 365.25) },
-  { label: 'when they turn eighteen', days: Math.round(18 * 365.25) },
-];
 
 /** Read by `/try` on mount so the words survive the handoff. */
 export const DRAFT_KEY = 'tc-landing-draft';
@@ -63,7 +54,6 @@ export const DRAFT_KEY = 'tc-landing-draft';
 export function WriteAndSeal() {
   const [recipient, setRecipient] = useState('');
   const [letter, setLetter] = useState('');
-  const [horizonDays, setHorizonDays] = useState(HORIZONS[2].days);
   const [ceremonyOpen, setCeremonyOpen] = useState(false);
   const [sealed, setSealed] = useState(false);
   const [sealedAtMs, setSealedAtMs] = useState<number | null>(null);
@@ -73,9 +63,27 @@ export function WriteAndSeal() {
   const transit = useTransit(arriving, arrivalRun);
   const arrived = arriving && transit.elapsedMs >= TRANSIT_END;
 
-  const canSeal = letter.trim().length > 0;
+  /*
+   * The same moments the real Address movement offers, from the same
+   * generator — not a marketing list that happens to resemble it.
+   *
+   * This used to be a `<select>` of durations ("in one year", "in five
+   * years"), which is exactly the lengths-over-moments shape Capsule Creation
+   * V2 moved away from (`design/21 §III`). A stranger met a dropdown here and
+   * then a Horizon in the product, and had no reason to think they were the
+   * same act. Capped tighter than the composer's six, because this is a
+   * demonstration and the section should stay short.
+   */
+  const [now] = useState(() => new Date());
+  const tz = browserZone();
+  const candidates = useMemo(() => horizonCandidates(now, tz, null, { limit: 4 }), [now, tz]);
+  const [selectedAt, setSelectedAt] = useState<Date | null>(null);
+  const chosen = selectedAt ?? candidates[0]?.at ?? null;
+
+  const horizonDays = chosen ? Math.max(1, Math.round((chosen.getTime() - now.getTime()) / DAY)) : 365;
+  const canSeal = letter.trim().length > 0 && chosen !== null;
   const needsAccount = horizonDays > GUEST_MAX_DAYS;
-  const horizonLabel = HORIZONS.find((h) => h.days === horizonDays)?.label ?? '';
+  const horizonLabel = chosen ? gapPhrase(now.getTime(), chosen.getTime()).replace(/\.$/, '').toLowerCase() : '';
 
   function handleSeal() {
     if (!canSeal) return;
@@ -99,8 +107,7 @@ export function WriteAndSeal() {
           <Hallmark>It is waiting</Hallmark>
           <p className="max-w-[36rem] text-[length:var(--text-body)] text-secondary">
             Nothing has been sent anywhere — this one lives only in this browser tab. But this is exactly what
-            the next {horizonLabel.replace('in ', '').replace('when they turn eighteen', 'eighteen years')} would
-            look like.
+            the next {horizonLabel} would look like.
           </p>
         </div>
 
@@ -230,45 +237,68 @@ export function WriteAndSeal() {
 
   return (
     <div className="flex flex-col gap-7">
-      <div className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-        <Input
-          label="Who is it for?"
-          placeholder="A name, or leave it blank"
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
+      <Input
+        label="Who is it for?"
+        placeholder="A name, or leave it blank"
+        value={recipient}
+        onChange={(e) => setRecipient(e.target.value)}
+      />
+
+      <div className="flex flex-col gap-3">
+        <span className="text-[length:var(--text-body-s)] font-medium text-foreground">When does it open?</span>
+        <Horizon
+          now={now}
+          selected={chosen}
+          candidates={candidates}
+          onSelect={setSelectedAt}
+          tz={tz}
+          reason={(at) => reasonFor(at, candidates, null, tz, now)}
         />
-        <div className="flex flex-col gap-1.5">
-          <span className="text-[length:var(--text-body-s)] font-medium">Opens</span>
-          <Select
-            label="When it opens"
-            value={String(horizonDays)}
-            onChange={(e) => setHorizonDays(Number(e.target.value))}
-            className="h-10"
-          >
-            {HORIZONS.map((h) => (
-              <option key={h.days} value={h.days}>
-                {h.label}
-              </option>
-            ))}
-          </Select>
-        </div>
       </div>
 
+      {/*
+        The letter is a record here too — paper, serif, bounded on all four
+        sides with the instrument ground visible around it. It was a grey
+        `<textarea>` on the page ground, which made the one surface the whole
+        product is built around look like a form field on the very page that
+        has to argue for it (`design/21 §IV`, Gate 1's rule 1).
+
+        A plain textarea inside the record rather than the composer's TipTap
+        editor: `RecordLetter` is bound to an editor this page has no use for,
+        and putting that on the marketing path would buy nothing a visitor can
+        see while costing every visitor the bundle. Same register, same
+        object, one-tenth the machinery — a shorter demonstration of the same
+        thing, which is what this section is for.
+      */}
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="landing-letter"
-          className="text-[length:var(--text-body-s)] font-medium text-foreground"
-        >
+        <label htmlFor="landing-letter" className="text-[length:var(--text-body-s)] font-medium text-foreground">
           The letter
         </label>
-        <textarea
-          id="landing-letter"
-          value={letter}
-          onChange={(e) => setLetter(e.target.value)}
-          rows={5}
-          placeholder="What do you want them to know that you might not say out loud?"
-          className="motion-instant resize-y rounded-[var(--radius-input)] border border-[var(--color-rule-strong)] bg-[var(--color-bg-raised)] p-4 text-[length:var(--text-body)] leading-[var(--lh-body)] text-foreground outline-none placeholder:text-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-interactive)]"
-        />
+        <div className="rounded-[var(--radius-record)] bg-[var(--color-bg-primary)] p-3 sm:p-5">
+          {/* Same single focus treatment as the composer's `RecordLetter` —
+              the ring is the paper's, not the field's. The old field carried
+              two indicators at once: a border that changed colour on
+              `focus-within` *and* the global 2px `:focus-visible` outline on
+              `textarea`, which is the double border this pass set out to
+              remove. */}
+          <Record
+            as="div"
+            className="p-0 focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-[var(--color-interactive)]"
+          >
+            {/* `resize-none`: the drag grabber a resizable textarea paints in
+                its corner sits directly on the paper and reads as a control
+                bolted to the record. The composer's own record has no such
+                handle, and matching it matters more here than resizing does. */}
+            <textarea
+              id="landing-letter"
+              value={letter}
+              onChange={(e) => setLetter(e.target.value)}
+              rows={5}
+              placeholder="What do you want them to know that you might not say out loud?"
+              className="motion-instant min-h-[11rem] w-full resize-none bg-transparent px-6 py-6 font-[var(--font-record)] text-[length:var(--text-body-l)] leading-[var(--lh-record)] text-[var(--color-text-primary)] outline-none placeholder:text-[var(--color-text-secondary)] sm:px-8 sm:py-7"
+            />
+          </Record>
+        </div>
         {/* `09 §IX`: a question produces the person's own words; a template
             produces ours. The placeholder asks, and inserts nothing. */}
       </div>
