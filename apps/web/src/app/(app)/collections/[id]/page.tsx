@@ -4,7 +4,7 @@ import { Button, EmptyState, Skeleton, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { use } from 'react';
-import { CapsuleCard } from '../../../../components/CapsuleCard';
+import { CapsuleRow } from '../../../../components/capsule/CapsuleRow';
 import { ApiClientError, capsulesApi, collectionsApi } from '../../../../lib/api-client';
 import { PageTitle, appFrame } from '../../../../components/page-frame';
 
@@ -110,7 +110,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
                   ↓
                 </button>
               </div>
-              <CapsuleCard capsule={capsule} className="flex-1" />
+              <CapsuleRow capsule={capsule} className="flex-1" />
               <Button size="sm" variant="ghost" onClick={() => removeMutation.mutate(capsule.id)}>
                 Remove
               </Button>

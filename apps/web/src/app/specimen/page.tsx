@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Button, DualClock, EmptyState, Hallmark, Lockup, Mark, Record, Skeleton, StateChip, type CapsuleState } from '@tc/ui-web';
 import { SpecimenClient, ShellStage, AuthStage, DashboardStage, CeremonyStage, FIXTURE_CAPSULE } from './SpecimenClient';
-import { CapsuleCard } from '../../components/CapsuleCard';
+import { CapsuleRow } from '../../components/capsule/CapsuleRow';
 
 /**
  * Meridian V2 primitive specimen — the living component gallery.
@@ -128,7 +128,7 @@ export default function SpecimenPage() {
 
       <Section title="Composites" note="Staged with fixture data — these live behind auth in the real app.">
         <div className="grid max-w-[720px] gap-4 sm:grid-cols-2">
-          <CapsuleCard capsule={FIXTURE_CAPSULE} />
+          <CapsuleRow capsule={FIXTURE_CAPSULE} />
         </div>
       </Section>
 

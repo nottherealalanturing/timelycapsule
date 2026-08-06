@@ -6,8 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import { useCorrectedNow } from '../../../../lib/use-corrected-now';
-import { resolveUnlockDate } from '../../../../components/CapsuleCard';
-import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
+import { formatAbsoluteDate, horizonPhrase, resolveUnlockDate } from '../../../../lib/waiting';
 import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
 import { CustodyTerms } from '../../../../components/capsule/CustodyTerms';
 import { LetterRecord } from '../../../../components/capsule/LetterRecord';
@@ -158,6 +157,8 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
   const openedCount = recipients.filter((r) => r.status === 'opened').length;
   const first = recipients[0];
   const addressee = capsule.type === 'self' ? null : (first?.displayName || first?.email || first?.phone || null);
+  const whoFor = addressee ? `For ${addressee}` : capsule.type === 'self' ? 'For yourself' : 'For someone else';
+  const opened = capsule.state === 'unlocked' && recipients.length > 0;
 
   // `04 §10.4` — the stamp is franked at the moment of opening, never during
   // the wait. So it appears once a capsule has *finished* waiting, which is
@@ -178,8 +179,16 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
 
       <div className="flex flex-col gap-3">
         <div className="flex items-baseline gap-3">
-          <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">
-            {capsule.title || 'Untitled capsule'}
+          {/* Unnamed is the normal case — the title was removed from the
+              writing flow entirely (`design/21 §II`) and is a note for the
+              sender. So an unnamed capsule is named by what it is, in the
+              same words `CapsuleRow` uses, rather than by a placeholder. */}
+          <h1
+            className={`text-[length:var(--text-title)] leading-[var(--lh-heading)] ${
+              capsule.title ? 'text-foreground' : 'text-secondary'
+            }`}
+          >
+            {capsule.title || whoFor}
           </h1>
           <button
             type="button"
@@ -194,12 +203,16 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           </button>
         </div>
 
-        <p className="text-[length:var(--text-body-s)] text-secondary">
-          {addressee ? `For ${addressee}` : 'For yourself'}
-          {capsule.state === 'unlocked' && recipients.length > 0
-            ? ` · opened by ${openedCount} of ${recipients.length}`
-            : ''}
-        </p>
+        {/* Only where it adds something. When the capsule is unnamed the
+            heading is already this line, and printing it twice is the kind
+            of small disagreement that makes a surface feel unconsidered. */}
+        {capsule.title || opened ? (
+          <p className="text-[length:var(--text-body-s)] text-secondary">
+            {capsule.title ? whoFor : null}
+            {capsule.title && opened ? ' · ' : null}
+            {opened ? `opened by ${openedCount} of ${recipients.length}` : null}
+          </p>
+        ) : null}
 
         {capsule.tagIds.length > 0 ? (
           <div className="flex flex-wrap gap-1.5">

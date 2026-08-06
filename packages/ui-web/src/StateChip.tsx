@@ -37,7 +37,14 @@ export function StateChip({ state, className }: StateChipProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 rounded-[var(--radius-pill)] px-2.5 py-1 text-xs font-medium',
+        // `04 §7` permits a fully-round radius only for "avatars, dials, the
+        // transit marker". A chip is a control, so it takes the 3px control
+        // radius — the same correction `SealStampsRow` was rebuilt to honour
+        // and that this, its sibling, was left out of. `text-xs` was a raw
+        // Tailwind step outside the type scale; `--text-caption` is the token
+        // every other small label in the system uses.
+        'inline-flex items-center gap-1.5 rounded-[var(--radius-input)] px-2.5 py-1',
+        'text-[length:var(--text-caption)] font-medium',
         // V1 pulsed on `unlocked`. Removed: it read as loading, and it
         // animated a *terminal* state — the capsule has arrived, nothing is
         // in progress (design/07 §VI.3). The label carries the state.

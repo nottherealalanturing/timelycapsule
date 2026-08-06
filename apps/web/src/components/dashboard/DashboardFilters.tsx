@@ -17,13 +17,11 @@ export interface DashboardFiltersProps {
   typeFilter: CapsuleType | undefined;
   tagFilter: string | undefined;
   favoriteOnly: boolean;
-  view: 'timeline' | 'grid';
   tags: { id: string; name: string }[];
   onState: (v: CapsuleState | undefined) => void;
   onType: (v: CapsuleType | undefined) => void;
   onTag: (v: string | undefined) => void;
   onFavorite: () => void;
-  onView: (v: 'timeline' | 'grid') => void;
 }
 
 /**
@@ -44,17 +42,14 @@ export function DashboardFilters({
   typeFilter,
   tagFilter,
   favoriteOnly,
-  view,
   tags,
   onState,
   onType,
   onTag,
   onFavorite,
-  onView,
 }: DashboardFiltersProps) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
         <Select
           label="Filter by state"
           value={stateFilter ?? ''}
@@ -105,29 +100,7 @@ export function DashboardFilters({
         >
           ★ Favourites
         </button>
-      </div>
 
-      {/* Segmented switch. Both options stay visible and the selected one is
-          marked with aria-pressed, so the control states itself rather than
-          relying on fill alone (`07 §V.4`). */}
-      <div className="flex gap-1 rounded-[var(--radius-input)] border border-[var(--color-rule)] p-1">
-        {(['timeline', 'grid'] as const).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onView(v)}
-            aria-pressed={view === v}
-            className={cn(
-              'motion-instant rounded-[2px] px-3 py-1 text-[length:var(--text-body-s)] capitalize',
-              view === v
-                ? 'bg-[var(--color-bg-raised)] text-foreground'
-                : 'text-secondary hover:text-foreground',
-            )}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
