@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { collectionsApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 function coverStyle(cover: { kind: 'gradient' | 'image'; value: string } | null): React.CSSProperties {
   if (cover?.kind === 'gradient') return { background: cover.value };
@@ -34,7 +35,7 @@ export default function CollectionsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-3 gap-4">
           <Skeleton className="h-32" />
@@ -45,9 +46,9 @@ export default function CollectionsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
+    <div className={appFrame('flex flex-col gap-6')}>
       <div className="flex items-center justify-between">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">Collections</h1>
+        <PageTitle>Collections</PageTitle>
         <Button onClick={() => setCreateOpen(true)}>New collection</Button>
       </div>
 
@@ -59,7 +60,7 @@ export default function CollectionsPage() {
             <Link
               key={collection.id}
               href={`/collections/${collection.id}`}
-              className="flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 transition hover:shadow-md"
+              className="flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-rule)] transition hover:shadow-md"
             >
               <div className="h-24 shrink-0" style={coverStyle(collection.cover)} />
               <div className="flex flex-col gap-1 p-4">

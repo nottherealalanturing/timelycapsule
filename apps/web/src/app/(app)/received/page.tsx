@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { blocksApi, receivedApi } from '../../../lib/api-client';
 import { useCorrectedNow } from '../../../lib/use-corrected-now';
 import { formatAbsoluteDate } from '../../../lib/waiting';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 const SECTION_COPY: Record<ReceivedCapsule['section'], { heading: string; empty: string }> = {
   waiting: { heading: 'Waiting to open', empty: '' },
@@ -55,7 +56,7 @@ function ReceivedRow({ item, onReport }: { item: ReceivedCapsule; onReport: (ite
   });
 
   return (
-    <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-3">
+    <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3">
       <div
         aria-hidden
         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium text-foreground"
@@ -93,7 +94,7 @@ function ReceivedRow({ item, onReport }: { item: ReceivedCapsule; onReport: (ite
           ⋯
         </Button>
         {menuOpen ? (
-          <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/15 bg-[var(--color-bg-raised)] py-1 shadow-md">
+          <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] py-1 shadow-md">
             <button
               type="button"
               disabled={!item.senderEmail || blockMutation.isPending}
@@ -154,7 +155,7 @@ export default function ReceivedPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-16" />
         <Skeleton className="h-16" />
@@ -164,7 +165,7 @@ export default function ReceivedPage() {
 
   if (items.length === 0) {
     return (
-      <div className="px-8 py-10">
+      <div className={appFrame()}>
         <EmptyState
           title="Nothing yet — but the future is long."
           action={<p className="text-sm text-secondary">Invite someone to exchange capsules.</p>}
@@ -174,8 +175,8 @@ export default function ReceivedPage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 px-8 py-10">
-      <h1 className="font-[var(--font-display)] text-2xl text-foreground">Received</h1>
+    <div className={appFrame('flex flex-col gap-8')}>
+      <PageTitle>Received</PageTitle>
 
       {sections.map((section) => {
         const sectionItems = items.filter((item) => item.section === section);

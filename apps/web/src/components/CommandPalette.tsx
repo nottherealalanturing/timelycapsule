@@ -93,7 +93,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search capsules, people, collections…"
-          className="w-full border-b border-[var(--color-text-secondary)]/15 bg-transparent px-4 py-3 text-sm text-foreground outline-none"
+          className="w-full border-b border-[var(--color-rule)] bg-transparent px-4 py-3 text-sm text-foreground outline-none"
         />
 
         <div className="max-h-96 overflow-y-auto py-2">
@@ -169,7 +169,7 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
             <button
               type="button"
               onClick={() => go(`/search?q=${encodeURIComponent(query.trim())}`)}
-              className="mt-1 block w-full border-t border-[var(--color-text-secondary)]/15 px-4 py-2 text-left text-sm text-secondary hover:text-foreground"
+              className="mt-1 block w-full border-t border-[var(--color-rule)] px-4 py-2 text-left text-sm text-secondary hover:text-foreground"
             >
               See all results for “{query.trim()}”
             </button>

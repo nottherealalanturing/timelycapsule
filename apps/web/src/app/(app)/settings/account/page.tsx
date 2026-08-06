@@ -29,7 +29,7 @@ function SessionsList() {
   return (
     <div className="flex flex-col gap-2">
       {sessions.map((session) => (
-        <div key={session.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-3">
+        <div key={session.id} className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3">
           <div>
             <p className="text-sm text-foreground">
               {session.deviceName ?? session.platform} {session.current ? <span className="text-secondary">(this device)</span> : null}
@@ -141,7 +141,7 @@ function SetInitialPasswordForm() {
         <p className="text-sm text-secondary">
           Save this recovery code somewhere safe — it&apos;s the only time it will be shown.
         </p>
-        <div className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 bg-[var(--color-bg-raised)] p-3 text-center font-mono text-sm tracking-wider text-foreground">
+        <div className="rounded-[var(--radius-card)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] p-3 text-center font-mono text-sm tracking-wider text-foreground">
           {recoveryKit}
         </div>
         <Button type="button" variant="ghost" onClick={() => navigator.clipboard.writeText(recoveryKit)}>

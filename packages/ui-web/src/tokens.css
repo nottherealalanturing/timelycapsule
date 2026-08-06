@@ -188,6 +188,15 @@
   --measure-record: 66ch;
   --measure-ui: 58ch;
 
+  /* The authenticated frame. Not a reading measure — a *scanning* one.
+     Dashboard rows carry a label on the left and an instrument reading on
+     the right, and the pair has to be read as one line. Unbounded, the
+     authenticated pages ran the full viewport, which on a wide monitor put
+     ~1200px between a capsule's title and its own Dual Clock. 64rem keeps
+     the two ends of a row within one comfortable scan while still leaving
+     a grid of cards room to breathe. */
+  --measure-app: 64rem;
+
   /* V1 aliases — retired. Kept only as a redirect so any straggling
      reference resolves to the V2 family rather than silently falling back
      to a system serif. Delete once grep is clean. */

@@ -116,7 +116,7 @@ function DeleteAccountSection() {
             <p className="text-sm text-foreground">Nothing undelivered — you&apos;re clear to continue.</p>
           ) : (
             needsDecision.map((capsule) => (
-              <div key={capsule.id} className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/15 p-3">
+              <div key={capsule.id} className="rounded-[var(--radius-input)] border border-[var(--color-rule)] p-3">
                 <p className="text-sm font-medium text-foreground">{capsule.title || 'Untitled capsule'}</p>
                 <p className="mb-2 text-sm text-secondary">{capsule.recipientCount} recipient(s)</p>
                 <div className="flex gap-4 text-sm text-foreground">

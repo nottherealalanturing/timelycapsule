@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
 import { searchApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 const GROUP_LABEL: Record<SearchResultItem['kind'], string> = {
   capsule: 'Capsules',
@@ -42,8 +43,8 @@ function SearchPageInner() {
   }));
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
-      <h1 className="font-[var(--font-display)] text-2xl text-foreground">Search</h1>
+    <div className={appFrame('flex flex-col gap-6')}>
+      <PageTitle>Search</PageTitle>
       <Input
         label="Search capsules, people, collections"
         value={query}
@@ -66,7 +67,7 @@ function SearchPageInner() {
                     <Link
                       key={item.id}
                       href={href(item)}
-                      className="rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 px-4 py-3 text-sm text-foreground hover:bg-[var(--color-bg-raised)]"
+                      className="rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-3 text-sm text-foreground hover:bg-[var(--color-bg-raised)]"
                     >
                       {label(item)}
                       {item.kind === 'capsule' ? <span className="ml-2 text-secondary">matched on {item.matchedOn}</span> : null}

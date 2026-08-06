@@ -10,6 +10,7 @@ import { CapsuleTimelineRow } from '../../../components/dashboard/CapsuleTimelin
 import { DashboardFilters } from '../../../components/dashboard/DashboardFilters';
 import { capsulesApi, tagsApi } from '../../../lib/api-client';
 import { useAuth } from '../../../lib/auth-context';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 const TEMPLATES: { label: string; type: CapsuleType }[] = [
   { label: 'Letter to my future self', type: 'self' },
@@ -95,7 +96,7 @@ export default function HomePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-6 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-6')}>
         <Skeleton className="h-7 w-64" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-36" />
@@ -108,7 +109,7 @@ export default function HomePage() {
 
   if (capsules.length === 0 && !stateFilter && !typeFilter && !favoriteOnly && !tagFilter) {
     return (
-      <div className="px-8 py-10">
+      <div className={appFrame()}>
         {/* `07 §XI`: a genuinely empty account gets one line and one action —
             no illustration, no mascot, no encouragement. V1's "Your future is
             unwritten" sells; the voice states (`07 §VIII`). */}
@@ -129,11 +130,11 @@ export default function HomePage() {
   }
 
   return (
-    <div className="flex flex-col gap-9 px-8 py-10">
+    <div className={appFrame('flex flex-col gap-9')}>
       <header>
-        <h1 className="text-[length:var(--text-title)] leading-[var(--lh-heading)] text-foreground">
+        <PageTitle>
           {greeting(mountedAtMs)}, {user?.displayName}
-        </h1>
+        </PageTitle>
       </header>
 
       {openingSoon.length > 0 ? (

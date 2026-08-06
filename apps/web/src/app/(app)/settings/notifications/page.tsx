@@ -95,14 +95,14 @@ export default function NotificationsSettingsPage() {
             type="time"
             value={start}
             onChange={(e) => setQuietStart(e.target.value)}
-            className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-sm text-foreground"
           />
           <span className="text-secondary">to</span>
           <input
             type="time"
             value={end}
             onChange={(e) => setQuietEnd(e.target.value)}
-            className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-sm text-foreground"
           />
           <Button size="sm" variant="secondary" onClick={saveQuietHours}>
             Save

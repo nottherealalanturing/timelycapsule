@@ -55,7 +55,7 @@ export default function PrivacySettingsPage() {
             {blocks.map((block) => (
               <div
                 key={block.blockedEmail}
-                className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 px-4 py-2"
+                className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-2"
               >
                 <span className="text-sm text-foreground">{block.blockedEmail}</span>
                 <Button size="sm" variant="ghost" onClick={() => removeMutation.mutate(block.blockedEmail)}>

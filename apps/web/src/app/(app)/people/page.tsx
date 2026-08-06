@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { contactGroupsApi, contactsApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 interface ContactFormState {
   name: string;
@@ -181,7 +182,7 @@ export default function PeoplePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-16" />
         <Skeleton className="h-16" />
@@ -190,9 +191,9 @@ export default function PeoplePage() {
   }
 
   return (
-    <div className="flex flex-col gap-8 px-8 py-10">
+    <div className={appFrame('flex flex-col gap-8')}>
       <div className="flex items-center justify-between">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">People</h1>
+        <PageTitle>People</PageTitle>
         <Button
           onClick={() => {
             setEditing(null);
@@ -210,7 +211,7 @@ export default function PeoplePage() {
             {upcomingBirthdays.map(({ contact, daysUntil }) => (
               <div
                 key={contact.id}
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-3"
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3"
               >
                 <p className="text-sm text-foreground">
                   {contact.name} turns {turningAge(contact.birthday!, new Date(mountedAtMs))} {formatDaysUntil(daysUntil)}
@@ -230,7 +231,7 @@ export default function PeoplePage() {
             type="button"
             onClick={() => setGroupFilter(null)}
             className={`rounded-[var(--radius-pill)] border px-3 py-1 text-sm ${
-              groupFilter === null ? 'border-accent bg-accent text-foreground' : 'border-[var(--color-text-secondary)]/30 text-secondary'
+              groupFilter === null ? 'border-accent bg-accent text-foreground' : 'border-[var(--color-rule-strong)] text-secondary'
             }`}
           >
             All
@@ -243,7 +244,7 @@ export default function PeoplePage() {
               className={`rounded-[var(--radius-pill)] border px-3 py-1 text-sm ${
                 groupFilter === group.id
                   ? 'border-accent bg-accent text-foreground'
-                  : 'border-[var(--color-text-secondary)]/30 text-secondary'
+                  : 'border-[var(--color-rule-strong)] text-secondary'
               }`}
             >
               {group.name}
@@ -276,7 +277,7 @@ export default function PeoplePage() {
             {contacts.map((contact) => (
               <div
                 key={contact.id}
-                className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-3"
+                className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3"
               >
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-foreground">{contact.name}</p>
@@ -294,7 +295,7 @@ export default function PeoplePage() {
                             type="button"
                             onClick={() => toggleGroupMembership.mutate({ contact, groupId: group.id, member })}
                             className={`rounded-[var(--radius-pill)] border px-2 py-0.5 text-xs ${
-                              member ? 'border-accent bg-accent text-foreground' : 'border-[var(--color-text-secondary)]/30 text-secondary'
+                              member ? 'border-accent bg-accent text-foreground' : 'border-[var(--color-rule-strong)] text-secondary'
                             }`}
                           >
                             {group.name}

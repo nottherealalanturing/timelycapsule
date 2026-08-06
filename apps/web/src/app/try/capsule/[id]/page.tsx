@@ -130,7 +130,7 @@ export default function GuestCapsuleStatusPage() {
         <p className="text-sm text-secondary">The share link isn&apos;t cached on this device anymore — check wherever you originally sent it.</p>
       )}
 
-      <div className="w-full border-t border-[var(--color-text-secondary)]/15 pt-6">
+      <div className="w-full border-t border-[var(--color-rule)] pt-6">
         <p className="mb-3 text-sm text-secondary">Keep it safe with a free account — get five capsules, media, and email delivery.</p>
         <Link href={`/signup?guestToken=${encodeURIComponent(guestToken ?? '')}`}>
           <Button size="lg">Sign up free</Button>

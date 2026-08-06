@@ -171,7 +171,7 @@ export default function GuestComposerPage() {
           This link is the only way to open your capsule — copy it now and send it yourself. There&apos;s no account, so
           if you lose it, it&apos;s gone for good.
         </p>
-        <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-3">
+        <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3">
           <code className="break-all text-xs text-secondary">{handoff.url}</code>
         </div>
         <div className="flex gap-3">

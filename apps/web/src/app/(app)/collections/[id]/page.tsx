@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { use } from 'react';
 import { CapsuleCard } from '../../../../components/CapsuleCard';
 import { ApiClientError, capsulesApi, collectionsApi } from '../../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../../components/page-frame';
 
 /**
  * Collection detail = filtered timeline (02-UX-DESIGN.md §5.10). Reorder
@@ -67,7 +68,7 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-40" />
       </div>
@@ -75,9 +76,9 @@ export default function CollectionDetailPage({ params }: { params: Promise<{ id:
   }
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
+    <div className={appFrame('flex flex-col gap-6')}>
       <div className="flex items-center justify-between">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">{collection?.name ?? 'Collection'}</h1>
+        <PageTitle>{collection?.name ?? 'Collection'}</PageTitle>
         <Button variant="ghost" size="sm" onClick={() => deleteMutation.mutate()}>
           Delete collection
         </Button>

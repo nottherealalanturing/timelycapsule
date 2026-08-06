@@ -4,6 +4,7 @@ import { EmptyState, Skeleton } from '@tc/ui-web';
 import { useQuery } from '@tanstack/react-query';
 import { CapsuleCard } from '../../../components/CapsuleCard';
 import { capsulesApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 /** Archive view per 02-UX-DESIGN.md §5.10 — a filtered timeline, same grid CapsuleCard uses elsewhere. */
 export default function ArchivePage() {
@@ -15,7 +16,7 @@ export default function ArchivePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <div className="grid grid-cols-3 gap-4">
           <Skeleton className="h-40" />
@@ -27,8 +28,8 @@ export default function ArchivePage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
-      <h1 className="font-[var(--font-display)] text-2xl text-foreground">Archive</h1>
+    <div className={appFrame('flex flex-col gap-6')}>
+      <PageTitle>Archive</PageTitle>
       {capsules.length === 0 ? (
         <EmptyState title="Nothing archived yet." />
       ) : (

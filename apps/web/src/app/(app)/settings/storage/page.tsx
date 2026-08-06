@@ -55,7 +55,7 @@ export default function StorageSettingsPage() {
             <Link
               key={capsule.id}
               href={`/capsule/${capsule.id}`}
-              className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 px-4 py-3 text-sm hover:bg-[var(--color-bg-raised)]"
+              className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-3 text-sm hover:bg-[var(--color-bg-raised)]"
             >
               <span className="text-foreground">{capsule.title || 'Untitled capsule'}</span>
               <span className="text-secondary">{formatBytes(capsule.sizeBytes)}</span>

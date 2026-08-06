@@ -97,7 +97,7 @@ export default function ProfileSettingsPage() {
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
-              className="flex-1 rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+              className="flex-1 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-sm text-foreground"
             >
               {Intl.supportedValuesOf('timeZone').map((tz) => (
                 <option key={tz} value={tz}>
@@ -116,7 +116,7 @@ export default function ProfileSettingsPage() {
           <select
             value={locale}
             onChange={(e) => setLocale(e.target.value)}
-            className="rounded-[var(--radius-input)] border border-[var(--color-text-secondary)]/20 bg-transparent px-3 py-2 text-sm text-foreground"
+            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-sm text-foreground"
           >
             {LOCALES.map((l) => (
               <option key={l.value} value={l.value}>

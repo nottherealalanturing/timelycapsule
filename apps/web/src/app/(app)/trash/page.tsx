@@ -5,6 +5,7 @@ import { Button, EmptyState, Skeleton, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiClientError, capsulesApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
 function daysAgo(iso: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
@@ -37,7 +38,7 @@ function TrashRow({ capsule, onChanged }: { capsule: CapsuleListItem; onChanged:
   });
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-3">
+    <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-foreground">{capsule.title || 'Untitled capsule'}</p>
         <p className="text-sm text-secondary">
@@ -101,7 +102,7 @@ export default function TrashPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-16" />
         <Skeleton className="h-16" />
@@ -110,9 +111,9 @@ export default function TrashPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
+    <div className={appFrame('flex flex-col gap-6')}>
       <div className="flex items-center justify-between">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">Trash</h1>
+        <PageTitle>Trash</PageTitle>
         {capsules.length > 0 ? (
           emptyStep === 0 ? (
             <Button variant="ghost" size="sm" onClick={() => setEmptyStep(1)}>
