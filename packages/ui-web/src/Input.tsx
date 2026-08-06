@@ -37,8 +37,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           'motion-instant h-10 rounded-[var(--radius-input)] border px-3 text-sm text-foreground',
           'bg-[var(--color-bg-raised)] border-[var(--color-rule-strong)]',
           // V1 focused with a dusk-violet ring that V2 does not have. Focus is
-          // now the interactive token, via focus-visible so it appears for
-          // keyboard users without firing on every mouse click.
+          // now the interactive token. Note that `focus-visible` does not make
+          // this keyboard-only: a text field always matches `:focus-visible`,
+          // so the ring shows on mouse focus too — which is what we want for a
+          // field you type into. One indicator; the border never also changes.
           'outline-none focus-visible:outline-2 focus-visible:outline-offset-2',
           'focus-visible:outline-[var(--color-interactive)]',
           error && 'border-[var(--color-danger)]',

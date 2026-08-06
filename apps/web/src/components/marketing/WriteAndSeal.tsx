@@ -275,7 +275,16 @@ export function WriteAndSeal() {
           The letter
         </label>
         <div className="rounded-[var(--radius-record)] bg-[var(--color-bg-primary)] p-3 sm:p-5">
-          <Record as="div" className="p-0">
+          {/* Same single focus treatment as the composer's `RecordLetter` —
+              the ring is the paper's, not the field's. The old field carried
+              two indicators at once: a border that changed colour on
+              `focus-within` *and* the global 2px `:focus-visible` outline on
+              `textarea`, which is the double border this pass set out to
+              remove. */}
+          <Record
+            as="div"
+            className="p-0 focus-within:outline focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-[var(--color-interactive)]"
+          >
             {/* `resize-none`: the drag grabber a resizable textarea paints in
                 its corner sits directly on the paper and reads as a control
                 bolted to the record. The composer's own record has no such
