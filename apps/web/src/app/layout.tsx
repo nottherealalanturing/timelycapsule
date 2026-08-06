@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { IBM_Plex_Mono, IBM_Plex_Sans, Source_Serif_4 } from 'next/font/google';
 import { Providers } from './providers';
+import { SITE_URL } from '../lib/site';
 import './globals.css';
 
 /**
@@ -43,6 +44,10 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
+  // Required for next/og's per-route opengraph-image files (below) to resolve
+  // to an absolute URL — without it, crawlers that don't follow relative
+  // og:image URLs (several do not) see nothing.
+  metadataBase: new URL(SITE_URL),
   title: 'TimelyCapsule',
   description: 'Send it to the future.',
 };

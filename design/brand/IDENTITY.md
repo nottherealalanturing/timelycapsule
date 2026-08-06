@@ -91,13 +91,24 @@ mark.
 **Wordmark alone** is permitted wherever the mark has already appeared on the
 same surface.
 
-> **The `<text>` elements in `wordmark.svg` and the lockups must be converted to
-> outlines before production use.** A live text element renders in a fallback
-> face anywhere IBM Plex Sans is absent — which includes most email clients, many
-> PDF viewers and every partner's slide deck.
+> **The wordmark and both lockups are outlined.** They contain zero live `<text>`
+> and no longer depend on IBM Plex Sans being installed anywhere. The contours are
+> extracted by `design/.build-wordmark.py`, shaped with HarfBuzz so the kerning
+> matches what a browser rendered from the former live-text version — this family
+> carries its kerning in GPOS only, so an advance-width walk would silently drop
+> it. The outlines are cached in `design/.wordmark-outlines.json`; re-run that
+> script only if the letterforms, weights or tracking change.
 
 Wordmark setting: IBM Plex Sans · *Timely* 600 · *Capsule* 400 at 62% opacity ·
 tracking −0.2.
+
+**Both lockups are built from the two rules above rather than from fitted
+numbers.** An earlier build shipped a mark at 1.55× cap height with a gap of 1.85×
+the mark width — neither was the rule. *Known tension:* at cap height the mark's
+stroke measures 67 units against the wordmark's 197-unit stem, so the mark reads
+about 2.9× lighter than the word beside it. That is the guideline faithfully
+executed, and it is the number to revisit if the mark ever reads as punctuation.
+Amend this section rather than deviating from it silently.
 
 ---
 
@@ -143,20 +154,45 @@ design/brand/
   mark-paper.svg           #16181A — record register
   mark-black.svg           #000000 — one-colour print
   mark-white.svg           #FFFFFF — reversed
-  mark-black-512.png       transparent raster, partner use
-  mark-black-128.png
+  mark-black-{512,128}.png transparent raster, partner use
   app-icon.svg             mark on ground, 12.5% safe area
   app-icon-paper.svg       inverted tile
+  app-icon-maskable.svg    80-unit tile — Android adaptive safe circle
   favicon.svg              minimal density on a tile
-  wordmark.svg             ⚠ outline before use
-  lockup-horizontal.svg    ⚠ outline before use
-  lockup-vertical.svg      ⚠ outline before use
-  icon/icon-{1024,512,256,192,180,128,64,48}.png
+  wordmark.svg             outlined
+  lockup-horizontal.svg    outlined — primary
+  lockup-vertical.svg      outlined — square spaces
+  lockup-horizontal-black-{1024,512}.png  transparent, partner use
+  icon/icon-{1024,512,256,192,180,128,64,48}.png       instrument
+  icon/icon-maskable-{512,192}.png
+  icon-paper/icon-{1024,512,256,192,180,128,64,48}.png record
   favicon/favicon-{48,32,16}.png
+  favicon/favicon.ico      16+32+48, PNG-in-ICO
+  social/avatar-{paper,ink}.svg
+  social/avatar-{paper,ink}-{1024,400}.png   opaque, square
+  CONTACT-SHEET.png        every asset at true rendered size
 ```
 
-**Web:** serve `favicon.svg` first with the PNGs as fallback; `icon-192` and
-`icon-512` are the PWA manifest sizes; `icon-180` is `apple-touch-icon`.
+**Web:** serve `favicon.svg` first, then `favicon.ico`, then the PNGs; `icon-192`
+and `icon-512` are the PWA manifest sizes, `icon-maskable-*` carry
+`purpose: "maskable"`; `icon-180` is `apple-touch-icon`.
+
+**Social:** use the **paper** avatar. Tested on both platform grounds — the
+instrument tile is nearly indistinguishable from `#000000`, so on X in dark mode
+it loses its edge entirely and the mark appears to float. Paper holds on white
+and on black. Avatars are square and opaque: every platform applies its own
+circular mask, and a baked-in radius or an alpha channel gives it something to
+composite wrongly.
+
+**Avatar sizing is derived, not chosen.** The mark sits at 64% of the tile —
+20.5px at a 32px platform render, which clears the 20px density threshold in §3
+by half a pixel. Above that the diagonal clear space fails; below it the mark
+must switch density. Do not adjust it without redoing both calculations.
+
+> **`design/.build-brand.mjs` regenerates everything in this folder.** It deletes
+> only files with generated extensions — this document lives here and an earlier
+> version of the script destroyed it on every run. Do not widen that back to a
+> blanket delete.
 
 ---
 
