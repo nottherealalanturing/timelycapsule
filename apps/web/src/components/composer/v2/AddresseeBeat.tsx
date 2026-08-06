@@ -120,7 +120,11 @@ export function AddresseeBeat({
             <div className="flex-1">
               <Input
                 label={recipients.length > 0 ? 'Anyone else?' : 'Their email or phone'}
-                placeholder="amara@example.com"
+                // A different example than the first field's: once a real
+                // "amara@example.com" is already sitting in the chip list
+                // above, echoing the same string back as a placeholder here
+                // reads like it was entered twice.
+                placeholder={recipients.length > 0 ? 'jordan@example.com' : 'amara@example.com'}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value);

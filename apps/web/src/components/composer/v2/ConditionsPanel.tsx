@@ -261,6 +261,16 @@ export function ConditionsPanel({ draft, hasRecipients, recipientName, className
   );
 }
 
+/*
+ * Both controls below draw their own box/dot rather than showing the native
+ * one — the same technique `Checkbox` in ui-web uses, and for the same
+ * reason its docstring gives: a bare `<input type="checkbox">` or
+ * `type="radio"` renders in the browser's own accent blue and ignores the
+ * design system entirely, which stood out against every deliberately-styled
+ * control around it here. `Checkbox` itself isn't reused because its API is
+ * a single-line label; every row in this panel carries a label plus a
+ * secondary detail line, which these keep.
+ */
 function Check({
   checked,
   onChange,
@@ -274,12 +284,29 @@ function Check({
 }) {
   return (
     <label className="flex cursor-pointer items-start gap-3">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="mt-1 shrink-0"
-      />
+      <span className="relative mt-0.5 inline-flex h-4 w-4 shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+        <span
+          aria-hidden
+          className={cn(
+            'motion-instant pointer-events-none inline-flex h-4 w-4 items-center justify-center',
+            'rounded-[2px] border border-[var(--color-rule-strong)] text-[var(--color-on-accent)]',
+            'peer-checked:border-[var(--color-interactive)] peer-checked:bg-[var(--color-interactive)]',
+            'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
+            'peer-focus-visible:outline-[var(--color-interactive)]',
+            'peer-checked:[&>svg]:opacity-100',
+          )}
+        >
+          <svg viewBox="0 0 12 12" className="h-3 w-3 opacity-0" fill="none">
+            <path d="M2.5 6.2 4.8 8.5 9.5 3.8" stroke="currentColor" strokeWidth="1.8" />
+          </svg>
+        </span>
+      </span>
       <span className="flex flex-col gap-0.5">
         <span className="text-[length:var(--text-body-s)] text-foreground">{label}</span>
         {detail ? <span className="text-[length:var(--text-caption)] text-secondary">{detail}</span> : null}
@@ -301,7 +328,32 @@ function Radio({
 }) {
   return (
     <label className="flex cursor-pointer items-start gap-3">
-      <input type="radio" name="expiry" checked={checked} onChange={onSelect} className="mt-1 shrink-0" />
+      <span className="relative mt-0.5 inline-flex h-4 w-4 shrink-0">
+        <input
+          type="radio"
+          name="expiry"
+          checked={checked}
+          onChange={onSelect}
+          className="peer absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+        <span
+          aria-hidden
+          className={cn(
+            'motion-instant pointer-events-none inline-flex h-4 w-4 items-center justify-center rounded-full',
+            'border border-[var(--color-rule-strong)]',
+            'peer-checked:border-[var(--color-interactive)]',
+            'peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2',
+            'peer-focus-visible:outline-[var(--color-interactive)]',
+          )}
+        >
+          <span
+            className={cn(
+              'motion-instant h-2 w-2 scale-0 rounded-full bg-[var(--color-interactive)]',
+              checked && 'scale-100',
+            )}
+          />
+        </span>
+      </span>
       <span className="flex flex-col gap-0.5">
         <span className="text-[length:var(--text-body-s)] text-foreground">{label}</span>
         {detail ? <span className="text-[length:var(--text-caption)] text-secondary">{detail}</span> : null}

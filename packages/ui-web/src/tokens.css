@@ -360,6 +360,25 @@
 }
 
 /* ══════════════════════════════════════════════════════════════════════
+   PROSEMIRROR PLACEHOLDER
+
+   `RecordLetter` configures TipTap's `Placeholder` extension, which marks
+   the empty paragraph with `data-placeholder` and an `is-editor-empty`
+   class but renders no text of its own — the `::before` that paints
+   `attr(data-placeholder)` is something every consumer is expected to
+   supply. Nobody had, so the letter's empty state was a blank sheet with
+   no invitation to write, unlike the landing page's letter field, whose
+   native `placeholder` attribute renders one for free.
+   ══════════════════════════════════════════════════════════════════════ */
+.ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: var(--color-text-secondary);
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════════════════════
    FOCUS
 
    Keyboard focus is never invisible. design/07 §XIII treats accessibility

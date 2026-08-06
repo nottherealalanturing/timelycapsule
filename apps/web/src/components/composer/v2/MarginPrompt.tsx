@@ -50,6 +50,19 @@ export interface MarginPromptProps {
   className?: string;
 }
 
+/**
+ * `addressee` is also used as a Hallmark label ("FOR AMARA@EXAMPLE.COM"),
+ * where an email or phone number reads fine as an identifier. Slotted into
+ * this component's own sentences instead — "What do you want
+ * amara@example.com to know" — the same string reads as a typo, not an
+ * address. A recipient without a saved display name still gets the OTHERS
+ * bank (this is not a self capsule), just with the neutral "them" in place
+ * of a name that was never a name to begin with.
+ */
+function isDisplayName(value: string): boolean {
+  return !value.includes('@') && !/^[+\d][\d\s-]*$/.test(value);
+}
+
 export function MarginPrompt({ addressee, className }: MarginPromptProps) {
   const [index, setIndex] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -57,7 +70,8 @@ export function MarginPrompt({ addressee, className }: MarginPromptProps) {
   if (dismissed) return null;
 
   const bank = addressee ? QUESTIONS_FOR_OTHERS : QUESTIONS_FOR_SELF;
-  const question = bank[index % bank.length]!.replace('{name}', addressee ?? '');
+  const name = addressee && isDisplayName(addressee) ? addressee : 'them';
+  const question = bank[index % bank.length]!.replace('{name}', name);
 
   return (
     <aside
