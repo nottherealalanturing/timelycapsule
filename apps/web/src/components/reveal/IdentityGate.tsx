@@ -44,22 +44,22 @@ export function IdentityGate({ token, onSatisfied }: { token: string; onSatisfie
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-6 text-center">
-      <p className="text-sm text-secondary">Verify it&apos;s really you before this capsule opens.</p>
+    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-6 text-center">
+      <p className="text-[length:var(--text-body-s)] text-secondary">Verify it&apos;s really you before this capsule opens.</p>
       {!sent ? (
         <Button onClick={() => void requestCode()} loading={sending}>
           Send me a code
         </Button>
       ) : (
         <>
-          <p className="text-xs text-secondary">Enter the 6-digit code we just sent you.</p>
+          <p className="text-[length:var(--text-caption)] text-secondary">Enter the 6-digit code we just sent you.</p>
           <OtpInput length={6} value={code} onChange={handleCodeChange} disabled={verifying} />
           <Button variant="ghost" size="sm" onClick={() => void requestCode()} loading={sending}>
             Resend code
           </Button>
         </>
       )}
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {error ? <p className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">{error}</p> : null}
     </div>
   );
 }

@@ -146,6 +146,7 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
       unlockLocal: capsule.unlockLocal as { date: string; time: string; tz: string } | null,
       seals: buildSealStatuses(capsule, gates, recipient.id),
       recipientDisplayName: recipient.displayName,
+      sealedAt: capsule.sealedAt ? capsule.sealedAt.toISOString() : null,
     };
   }
 

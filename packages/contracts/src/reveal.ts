@@ -28,6 +28,21 @@ export const RevealLockedResponseSchema = z.object({
   unlockLocal: z.object({ date: z.string(), time: z.string(), tz: z.string() }).nullable(),
   seals: z.array(SealStatusSchema),
   recipientDisplayName: z.string().nullable(),
+  /**
+   * When the sender sealed it — the elapsed half of the Dual Clock.
+   *
+   * Without this the recipient's waiting screen could only state what
+   * remained, so the product's second signature device (`07 §III`, "carries
+   * more brand than the logo, because it is on every screen") was missing from
+   * the one screen `03 §V.3` calls the primary screen of the product. Faking
+   * elapsed as zero was not an option — that renders exactly the demoralising
+   * day-one case `07 §XV.5` exists to prevent — so the figure was omitted and
+   * the gap recorded until the contract could carry it.
+   *
+   * Nullable because a capsule can be locked without having been sealed
+   * through the normal path.
+   */
+  sealedAt: z.string().nullable(),
 });
 export type RevealLockedResponse = z.infer<typeof RevealLockedResponseSchema>;
 

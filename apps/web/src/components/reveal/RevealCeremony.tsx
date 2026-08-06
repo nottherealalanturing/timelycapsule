@@ -2,7 +2,7 @@
 
 import type { RevealMedia } from '@tc/contracts';
 import { decryptBytes } from '@tc/crypto';
-import { Button, Record, useToast } from '@tc/ui-web';
+import { Button, Hallmark, Record, useToast } from '@tc/ui-web';
 import { zipSync } from 'fflate';
 import { useEffect, useRef, useState } from 'react';
 import { revealApi } from '../../lib/api-client';
@@ -277,7 +277,19 @@ export function RevealCeremony({
   if (alreadyOpened) {
     return (
       <main className="flex min-h-screen items-center justify-center px-6 py-16">
-        <div className="w-full max-w-[--measure-record]">
+        <div className="w-full max-w-[var(--measure-record)]">
+          {/*
+            The frame survives the ceremony. `TransitStage` holds the public id
+            and the state hallmark still through every phase — `07 §VI.5`, the
+            institution is static — and then a return visit dropped both, so a
+            reader coming back a year later met the letter with nothing around
+            it identifying the capsule it came from. The record is unchanged;
+            only its frame is restored.
+          */}
+          <div className="mb-6 flex justify-between">
+            <Hallmark>{publicId}</Hallmark>
+            <Hallmark>Opened</Hallmark>
+          </div>
           <RecordAtRest
             token={token}
             senderName={senderName}
@@ -302,15 +314,34 @@ export function RevealCeremony({
       // state. The reveal belongs to the recipient; if they want the letter
       // now, they get the letter now." Not a button, because a button at this
       // moment is a thing to decide about; the whole surface is the target.
+      //
+      // The keydown handler used to live here alone, on an element nothing can
+      // focus — so the reveal was skippable by pointer and not by keyboard,
+      // and the one guarantee `07 §V.7` makes about the ceremony (the document
+      // is never gated, only the animation) did not hold for a keyboard user.
+      // The surface keeps the pointer affordance; the offscreen control below
+      // carries the same action for anyone arriving by Tab.
       onClick={transit.skip}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') transit.skip();
-      }}
-      role="presentation"
     >
       <p aria-live="polite" className="sr-only">
         {transit.opened ? `Capsule opened. ${senderName} wrote to you.` : ''}
       </p>
+      {!transit.done ? (
+        <button
+          type="button"
+          onClick={transit.skip}
+          // Invisible until focused, without `sr-only`: that utility pins the
+          // control to 1×1 with `clip`, and `focus:not-sr-only` did not
+          // reliably undo every one of those properties, so the control stayed
+          // a one-pixel target once Tab reached it. Opacity leaves it
+          // measurable and focusable at full size while keeping it out of
+          // sight, which is what `06` requires — the skip must not present
+          // itself as a decision to anyone who has not gone looking for it.
+          className="pointer-events-none absolute left-4 top-4 z-20 rounded-[var(--radius-input)] bg-[var(--color-bg-raised)] px-3 py-2 text-[length:var(--text-body-s)] text-foreground opacity-0 focus:pointer-events-auto focus:opacity-100"
+        >
+          Show the letter now
+        </button>
+      ) : null}
       <TransitStage transit={transit} publicId={publicId}>
         <RecordAtRest
           token={token}
