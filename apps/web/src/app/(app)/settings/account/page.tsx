@@ -99,6 +99,10 @@ function PasswordChangeForm() {
 function SetInitialPasswordForm() {
   const { setUser } = useAuth();
   const [password, setPassword] = useState('');
+  // Holds the server's updated user record between success and
+  // acknowledgement — see the note on `savedConfirmed`'s Done handler below
+  // for why this isn't just passed straight to `setUser`.
+  const [pendingUser, setPendingUser] = useState<Parameters<typeof setUser>[0]>(null);
   const [recoveryKit, setRecoveryKit] = useState<string | null>(null);
   const [savedConfirmed, setSavedConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,8 +116,18 @@ function SetInitialPasswordForm() {
       const { user: updated } = await authApi.setInitialPassword({ newPassword: password, masterKeyWrap, recoveryKeyWrap });
       return { updated, recoveryKit: formatRecoveryCode(recoveryCodeBytes) };
     },
+    // `setUser` is deliberately *not* called here. The parent switches from
+    // this form to `PasswordChangeForm` the instant `user.masterKeyWrap`
+    // turns truthy, and React 18+ batches that state update with this one —
+    // so calling `setUser(updated)` here unmounted this component in the
+    // same render that set `recoveryKit`, and the one-time recovery code was
+    // generated, wrapped, sent to the server, and never painted to the
+    // screen. Reproduced live: the settings page jumped straight from "no
+    // password yet" to "Change password" with no recovery-code screen ever
+    // shown. `setUser` now runs only from the Done button below, after the
+    // person has confirmed they saved the code.
     onSuccess: ({ updated, recoveryKit: kit }) => {
-      setUser(updated);
+      setPendingUser(updated);
       setPassword('');
       setError(null);
       setRecoveryKit(kit);
@@ -137,7 +151,14 @@ function SetInitialPasswordForm() {
           <input type="checkbox" checked={savedConfirmed} onChange={(e) => setSavedConfirmed(e.target.checked)} className="mt-0.5" />
           I&apos;ve saved this recovery code somewhere safe.
         </label>
-        <Button type="button" disabled={!savedConfirmed} onClick={() => setRecoveryKit(null)}>
+        <Button
+          type="button"
+          disabled={!savedConfirmed}
+          onClick={() => {
+            setUser(pendingUser);
+            setRecoveryKit(null);
+          }}
+        >
           Done
         </Button>
       </div>
