@@ -231,7 +231,7 @@ export default function GuestComposerPage() {
           <div className="flex flex-col gap-1 pb-8">
             <h1 className="font-[var(--font-display)] text-2xl text-foreground">Write something for later</h1>
             <p className="text-[length:var(--text-body-s)] text-secondary">
-              No account needed. Up to a year out — accounts go to fifty.
+              No account needed. Up to a year out — accounts go to fifty years.
             </p>
           </div>
         ) : null}
@@ -246,8 +246,10 @@ export default function GuestComposerPage() {
             onRemoveRecipient={() => {}}
             footer={
               <div className="flex justify-end pt-2">
+                {/* Says why it cannot advance — see the matching note in
+                    `Composer.tsx`. */}
                 <Button onClick={() => setMovement('compose')} disabled={!hasMoment}>
-                  Compose
+                  {hasMoment ? 'Compose' : 'Choose when it opens'}
                 </Button>
               </div>
             }

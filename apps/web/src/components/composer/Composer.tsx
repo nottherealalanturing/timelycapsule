@@ -238,8 +238,15 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             recipientError={recipientError}
             selfBirthday={user?.birthday ?? null}
             footer={
+              // Says why it cannot advance, the same way the Compose footer
+              // does with `blocker`. It was previously just dead and silent —
+              // a first-time writer presses it, nothing happens, and nothing
+              // anywhere says a moment is what is missing (`07 §V.10`: state
+              // what happened and what to do next). Phrase borrowed verbatim
+              // from `firstCompletenessBlocker` so the two footers speak with
+              // one voice.
               <Advance onClick={() => setMovement('compose')} disabled={!hasMoment}>
-                Compose
+                {hasMoment ? 'Compose' : 'Choose when it opens'}
               </Advance>
             }
           />
