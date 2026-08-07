@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { CoverSchema } from './capsules';
 
 /**
  * `GET /search` — T-17, plan/02-UX-DESIGN.md §5.11 / 03-ARCHITECTURE.md
@@ -14,8 +13,17 @@ export const SearchResultItemSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('capsule'),
     id: z.string().uuid(),
+    /**
+     * `publicId` and `type` carry the vocabulary the rest of the app names a
+     * capsule with — the hallmark, and the "For yourself" / "For someone
+     * else" description an untitled capsule is identified by. Without them a
+     * search result had to fall back to `Untitled capsule`, the placeholder
+     * M2 removed everywhere else, so the one surface that reaches every
+     * capsule spoke a vocabulary no other surface still used.
+     */
+    publicId: z.string(),
+    type: z.string(),
     title: z.string().nullable(),
-    cover: CoverSchema.nullable(),
     state: z.string(),
     matchedOn: z.enum(['title', 'tag', 'recipient']),
   }),

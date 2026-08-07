@@ -5,7 +5,7 @@ import { Button, Checkbox, Dialog, Input, OtpInput, PasswordStrengthMeter } from
 import { RecoveryKit } from '../../components/RecoveryKit';
 import { AppSidebar } from '../../components/AppSidebar';
 import { DashboardFilters } from '../../components/dashboard/DashboardFilters';
-import { CapsuleTimelineRow } from '../../components/dashboard/CapsuleTimelineRow';
+import { CapsuleRow } from '../../components/capsule/CapsuleRow';
 import { SealCeremony } from '../../components/composer/SealCeremony';
 
 /** Interactive half of the primitive specimen (dev only). */
@@ -85,7 +85,6 @@ export function AuthStage() {
 }
 
 export function DashboardStage() {
-  const [view, setView] = useState<'timeline' | 'grid'>('timeline');
   const [fav, setFav] = useState(false);
   const [state, setState] = useState<undefined | 'draft' | 'sealed'>(undefined);
   return (
@@ -95,17 +94,15 @@ export function DashboardStage() {
         typeFilter={undefined}
         tagFilter={undefined}
         favoriteOnly={fav}
-        view={view}
         tags={[{ id: 't1', name: 'family' }]}
         onState={(v) => setState(v as undefined | 'draft' | 'sealed')}
         onType={() => {}}
         onTag={() => {}}
         onFavorite={() => setFav((v) => !v)}
-        onView={setView}
       />
       <div className="flex flex-col gap-2">
-        <CapsuleTimelineRow capsule={FIXTURE_CAPSULE} />
-        <CapsuleTimelineRow capsule={{ ...FIXTURE_CAPSULE, id: 'x2', state: 'draft', title: 'Untitled capsule', sealedAt: null } as typeof FIXTURE_CAPSULE} />
+        <CapsuleRow capsule={FIXTURE_CAPSULE} />
+        <CapsuleRow capsule={{ ...FIXTURE_CAPSULE, id: 'x2', state: 'draft', title: '', sealedAt: null } as typeof FIXTURE_CAPSULE} />
       </div>
     </div>
   );
@@ -153,7 +150,7 @@ export function ShellStage() {
    fixture data to get honest before/after captures during the rebuild. */
 export const FIXTURE_CAPSULE = {
   id: '00000000-0000-4000-8000-000000000001',
-  publicId: 'TC-84KZQM3P',
+  publicId: '84KZQM3P',
   ownerId: '00000000-0000-4000-8000-000000000002',
   type: 'standard',
   state: 'sealed',

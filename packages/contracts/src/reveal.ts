@@ -28,6 +28,21 @@ export const RevealLockedResponseSchema = z.object({
   unlockLocal: z.object({ date: z.string(), time: z.string(), tz: z.string() }).nullable(),
   seals: z.array(SealStatusSchema),
   recipientDisplayName: z.string().nullable(),
+  /**
+   * When the sender sealed it — the elapsed half of the Dual Clock.
+   *
+   * Without this the recipient's waiting screen could only state what
+   * remained, so the product's second signature device (`07 §III`, "carries
+   * more brand than the logo, because it is on every screen") was missing from
+   * the one screen `03 §V.3` calls the primary screen of the product. Faking
+   * elapsed as zero was not an option — that renders exactly the demoralising
+   * day-one case `07 §XV.5` exists to prevent — so the figure was omitted and
+   * the gap recorded until the contract could carry it.
+   *
+   * Nullable because a capsule can be locked without having been sealed
+   * through the normal path.
+   */
+  sealedAt: z.string().nullable(),
 });
 export type RevealLockedResponse = z.infer<typeof RevealLockedResponseSchema>;
 
@@ -97,7 +112,12 @@ export const RemindRequestSchema = z.object({ enabled: z.boolean() });
 export type RemindRequest = z.infer<typeof RemindRequestSchema>;
 
 export const ReactRequestSchema = z.object({
-  emoji: z.string().min(1).max(8),
+  // `max(8)` was sized for a literal emoji glyph; the reveal ceremony has
+  // sent named phrases ("This landed", 11 chars) since the reaction chips
+  // moved off emoji, so every real reaction was silently rejected client
+  // -side before ever reaching the network. 40 comfortably fits the current
+  // five phrases plus headroom, without inviting a free-text field.
+  emoji: z.string().min(1).max(40),
   note: z.string().max(500).optional(),
 });
 export type ReactRequest = z.infer<typeof ReactRequestSchema>;

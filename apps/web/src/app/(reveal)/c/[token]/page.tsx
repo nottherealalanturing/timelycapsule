@@ -1,7 +1,7 @@
 'use client';
 
 import { decodeCapsuleKeyFromLink, decryptBytes, fromBase64Url } from '@tc/crypto';
-import { Button, Hallmark, MeridianApproach, formatDuration } from '@tc/ui-web';
+import { Button, DualClock, Hallmark, MeridianApproach, formatDuration } from '@tc/ui-web';
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import type { RevealResponse } from '@tc/contracts';
@@ -25,15 +25,45 @@ type PageState = 'loading' | 'locked' | 'unlocked' | 'withdrawn' | 'expired' | '
  * and `07 §VIII.2` forbids apologising for the wait or dramatising its end.
  * These now state what happened, in the past tense (`09 §XVI`), and stop.
  */
-function SystemPage({ headline, body, cta }: { headline: string; body: string; cta?: { label: string; href: string } }) {
+function SystemPage({
+  state,
+  headline,
+  body,
+  cta,
+}: {
+  /** Hallmarked, so the page is legible as a reading and not as an error card. */
+  state: string;
+  headline: string;
+  body: string;
+  cta?: { label: string; href: string };
+}) {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-      <h1 className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">{headline}</h1>
-      <p className="max-w-md text-[length:var(--text-body-s)] text-secondary">{body}</p>
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6 py-16">
+      {/*
+        The same frame the waiting screen wears: hallmark, rule, measure, and
+        left-aligned. These pages used to be centred headline-and-button error
+        cards — the copy was in voice, but nothing about the surface said which
+        product it belonged to, and they sat one navigation away from a screen
+        built entirely out of hallmarks and rules. `07 §VI.5`: the institution
+        is static, and it is present in every state, including the ones that
+        end badly.
+      */}
+      <header className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
+        <Hallmark>TimelyCapsule</Hallmark>
+        <Hallmark>{state}</Hallmark>
+      </header>
+
+      <div className="flex flex-col gap-3">
+        <h1 className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">{headline}</h1>
+        <p className="text-[length:var(--text-body-s)] text-secondary">{body}</p>
+      </div>
+
       {cta ? (
-        <a href={cta.href}>
-          <Button variant="secondary">{cta.label}</Button>
-        </a>
+        <div className="border-t border-[var(--color-rule)] pt-6">
+          <a href={cta.href}>
+            <Button variant="secondary">{cta.label}</Button>
+          </a>
+        </div>
       ) : null}
     </main>
   );
@@ -55,21 +85,24 @@ function SystemPage({ headline, body, cta }: { headline: string; body: string; c
  *    "Sealed until the right moment", which is precisely the greetings-card
  *    register the voice rules exclude, and it withheld the one fact a person
  *    waiting actually wants.
- * 3. **The figure is stated in the Dual Clock's idiom** — mono, tabular,
- *    hallmarked — so the numeral reads as an instrument reading rather than a
- *    countdown timer.
+ * 3. **The Dual Clock**, signature device 2 (`07 §III`) — the component that
+ *    "carries more brand than the logo, because it is on every screen". It was
+ *    absent here for one reason: `RevealLockedResponseSchema` carried no
+ *    `sealedAt`, so this screen could state only what remained. That gap is
+ *    now closed in the contract, and both figures are stated with the
+ *    weighting `07 §XV.5` specifies. Elapsed is the figure that visibly
+ *    accumulates — the reason a three-year wait reads as custody rather than
+ *    as a still image.
  * 4. **Silence.** `07 §II.5` treats it as a design material. There is no
  *    reassurance copy, no progress language, nothing that fills the wait with
  *    talk about the wait.
  *
- * **Known contract gap, deliberately not papered over:** `03 §V.1` wants
- * elapsed shown as prominently as remaining, and the full `DualClock` is used
- * everywhere the owner sees a capsule. `RevealLockedResponseSchema` carries no
- * `sealedAt`, so the recipient's screen cannot state how long this has already
- * been kept for them — the single most meaningful figure on this page. Faking
- * it (elapsed = 0) would render exactly the demoralising day-one case
- * `07 §XV.5` exists to prevent, so the figure is remaining-only here and the
- * contract gap is reported rather than hidden.
+ * No motion is added here, and that is deliberate. Motion Constitution 5 —
+ * "the mark never animates; institution is static" — and rule 3's ban on
+ * anything that reads as loading leave no opening for ambient movement. The
+ * page is already alive in the only way the instrument permits: the reading
+ * changes because time actually passed, at the granularity
+ * `useCorrectedNow` judges the figure needs.
  */
 function LockedWait({
   token,
@@ -88,6 +121,7 @@ function LockedWait({
   const unlockDate = data.unlockAt ? new Date(data.unlockAt) : null;
   const nowMs = useCorrectedNow(unlockDate);
   const remainingMs = unlockDate && nowMs !== null ? Math.max(0, unlockDate.getTime() - nowMs) : null;
+  const sealedMs = data.sealedAt ? new Date(data.sealedAt).getTime() : null;
 
   const placeSeal = data.seals.find((s) => s.type === 'place' && !s.satisfied);
   const identitySeal = data.seals.find((s) => s.type === 'identity' && !s.satisfied);
@@ -120,11 +154,28 @@ function LockedWait({
             <p className="text-[length:var(--text-body-s)] text-secondary">{horizonPhrase(remainingMs)}</p>
           </div>
 
-          <div className="flex flex-col gap-0.5 border-t border-[var(--color-rule)] pt-4">
-            <Hallmark>Remaining</Hallmark>
-            <span className="whitespace-nowrap font-[family-name:var(--font-mono)] text-[length:var(--text-display-s)] leading-none tabular-nums text-foreground">
-              {formatDuration(remainingMs)}
-            </span>
+          {/*
+            Both figures, weighted by where the capsule is in its life — the
+            refinement `07 §XV.5` specifies and `clockEmphasis` implements.
+            Elapsed is the figure that visibly accumulates, and it is what
+            makes a long wait read as something happening rather than nothing
+            happening (`07 §XI`'s acceptance test). Where the sender never
+            sealed through the normal path there is no elapsed to state, so
+            the reading falls back to remaining alone rather than inventing a
+            zero — `07 §XV.5` is explicit that a fabricated day-one elapsed is
+            worse than none.
+          */}
+          <div className="border-t border-[var(--color-rule)] pt-4">
+            {sealedMs !== null ? (
+              <DualClock elapsedMs={Math.max(0, nowMs! - sealedMs)} remainingMs={remainingMs} size="lg" />
+            ) : (
+              <div className="flex flex-col gap-0.5">
+                <Hallmark>Remaining</Hallmark>
+                <span className="whitespace-nowrap font-[family-name:var(--font-mono)] text-[length:var(--text-display-s)] leading-none tabular-nums text-foreground">
+                  {formatDuration(remainingMs)}
+                </span>
+              </div>
+            )}
           </div>
         </section>
       ) : data.unlockLocal ? (
@@ -296,7 +347,15 @@ export default function RevealPage() {
       // `07 §II.8` — never simulate what we can state, and `07 §XVI` bans
       // spinners and skeleton shimmer outright. A held line is the honest
       // form: it says what is happening once, and then is quiet.
-      <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+      //
+      // Held in the same frame the resolved page uses, so the line does not
+      // sit dead-centre and then jump to a left-aligned instrument a moment
+      // later. `07 §XI` asks for layout-stable placeholders; the measure and
+      // the hallmark rule are what make it stable.
+      <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6 py-16">
+        <header className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
+          <Hallmark>TimelyCapsule</Hallmark>
+        </header>
         <p className="text-[length:var(--text-body-s)] text-secondary">Retrieving this capsule.</p>
       </main>
     );
@@ -305,6 +364,7 @@ export default function RevealPage() {
   if (state === '404') {
     return (
       <SystemPage
+        state="Not found"
         headline="No capsule at this link."
         body="The link may be incomplete or mistyped. Ask the sender for the full one."
         cta={{ label: 'Go to TimelyCapsule', href: '/' }}
@@ -315,6 +375,7 @@ export default function RevealPage() {
   if (state === 'withdrawn') {
     return (
       <SystemPage
+        state="Withdrawn"
         headline="This capsule was withdrawn."
         body="The sender withdrew it before it opened. Its contents were never shown."
         cta={{ label: 'Go to TimelyCapsule', href: '/' }}
@@ -325,6 +386,7 @@ export default function RevealPage() {
   if (state === 'expired') {
     return (
       <SystemPage
+        state="Expired"
         headline="This capsule has expired."
         body="It opened, and its contents were removed on the schedule the sender set."
         cta={{ label: 'Go to TimelyCapsule', href: '/' }}
@@ -333,7 +395,22 @@ export default function RevealPage() {
   }
 
   if (state === 'rate-limited') {
-    return <SystemPage headline="Too many attempts." body="Wait a moment, then try again." />;
+    /*
+      The one state that used to stop rather than conclude: it named the
+      problem and then offered nothing — no way to retry, no sense of how
+      long, and no way onward, on a page reached by someone who has done
+      nothing wrong but reload. Retrying is the whole of what they want, so
+      it is the action; the sentence says plainly that waiting is what
+      resolves it, without inventing a countdown we cannot honour.
+    */
+    return (
+      <SystemPage
+        state="Paused"
+        headline="Too many attempts."
+        body="This link is being opened too often. Give it a minute, then try again — nothing has happened to the capsule."
+        cta={{ label: 'Try again', href: `/c/${token}${typeof window === 'undefined' ? '' : window.location.hash}` }}
+      />
+    );
   }
 
   if (state === 'locked' && data?.status === 'locked') {
@@ -378,6 +455,7 @@ export default function RevealPage() {
     if (!capsuleKey && !data.passphraseSeal) {
       return (
         <SystemPage
+          state="Key missing"
           headline="This link is missing its key."
           body="The part after the # carries the key that opens this capsule, and some apps drop it when a link is forwarded. Ask the sender for the original link."
         />
@@ -388,6 +466,7 @@ export default function RevealPage() {
     if (decryptFailed) {
       return (
         <SystemPage
+          state="Key mismatch"
           headline="This link did not open the capsule."
           body="The key it carries does not match. It may have been shortened or edited in transit. Ask the sender for the original link."
         />
@@ -396,7 +475,11 @@ export default function RevealPage() {
 
     if (decryptedDoc === undefined) {
       return (
-        <main className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
+        <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 px-6 py-16">
+          <header className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
+            <Hallmark>{data.publicId}</Hallmark>
+            <Hallmark>Opening</Hallmark>
+          </header>
           <p className="text-[length:var(--text-body-s)] text-secondary">Decrypting this capsule.</p>
         </main>
       );

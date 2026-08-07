@@ -164,14 +164,23 @@ export default function GuestComposerPage() {
   if (handoff) {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-6 text-center">
+        {/*
+          `/try`'s Address movement never asks who this is for — every guest
+          capsule is framed "FOR YOURSELF" from the first prompt onward (no
+          recipient field exists on this page). "Now send it" told every one
+          of those writers to send something they had just written to
+          themselves, which read as a real snag right after sealing. Copy
+          here is self-addressed to match; the guest status page's own
+          "Copy link again" already avoids the same trap.
+        */}
         <h1 ref={sealedHeadingRef} tabIndex={-1} className="font-[var(--font-display)] text-2xl text-foreground outline-none">
-          Sealed. Now send it.
+          Sealed. Now save the link.
         </h1>
         <p className="max-w-md text-secondary">
-          This link is the only way to open your capsule — copy it now and send it yourself. There&apos;s no account, so
-          if you lose it, it&apos;s gone for good.
+          This link is the only way to open your capsule — keep it somewhere you&apos;ll find it again. There&apos;s no
+          account, so if you lose it, it&apos;s gone for good.
         </p>
-        <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-3">
+        <div className="w-full max-w-md rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3">
           <code className="break-all text-xs text-secondary">{handoff.url}</code>
         </div>
         <div className="flex gap-3">

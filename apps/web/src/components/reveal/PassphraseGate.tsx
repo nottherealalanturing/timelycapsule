@@ -43,9 +43,9 @@ export function PassphraseGate({
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-6 text-center">
-      <p className="text-sm text-secondary">This capsule needs a passphrase to open.</p>
-      <p className="text-xs text-secondary">Hint: {hint}</p>
+    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-6 text-center">
+      <p className="text-[length:var(--text-body-s)] text-secondary">This capsule needs a passphrase to open.</p>
+      <p className="text-[length:var(--text-caption)] text-secondary">Hint: {hint}</p>
       <Input
         type="password"
         label="Passphrase"
@@ -55,7 +55,7 @@ export function PassphraseGate({
           if (e.key === 'Enter') void submit();
         }}
       />
-      {error ? <p className="text-sm text-[var(--color-danger)]">{error}</p> : null}
+      {error ? <p className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">{error}</p> : null}
       <Button onClick={() => void submit()} loading={busy} disabled={!passphrase}>
         Unlock
       </Button>

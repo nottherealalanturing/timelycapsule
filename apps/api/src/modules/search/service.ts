@@ -13,8 +13,9 @@ function capsuleResult(row: CapsuleRow, matchedOn: 'title' | 'tag' | 'recipient'
   return {
     kind: 'capsule',
     id: row.id,
+    publicId: row.publicId,
+    type: row.type,
     title: row.title,
-    cover: row.cover as Extract<SearchResultItem, { kind: 'capsule' }>['cover'],
     state: row.state,
     matchedOn,
   };

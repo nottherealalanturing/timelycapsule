@@ -1,90 +1,56 @@
 'use client';
 
-import type { Capsule, MediaItem, Recipient } from '@tc/contracts';
-import { Button, Dialog, DualClock, MeridianApproach, Skeleton, StateChip, useToast } from '@tc/ui-web';
+import type { Recipient } from '@tc/contracts';
+import { Button, Dialog, DualClock, DurationStamp, Hallmark, MeridianApproach, Skeleton, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
-import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 import { useCorrectedNow } from '../../../../lib/use-corrected-now';
-import { resolveUnlockDate } from '../../../../components/CapsuleCard';
-import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
-import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, mediaApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
-import { decodeIvCiphertext } from '../../../../lib/capsule-crypto';
-import { envelopeText } from '../../../../lib/letter-envelope';
-import { useMasterKey } from '../../../../lib/master-key-context';
-import { MasterKeyGate } from '../../../../components/MasterKeyGate';
+import { formatAbsoluteDate, horizonPhrase, resolveUnlockDate } from '../../../../lib/waiting';
+import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
+import { CustodyTerms } from '../../../../components/capsule/CustodyTerms';
+import { LetterRecord } from '../../../../components/capsule/LetterRecord';
+import { appFrame } from '../../../../components/page-frame';
 
-type Tab = 'overview' | 'recipients' | 'activity' | 'contents';
+const STATE_LABEL: Record<string, string> = {
+  draft: 'Draft',
+  sealing: 'Sealing',
+  sealed: 'Sealed',
+  unlocked: 'Opened',
+  expired: 'Expired',
+  withdrawn: 'Withdrawn',
+};
 
 /**
- * Minimal read-only rendering — plain paragraphs, not a full rich-text
- * renderer, since the letter only ever uses minimal marks (T-11). Reads both
- * the V2 letter envelope and the bare document older capsules hold.
+ * A quiet, reversible action. Everything an owner can do to a capsule that is
+ * not destructive reads the same way, so no single one of them draws the eye.
  */
-const renderDoc = envelopeText;
-
-function coverStyle(cover: Capsule['cover']): React.CSSProperties {
-  if (cover?.kind === 'gradient') return { background: cover.value };
-  return { background: 'var(--color-bg-raised)' };
+function QuietAction({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
+  return (
+    <Button variant="ghost" size="sm" onClick={onClick}>
+      {children}
+    </Button>
+  );
 }
 
-function ContentsPanel({ capsule }: { capsule: Capsule }) {
-  const { masterKey } = useMasterKey();
-  const { data: media = [] } = useQuery({
-    queryKey: ['media', capsule.id],
-    queryFn: async () => (await mediaApi.list(capsule.id)).data,
-  });
-  const { data: letter, isLoading } = useQuery({
-    queryKey: ['capsule-contents', capsule.id],
-    queryFn: async () => {
-      if (!capsule.contentDocEnc || !capsule.ownerKeyWrap || !masterKey) return null;
-      const capsuleKey = await unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
-      const { iv, ciphertext } = decodeIvCiphertext(capsule.contentDocEnc);
-      const plaintext = await decryptBytes(capsuleKey, iv, ciphertext);
-      return renderDoc(JSON.parse(new TextDecoder().decode(plaintext)));
-    },
-    enabled: Boolean(masterKey),
-  });
-
-  async function viewMedia(item: MediaItem) {
-    if (!masterKey || !capsule.ownerKeyWrap) return;
-    const capsuleKey = await unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
-    const { url } = await mediaApi.view(item.id);
-    const res = await fetch(url);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const iv = bytes.slice(0, 12);
-    const ciphertext = bytes.slice(12);
-    const plaintext = await decryptBytes(capsuleKey, iv, ciphertext);
-    // TS's DOM lib types BlobPart's ArrayBufferView as Uint8Array<ArrayBuffer>
-    // specifically, excluding the wider Uint8Array<ArrayBufferLike> that
-    // decryptBytes returns — same lib-version quirk as packages/crypto's
-    // buffer-source.ts `bs()` cast, not a real runtime distinction here.
-    const blob = new Blob([plaintext as unknown as BlobPart], { type: item.mime ?? 'application/octet-stream' });
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, '_blank');
-  }
-
-  if (isLoading) return <Skeleton className="h-32 w-full" />;
-
+/**
+ * A destructive action, subordinate.
+ *
+ * `Withdraw` was a filled danger button sitting in a flat row of seven, which
+ * made the most irreversible thing on the page the most visually prominent
+ * thing on it. The weight belongs on the *confirmation*, not on the page — the
+ * dialogs below still carry a filled destructive button, which is where a
+ * decision is actually made. Here it is a stated word.
+ */
+function GraveAction({ children, onClick }: { children: React.ReactNode; onClick: () => void }) {
   return (
-    <div className="flex flex-col gap-6">
-      <div className="whitespace-pre-wrap rounded-[var(--radius-card)] border border-[var(--color-rule)] p-4 text-foreground">
-        {letter || 'No letter content.'}
-      </div>
-      {media.length > 0 ? (
-        <ul className="flex flex-col gap-2">
-          {media.map((item) => (
-            <li key={item.id} className="flex items-center justify-between rounded-[var(--radius-input)] border border-[var(--color-rule)] px-4 py-2">
-              <span className="text-[length:var(--text-body-s)] text-foreground">{item.originalName}</span>
-              <Button variant="ghost" size="sm" onClick={() => void viewMedia(item)}>
-                Decrypt &amp; view
-              </Button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="motion-instant text-[length:var(--text-body-s)] text-secondary underline-offset-4 hover:text-[var(--color-danger)] hover:underline"
+    >
+      {children}
+    </button>
   );
 }
 
@@ -93,13 +59,13 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
   const router = useRouter();
   const queryClient = useQueryClient();
   const { show } = useToast();
-  const [tab, setTab] = useState<Tab>('overview');
   const [extendOpen, setExtendOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [newUnlockAt, setNewUnlockAt] = useState('');
   const [tagsOpen, setTagsOpen] = useState(false);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
-  const [purgeConfirming, setPurgeConfirming] = useState(false);
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [activityOpen, setActivityOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['capsule', id],
@@ -160,7 +126,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
   const { data: activityData } = useQuery({
     queryKey: ['activity', id],
     queryFn: () => capsulesApi.activity(id),
-    enabled: Boolean(capsule) && tab === 'activity',
+    enabled: Boolean(capsule) && activityOpen,
   });
 
   async function refresh() {
@@ -179,228 +145,240 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
 
   if (isLoading || !capsule) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-6 w-1/3" />
+      <div className={appFrame('flex flex-col gap-6')}>
+        <Skeleton className="h-4 w-32" />
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-56 w-full" />
       </div>
     );
   }
 
   const unlockDate = resolveUnlockDate(capsule);
   const openedCount = recipients.filter((r) => r.status === 'opened').length;
-  const contentsHidden = capsule.type === 'self' && capsule.state === 'sealed';
+  const first = recipients[0];
+  const addressee = capsule.type === 'self' ? null : (first?.displayName || first?.email || first?.phone || null);
+  const whoFor = addressee ? `For ${addressee}` : capsule.type === 'self' ? 'For yourself' : 'For someone else';
+  const opened = capsule.state === 'unlocked' && recipients.length > 0;
+
+  // `04 §10.4` — the stamp is franked at the moment of opening, never during
+  // the wait. So it appears once a capsule has *finished* waiting, which is
+  // the only point at which the duration it reports is final.
+  const finishedWaiting = capsule.state === 'unlocked' || capsule.state === 'expired';
+  const stampMs =
+    finishedWaiting && sealedMs !== null && unlockDate ? unlockDate.getTime() - sealedMs : null;
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
-      <div className="overflow-hidden rounded-[var(--radius-card)]">
-        <div className="flex h-32 flex-col justify-end p-4" style={coverStyle(capsule.cover)}>
-          <StateChip state={capsule.state} />
+    <div className={appFrame('flex flex-col gap-9')}>
+      {/* The same header the recipient's wait and the reveal wear — the public
+          id on the left, what this capsule is on the right. `07 §VI.5`: the
+          institution is present and static in every state. */}
+      <header className="flex items-start justify-between gap-4 border-b border-[var(--color-rule)] pb-4">
+        <Hallmark>{capsule.publicId}</Hallmark>
+        <Hallmark>{STATE_LABEL[capsule.state] ?? capsule.state}</Hallmark>
+      </header>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-baseline gap-3">
+          {/* Unnamed is the normal case — the title was removed from the
+              writing flow entirely (`design/21 §II`) and is a note for the
+              sender. So an unnamed capsule is named by what it is, in the
+              same words `CapsuleRow` uses, rather than by a placeholder. */}
+          <h1
+            className={`text-[length:var(--text-title)] leading-[var(--lh-heading)] ${
+              capsule.title ? 'text-foreground' : 'text-secondary'
+            }`}
+          >
+            {capsule.title || whoFor}
+          </h1>
+          <button
+            type="button"
+            aria-label={capsule.isFavorite ? 'Remove from favourites' : 'Add to favourites'}
+            aria-pressed={capsule.isFavorite}
+            onClick={() => favoriteMutation.mutate(!capsule.isFavorite)}
+            className={`motion-instant shrink-0 text-[length:var(--text-body-s)] ${
+              capsule.isFavorite ? 'text-[var(--color-interactive)]' : 'text-secondary hover:text-foreground'
+            }`}
+          >
+            ★
+          </button>
         </div>
+
+        {/* Only where it adds something. When the capsule is unnamed the
+            heading is already this line, and printing it twice is the kind
+            of small disagreement that makes a surface feel unconsidered. */}
+        {capsule.title || opened ? (
+          <p className="text-[length:var(--text-body-s)] text-secondary">
+            {capsule.title ? whoFor : null}
+            {capsule.title && opened ? ' · ' : null}
+            {opened ? `opened by ${openedCount} of ${recipients.length}` : null}
+          </p>
+        ) : null}
+
+        {capsule.tagIds.length > 0 ? (
+          <div className="flex flex-wrap gap-1.5">
+            {capsule.tagIds.map((tagId) => {
+              const tag = allTags.find((t) => t.id === tagId);
+              return tag ? (
+                <span
+                  key={tagId}
+                  className="rounded-[var(--radius-input)] border border-[var(--color-rule)] px-2 py-0.5 text-[length:var(--text-caption)] text-secondary"
+                >
+                  {tag.name}
+                </span>
+              ) : null;
+            })}
+          </div>
+        ) : null}
       </div>
 
       {/*
-        `flex-wrap` + a min-width on the title column: without it the actions
-        row squeezes the title to a ~200px column at narrower desktop widths,
-        which wrapped both the capsule title and — worse — the Dual Clock's
-        numerals. `03 §VII` requires the figure to "hold tabular alignment
-        across every magnitude"; a figure broken across two lines does not.
+        The wait, while there is one — the full reading `03 §V` asks for:
+        both figures, the position on the Meridian, and the literal date.
+        Once the wait is over the instrument is replaced by the receipt, and
+        the Duration Stamp says what it came to.
       */}
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-6">
-        <div className="min-w-[19rem] flex-1">
-          <div className="flex items-center gap-2">
-            <h1 className="text-[length:var(--text-display-s)] text-foreground">{capsule.title || 'Untitled capsule'}</h1>
-            <button
-              type="button"
-              aria-label={capsule.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
-              onClick={() => favoriteMutation.mutate(!capsule.isFavorite)}
-              className={capsule.isFavorite ? 'text-[var(--color-interactive)]' : 'text-secondary'}
-            >
-              ★
-            </button>
+      {capsule.state === 'sealed' && unlockDate && sealedMs !== null && nowMs !== null ? (
+        <section aria-label="The wait" className="flex max-w-md flex-col gap-4">
+          <DualClock elapsedMs={nowMs - sealedMs} remainingMs={unlockDate.getTime() - nowMs} />
+          <MeridianApproach remainingMs={unlockDate.getTime() - nowMs} />
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[length:var(--text-body-s)] text-foreground">
+              Sealed until {formatAbsoluteDate(unlockDate.toISOString())}
+            </p>
+            <p className="text-[length:var(--text-caption)] text-secondary">
+              {horizonPhrase(unlockDate.getTime() - nowMs)}
+            </p>
           </div>
-          {capsule.tagIds.length > 0 ? (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {capsule.tagIds.map((tagId) => {
-                const tag = allTags.find((t) => t.id === tagId);
-                return tag ? (
-                  <span key={tagId} className="rounded-[var(--radius-pill)] border border-[var(--color-rule-strong)] px-2 py-0.5 text-[length:var(--text-caption)] text-secondary">
-                    {tag.name}
-                  </span>
-                ) : null;
-              })}
-            </div>
-          ) : null}
-          {capsule.state === 'sealed' && unlockDate && sealedMs !== null && nowMs !== null ? (
-            /*
-             * The owner's view of the same wait the recipient sees. Step 5 put
-             * the Dual Clock here; Step 6 completes it with the other three
-             * things `03 §V` asks a waiting state to carry — the Meridian
-             * (position), the temperature it warms through, and the literal
-             * absolute date (`07 §VIII.4`), which the header had never stated
-             * anywhere despite being the one fact the whole screen is about.
-             */
-            <div className="mt-4 flex max-w-md flex-col gap-4">
-              <DualClock elapsedMs={nowMs - sealedMs} remainingMs={unlockDate.getTime() - nowMs} />
-              <MeridianApproach remainingMs={unlockDate.getTime() - nowMs} />
-              <div className="flex flex-col gap-0.5">
-                <p className="text-[length:var(--text-body-s)] text-foreground">
-                  Sealed until {formatAbsoluteDate(unlockDate.toISOString())}
-                </p>
-                <p className="text-[length:var(--text-caption)] text-secondary">
-                  {horizonPhrase(unlockDate.getTime() - nowMs)}
-                </p>
-              </div>
-            </div>
-          ) : capsule.state === 'unlocked' && recipients.length > 0 ? (
-            <p className="mt-1 text-[length:var(--text-body-s)] text-secondary">
-              Opened by {openedCount} of {recipients.length}
+        </section>
+      ) : stampMs !== null && stampMs > 0 ? (
+        <section aria-label="What it came to" className="flex flex-col gap-2">
+          <DurationStamp elapsedMs={stampMs} className="self-start" />
+          {unlockDate ? (
+            <p className="text-[length:var(--text-caption)] text-secondary">
+              Opened {formatAbsoluteDate(unlockDate.toISOString())}
             </p>
           ) : null}
-        </div>
+        </section>
+      ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setTagsOpen(true)}>
-            Tags
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => setCollectionsOpen(true)}>
-            Add to collection
-          </Button>
-          <Button variant="secondary" size="sm" onClick={() => void runAction(() => capsulesApi.duplicate(id).then((r) => router.push(`/capsule/${r.capsule.id}/edit`)), 'Duplicated')}>
-            Duplicate
-          </Button>
-          {capsule.state === 'sealed' && !capsule.extendedOnce ? (
-            <Button variant="secondary" size="sm" onClick={() => setExtendOpen(true)}>
-              Extend unlock
-            </Button>
-          ) : null}
-          {capsule.state === 'sealed' ? (
-            <Button variant="destructive" size="sm" onClick={() => setWithdrawOpen(true)}>
-              Withdraw
-            </Button>
-          ) : null}
-          {capsule.archivedAt ? (
-            <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.unarchive(id), 'Unarchived')}>
-              Unarchive
-            </Button>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.archive(id), 'Archived')}>
-              Archive
-            </Button>
-          )}
-          {capsule.trashedAt ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.restore(id), 'Restored')}>
-                Restore
-              </Button>
-              {purgeConfirming ? (
-                <>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() =>
-                      void runAction(() => capsulesApi.purge(id).then(() => router.push('/trash')), 'Deleted forever')
-                    }
-                  >
-                    Confirm delete forever
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setPurgeConfirming(false)}>
-                    Cancel
-                  </Button>
-                </>
-              ) : (
-                <Button variant="destructive" size="sm" onClick={() => setPurgeConfirming(true)}>
-                  Delete forever
-                </Button>
-              )}
-            </>
-          ) : (
-            <Button variant="ghost" size="sm" onClick={() => void runAction(() => capsulesApi.trash(id), 'Moved to trash')}>
-              Trash
-            </Button>
-          )}
-        </div>
-      </div>
+      <LetterRecord capsule={capsule} />
 
-      <div className="flex gap-4 border-b border-[var(--color-rule)]">
-        {(['overview', 'recipients', 'activity', 'contents'] as Tab[]).map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`border-b-2 px-1 pb-2 text-[length:var(--text-body-s)] capitalize ${
-              tab === t ? 'border-accent font-medium text-foreground' : 'border-transparent text-secondary'
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      <CustodyTerms capsule={capsule} addressee={addressee} />
 
-      {tab === 'overview' ? (
-        <dl className="grid grid-cols-2 gap-4 text-[length:var(--text-body-s)]">
-          <div>
-            <dt className="text-secondary">Type</dt>
-            <dd className="text-foreground">{capsule.type}</dd>
-          </div>
-          <div>
-            <dt className="text-secondary">Size</dt>
-            <dd className="text-foreground">{(capsule.sizeBytes / 1024).toFixed(1)} KB</dd>
-          </div>
-          <div>
-            <dt className="text-secondary">Allow download</dt>
-            <dd className="text-foreground">{capsule.allowDownload ? 'Yes' : 'No'}</dd>
-          </div>
-          <div>
-            <dt className="text-secondary">Announce on seal</dt>
-            <dd className="text-foreground">{capsule.announceOnSeal ? 'Yes' : 'No'}</dd>
-          </div>
-        </dl>
-      ) : tab === 'recipients' ? (
-        <table className="w-full text-left text-[length:var(--text-body-s)]">
-          <thead>
-            <tr className="text-secondary">
-              <th className="pb-2 font-medium">Recipient</th>
-              <th className="pb-2 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
+      {recipients.length > 0 ? (
+        <section className="flex flex-col gap-3">
+          <span className="font-[family-name:var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.14em] text-secondary">
+            Addressed to
+          </span>
+          <ul className="flex flex-col">
             {recipients.map((r) => (
-              <tr key={r.id} className="border-t border-[var(--color-rule)]">
-                <td className="py-2 text-foreground">{r.displayName || r.email || r.phone}</td>
-                <td className="py-2 text-secondary">{r.status}</td>
-              </tr>
+              <li
+                key={r.id}
+                className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-[var(--color-rule)] py-2.5 first:border-t"
+              >
+                <span className="text-[length:var(--text-body-s)] text-foreground">
+                  {r.displayName || r.email || r.phone}
+                </span>
+                <span className="text-[length:var(--text-caption)] text-secondary">{r.status.replace(/_/g, ' ')}</span>
+              </li>
             ))}
-            {recipients.length === 0 ? (
-              <tr>
-                <td colSpan={2} className="py-4 text-secondary">
-                  No recipients.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      ) : tab === 'activity' ? (
-        <ul className="flex flex-col gap-2 text-[length:var(--text-body-s)]">
+          </ul>
+        </section>
+      ) : null}
+
+      {/*
+        A log is reference material, not part of the reading — so it is
+        available and not in the way. `<details>` rather than a tab strip:
+        the browser already has a disclosure, and the query stays lazy
+        because it is keyed to the open state.
+      */}
+      <details
+        className="border-t border-[var(--color-rule)] pt-4"
+        onToggle={(e) => setActivityOpen((e.currentTarget as HTMLDetailsElement).open)}
+      >
+        <summary className="cursor-pointer text-[length:var(--text-body-s)] text-secondary hover:text-foreground">
+          Its history
+        </summary>
+        <ul className="mt-3 flex flex-col">
           {(activityData?.data ?? []).map((entry, i) => (
-            <li key={i} className="flex justify-between border-b border-[var(--color-rule)] pb-2">
-              <span className="text-foreground">{entry.action}</span>
-              <span className="text-secondary">{new Date(entry.createdAt).toLocaleString()}</span>
+            <li
+              key={i}
+              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-[var(--color-rule)] py-2"
+            >
+              <span className="text-[length:var(--text-body-s)] text-foreground">{entry.action.replace(/_/g, ' ')}</span>
+              <span className="font-[family-name:var(--font-mono)] text-[length:var(--text-caption)] tabular-nums text-secondary">
+                {new Date(entry.createdAt).toLocaleString()}
+              </span>
             </li>
           ))}
+          {activityOpen && (activityData?.data ?? []).length === 0 ? (
+            <li className="py-2 text-[length:var(--text-body-s)] text-secondary">Nothing recorded yet.</li>
+          ) : null}
         </ul>
-      ) : contentsHidden ? (
-        <p className="rounded-[var(--radius-card)] border border-[var(--color-rule)] p-6 text-center text-[length:var(--text-body-s)] text-secondary">
-          This capsule&apos;s contents are hidden until it unlocks — the wait is the point.
-        </p>
-      ) : (
-        <MasterKeyGate>
-          <ContentsPanel capsule={capsule} />
-        </MasterKeyGate>
-      )}
+      </details>
 
-      <Dialog open={extendOpen} onOpenChange={setExtendOpen} title="Extend unlock date" width="sm">
+      {/*
+        Two tiers, separated by a rule. Above it, everything reversible, all
+        weighted the same. Below it, the things that cannot be undone, stated
+        rather than offered.
+      */}
+      <div className="flex flex-col gap-4 border-t border-[var(--color-rule)] pt-6">
+        <div className="flex flex-wrap gap-2">
+          {capsule.state === 'draft' ? (
+            <Button size="sm" onClick={() => router.push(`/capsule/${id}/edit`)}>
+              Continue writing
+            </Button>
+          ) : null}
+          <QuietAction onClick={() => setTagsOpen(true)}>Tags</QuietAction>
+          <QuietAction onClick={() => setCollectionsOpen(true)}>Add to collection</QuietAction>
+          <QuietAction
+            onClick={() =>
+              void runAction(
+                () => capsulesApi.duplicate(id).then((r) => router.push(`/capsule/${r.capsule.id}/edit`)),
+                'Duplicated',
+              )
+            }
+          >
+            Duplicate
+          </QuietAction>
+          {capsule.state === 'sealed' && !capsule.extendedOnce ? (
+            <QuietAction onClick={() => setExtendOpen(true)}>Extend the date</QuietAction>
+          ) : null}
+          {capsule.archivedAt ? (
+            <QuietAction onClick={() => void runAction(() => capsulesApi.unarchive(id), 'Unarchived')}>
+              Unarchive
+            </QuietAction>
+          ) : (
+            <QuietAction onClick={() => void runAction(() => capsulesApi.archive(id), 'Archived')}>
+              Archive
+            </QuietAction>
+          )}
+          {capsule.trashedAt ? (
+            <QuietAction onClick={() => void runAction(() => capsulesApi.restore(id), 'Restored')}>
+              Restore
+            </QuietAction>
+          ) : null}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-5">
+          {capsule.state === 'sealed' ? (
+            <GraveAction onClick={() => setWithdrawOpen(true)}>Withdraw it</GraveAction>
+          ) : null}
+          {capsule.trashedAt ? (
+            <GraveAction onClick={() => setPurgeOpen(true)}>Delete forever</GraveAction>
+          ) : (
+            <GraveAction onClick={() => void runAction(() => capsulesApi.trash(id), 'Moved to trash')}>
+              Move to trash
+            </GraveAction>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={extendOpen} onOpenChange={setExtendOpen} title="Extend the date" width="sm">
         <div className="flex flex-col gap-4">
-          <p className="text-[length:var(--text-body-s)] text-secondary">Can only be done once, up to 30 days later.</p>
+          <p className="text-[length:var(--text-body-s)] text-secondary">
+            Once only, and by no more than thirty days. The date can move later, never sooner.
+          </p>
           <input
             type="datetime-local"
             value={newUnlockAt}
@@ -411,7 +389,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
             fullWidth
             disabled={!newUnlockAt}
             onClick={() =>
-              void runAction(() => capsulesApi.extend(id, { newUnlockAt: new Date(newUnlockAt).toISOString() }), 'Unlock extended').then(() =>
+              void runAction(() => capsulesApi.extend(id, { newUnlockAt: new Date(newUnlockAt).toISOString() }), 'Date extended').then(() =>
                 setExtendOpen(false),
               )
             }
@@ -424,7 +402,8 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
       <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen} title="Withdraw this capsule?" width="sm">
         <div className="flex flex-col gap-4">
           <p className="text-[length:var(--text-body-s)] text-secondary">
-            Recipients who knew about this capsule will be told it was withdrawn. Its contents will never be shown.
+            Anyone who knew it was coming will be told it was withdrawn. Its contents will never be shown, and this
+            cannot be undone.
           </p>
           <Button
             variant="destructive"
@@ -432,6 +411,26 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
             onClick={() => void runAction(() => capsulesApi.withdraw(id), 'Withdrawn').then(() => setWithdrawOpen(false))}
           >
             Withdraw
+          </Button>
+        </div>
+      </Dialog>
+
+      <Dialog open={purgeOpen} onOpenChange={setPurgeOpen} title="Delete this capsule forever?" width="sm">
+        <div className="flex flex-col gap-4">
+          <p className="text-[length:var(--text-body-s)] text-secondary">
+            The letter and everything enclosed are destroyed. We hold no copy and no key, so there is nothing to
+            restore afterwards.
+          </p>
+          <Button
+            variant="destructive"
+            fullWidth
+            onClick={() =>
+              void runAction(() => capsulesApi.purge(id).then(() => router.push('/trash')), 'Deleted forever').then(() =>
+                setPurgeOpen(false),
+              )
+            }
+          >
+            Delete forever
           </Button>
         </div>
       </Dialog>

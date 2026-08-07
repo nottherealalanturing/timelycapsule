@@ -42,7 +42,7 @@ export function OrbitScrub() {
       <div className="flex flex-col gap-6 rounded-[var(--radius-card)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
-            <Hallmark>TC-9QXA4TFP</Hallmark>
+            <Hallmark>9QXA4TFP</Hallmark>
             <p className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)]">Letter to my future self</p>
           </div>
           <StateChip state={remainingMs <= 0 ? 'unlocked' : 'sealed'} />

@@ -37,17 +37,17 @@ export function PlaceGate({ token, name, radiusM, onSatisfied }: { token: string
   }
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/20 p-6 text-center">
-      <p className="text-sm text-secondary">This capsule opens near &ldquo;{name}&rdquo; ({(radiusM / 1000).toFixed(1)} km radius).</p>
+    <div className="flex flex-col items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-6 text-center">
+      <p className="text-[length:var(--text-body-s)] text-secondary">This capsule opens near &ldquo;{name}&rdquo; ({(radiusM / 1000).toFixed(1)} km radius).</p>
 
       {status === 'far' && distanceM !== null ? (
-        <p className="text-sm text-[var(--color-danger)]">
+        <p className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
           You&apos;re {(distanceM / 1000).toFixed(1)} km away{bearingDeg !== null ? ` (bearing ${bearingDeg}°)` : ''}. Try again once you&apos;re closer.
         </p>
       ) : null}
 
       {status === 'denied' ? (
-        <p className="text-sm text-[var(--color-danger)]">
+        <p className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
           We couldn&apos;t access your location. Check your browser&apos;s location permission and try again.
         </p>
       ) : null}

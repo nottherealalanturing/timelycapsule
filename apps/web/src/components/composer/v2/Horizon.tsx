@@ -1,7 +1,7 @@
 'use client';
 
 import { approachTemperature, cn } from '@tc/ui-web';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { HorizonChoice } from '../../../lib/horizons';
 import { zoneOffsetLabel } from '../../../lib/zoned-time';
 import { zoneChoice } from '../../../lib/zones';
@@ -91,6 +91,47 @@ export function Horizon({
 }: HorizonProps) {
   const [previewing, setPreviewing] = useState<string | null>(null);
 
+  /*
+   * Hover-preview is suppressed while the page is scrolling.
+   *
+   * During a scroll the pointer is stationary and the rows travel underneath
+   * it, so `mouseenter` fires on whichever row happens to arrive under the
+   * cursor. The reading, the date and the marker all changed as a result —
+   * indistinguishable, to the person scrolling, from having changed the
+   * horizon itself. Nothing was actually committed, but a preview that
+   * follows the scrollbar is a preview nobody asked for.
+   *
+   * A pointer that genuinely moves still previews immediately: `pointermove`
+   * clears the guard, so only motion caused *by* the scroll is ignored.
+   */
+  const scrolling = useRef(false);
+  useEffect(() => {
+    let settle: ReturnType<typeof setTimeout>;
+    function onScroll() {
+      scrolling.current = true;
+      setPreviewing(null);
+      clearTimeout(settle);
+      settle = setTimeout(() => {
+        scrolling.current = false;
+      }, 150);
+    }
+    function onPointerMove() {
+      scrolling.current = false;
+    }
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true });
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    return () => {
+      clearTimeout(settle);
+      window.removeEventListener('scroll', onScroll, { capture: true });
+      window.removeEventListener('pointermove', onPointerMove);
+    };
+  }, []);
+
+  function preview(id: string | null) {
+    if (id !== null && scrolling.current) return;
+    setPreviewing(id);
+  }
+
   const previewed = candidates.find((c) => c.id === previewing) ?? null;
   const shown = previewed?.at ?? selected;
   const temperature = shown ? approachTemperature(shown.getTime() - now.getTime()) : 1;
@@ -140,14 +181,30 @@ export function Horizon({
                 type="button"
                 aria-pressed={isSelected}
                 onClick={() => onSelect(c.at)}
-                onMouseEnter={() => setPreviewing(c.id)}
-                onMouseLeave={() => setPreviewing(null)}
-                onFocus={() => setPreviewing(c.id)}
-                onBlur={() => setPreviewing(null)}
+                onMouseEnter={() => preview(c.id)}
+                onMouseLeave={() => preview(null)}
+                onFocus={() => preview(c.id)}
+                onBlur={() => preview(null)}
+                /*
+                 * A committed choice is marked in a way hovering cannot
+                 * reproduce. Selected and hovered previously resolved to the
+                 * same `--color-bg-raised` fill, so the row under the cursor
+                 * was pixel-identical to the row actually chosen — leaving no
+                 * way to tell a preview from a decision. The fill stays as the
+                 * hover affordance; the rule is what says *this one is set*.
+                 */
                 className={cn(
-                  'flex w-full items-baseline justify-between gap-4 rounded-[var(--radius-input)] px-3 py-2.5 text-left',
+                  'flex w-full items-baseline justify-between gap-4 rounded-[var(--radius-input)] py-2.5 pr-3 text-left',
+                  'border-l-2 pl-[calc(0.75rem-2px)]',
                   'hover:bg-[var(--color-bg-raised)]',
-                  isSelected && 'bg-[var(--color-bg-raised)]',
+                  // Exactly one border-colour class is ever emitted. Supplying
+                  // a transparent default *and* an active colour left both in
+                  // the list — `cn` does not dedupe arbitrary values, so which
+                  // one applied came down to stylesheet order, and transparent
+                  // won. The marker never appeared.
+                  isSelected
+                    ? 'border-l-[var(--color-interactive)] bg-[var(--color-bg-raised)]'
+                    : 'border-l-transparent',
                 )}
               >
                 <span className="flex items-baseline gap-2">

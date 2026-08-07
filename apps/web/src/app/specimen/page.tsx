@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Button, DualClock, EmptyState, Hallmark, Lockup, Mark, Record, Skeleton, StateChip, type CapsuleState } from '@tc/ui-web';
 import { SpecimenClient, ShellStage, AuthStage, DashboardStage, CeremonyStage, FIXTURE_CAPSULE } from './SpecimenClient';
-import { CapsuleCard } from '../../components/CapsuleCard';
+import { CapsuleRow } from '../../components/capsule/CapsuleRow';
 
 /**
  * Meridian V2 primitive specimen — the living component gallery.
@@ -86,7 +86,7 @@ export default function SpecimenPage() {
         note="Paper and serif, permanently, in both themes. Bounded on all four sides with the instrument surround visible — a lit document in a dark room, never a move to a light room."
       >
         <Record as="article" className="max-w-[560px]">
-          <Hallmark>TC-84KZQM3P · sealed 14 March 2026</Hallmark>
+          <Hallmark>84KZQM3P · sealed 14 March 2026</Hallmark>
           <h2 className="mt-3 text-[length:var(--text-title)] leading-[var(--lh-heading)]">Letter to my daughter</h2>
           <p className="mt-4">Amara,</p>
           <p className="mt-3">
@@ -128,7 +128,7 @@ export default function SpecimenPage() {
 
       <Section title="Composites" note="Staged with fixture data — these live behind auth in the real app.">
         <div className="grid max-w-[720px] gap-4 sm:grid-cols-2">
-          <CapsuleCard capsule={FIXTURE_CAPSULE} />
+          <CapsuleRow capsule={FIXTURE_CAPSULE} />
         </div>
       </Section>
 

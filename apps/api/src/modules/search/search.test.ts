@@ -114,7 +114,15 @@ describe('search module (T-17)', () => {
     expect(match).toBeTruthy();
     expect(Object.keys(match)).not.toContain('contentDocEnc');
     expect(Object.keys(match)).not.toContain('content');
-    expect(Object.keys(match).sort()).toEqual(['cover', 'id', 'kind', 'matchedOn', 'state', 'title'].sort());
+    // Pinned exactly, which is the point of the test: any field added to a
+    // capsule search result has to be justified here before it can ship, so a
+    // ciphertext-derived column cannot arrive by accident. `publicId` and
+    // `type` were added so results can be named in the same vocabulary as
+    // every other capsule surface; `cover` was dropped with the decorative
+    // bands. All five remaining fields are plaintext-envelope columns.
+    expect(Object.keys(match).sort()).toEqual(
+      ['id', 'kind', 'matchedOn', 'publicId', 'state', 'title', 'type'].sort(),
+    );
   });
 
   it('excludes trashed capsules from title matches', async () => {

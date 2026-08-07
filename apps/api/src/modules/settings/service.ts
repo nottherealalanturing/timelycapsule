@@ -37,7 +37,13 @@ export async function getStorage(db: Database, userId: string): Promise<StorageR
     .where(eq(capsules.ownerId, userId));
 
   const largest = await db
-    .select({ id: capsules.id, publicId: capsules.publicId, title: capsules.title, sizeBytes: capsules.sizeBytes })
+    .select({
+      id: capsules.id,
+      publicId: capsules.publicId,
+      title: capsules.title,
+      type: capsules.type,
+      sizeBytes: capsules.sizeBytes,
+    })
     .from(capsules)
     .where(eq(capsules.ownerId, userId))
     .orderBy(desc(capsules.sizeBytes))
@@ -96,6 +102,7 @@ export async function getDeletionPreview(db: Database, userId: string): Promise<
     result.push({
       id: capsule.id,
       title: capsule.title,
+      type: capsule.type,
       cover: capsule.cover as DeletionPreviewItem['cover'],
       recipientCount: recipients.length,
     });

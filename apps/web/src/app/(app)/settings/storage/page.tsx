@@ -4,6 +4,7 @@ import { Skeleton } from '@tc/ui-web';
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { settingsApi } from '../../../../lib/api-client';
+import { capsuleName } from '../../../../components/capsule/CapsuleRow';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -41,7 +42,11 @@ export default function StorageSettingsPage() {
         </p>
         {data.quotaBytes ? (
           <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--color-bg-raised)]">
-            <div className="h-full rounded-full bg-[var(--color-accent-gold)]" style={{ width: `${percent}%` }} />
+            {/* Brass is reserved for the "waiting" capsule state (tokens.css:
+                `--color-state-sealed` "WAITING — the one use") — storage
+                usage isn't a wait, so it takes the general interactive
+                token, same fix already applied to the favourites toggle. */}
+            <div className="h-full rounded-full bg-[var(--color-interactive)]" style={{ width: `${percent}%` }} />
           </div>
         ) : null}
       </div>
@@ -55,9 +60,9 @@ export default function StorageSettingsPage() {
             <Link
               key={capsule.id}
               href={`/capsule/${capsule.id}`}
-              className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 px-4 py-3 text-sm hover:bg-[var(--color-bg-raised)]"
+              className="flex items-center justify-between rounded-[var(--radius-card)] border border-[var(--color-rule)] px-4 py-3 text-sm hover:bg-[var(--color-bg-raised)]"
             >
-              <span className="text-foreground">{capsule.title || 'Untitled capsule'}</span>
+              <span className="text-foreground">{capsuleName(capsule).label}</span>
               <span className="text-secondary">{formatBytes(capsule.sizeBytes)}</span>
             </Link>
           ))

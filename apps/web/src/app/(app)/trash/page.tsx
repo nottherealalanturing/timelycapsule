@@ -5,6 +5,8 @@ import { Button, EmptyState, Skeleton, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiClientError, capsulesApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
+import { CapsuleRow } from '../../../components/capsule/CapsuleRow';
 
 function daysAgo(iso: string): number {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
@@ -36,35 +38,40 @@ function TrashRow({ capsule, onChanged }: { capsule: CapsuleListItem; onChanged:
     onError: (err) => show(err instanceof ApiClientError ? err.message : 'Something went wrong', { variant: 'danger' }),
   });
 
+  // The same capsule as everywhere else — Trash adds what is true only here
+  // (how long it has been gone, and how long is left) rather than drawing its
+  // own third version of the object.
   return (
-    <div className="flex items-center justify-between gap-3 rounded-[var(--radius-card)] border border-[var(--color-text-secondary)]/15 p-3">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-foreground">{capsule.title || 'Untitled capsule'}</p>
-        <p className="text-sm text-secondary">
-          {capsule.trashedAt ? `Deleted ${daysAgo(capsule.trashedAt)} days ago` : null}
-          {capsule.purgeAfter ? ` · purges in ${daysUntil(capsule.purgeAfter)} days` : null}
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-2">
-        <Button size="sm" variant="secondary" loading={restoreMutation.isPending} onClick={() => restoreMutation.mutate()}>
-          Restore
-        </Button>
-        {confirmingPurge ? (
-          <>
-            <Button size="sm" variant="destructive" loading={purgeMutation.isPending} onClick={() => purgeMutation.mutate()}>
-              Confirm delete
+    <CapsuleRow
+      capsule={capsule}
+      trailing={
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <span className="text-[length:var(--text-caption)] text-secondary">
+            {capsule.trashedAt ? `Deleted ${daysAgo(capsule.trashedAt)} days ago` : null}
+            {capsule.purgeAfter ? ` · purges in ${daysUntil(capsule.purgeAfter)} days` : null}
+          </span>
+          <span className="flex items-center gap-2">
+            <Button size="sm" variant="secondary" loading={restoreMutation.isPending} onClick={() => restoreMutation.mutate()}>
+              Restore
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setConfirmingPurge(false)}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button size="sm" variant="ghost" onClick={() => setConfirmingPurge(true)}>
-            Delete forever
-          </Button>
-        )}
-      </div>
-    </div>
+            {confirmingPurge ? (
+              <>
+                <Button size="sm" variant="destructive" loading={purgeMutation.isPending} onClick={() => purgeMutation.mutate()}>
+                  Confirm delete
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setConfirmingPurge(false)}>
+                  Cancel
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" variant="ghost" onClick={() => setConfirmingPurge(true)}>
+                Delete forever
+              </Button>
+            )}
+          </span>
+        </div>
+      }
+    />
   );
 }
 
@@ -101,7 +108,7 @@ export default function TrashPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
         <Skeleton className="h-16" />
         <Skeleton className="h-16" />
@@ -110,9 +117,9 @@ export default function TrashPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
+    <div className={appFrame('flex flex-col gap-6')}>
       <div className="flex items-center justify-between">
-        <h1 className="font-[var(--font-display)] text-2xl text-foreground">Trash</h1>
+        <PageTitle>Trash</PageTitle>
         {capsules.length > 0 ? (
           emptyStep === 0 ? (
             <Button variant="ghost" size="sm" onClick={() => setEmptyStep(1)}>

@@ -7,6 +7,8 @@ export interface NavLinkProps {
   href: string;
   label: string;
   active: boolean;
+  /** Dismisses the drawer when navigation happens inside one. */
+  onNavigate?: () => void;
   className?: string;
 }
 
@@ -24,10 +26,11 @@ export interface NavLinkProps {
  *
  * Navigation is reversible, so it belongs to the instant tier (`07 §VI`).
  */
-export function NavLink({ href, label, active, className }: NavLinkProps) {
+export function NavLink({ href, label, active, onNavigate, className }: NavLinkProps) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       className={cn(
         'motion-instant relative rounded-[var(--radius-input)] py-2 pl-4 pr-3',

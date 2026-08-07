@@ -65,7 +65,7 @@ export function TransitStage({
   return (
     <div className={cn('relative flex items-center justify-center px-6 py-16', className ?? 'min-h-screen')}>
       {/* The frame holds. It is here in every phase, including the empty one. */}
-      <div className="relative w-full max-w-[--measure-record]">
+      <div className="relative w-full max-w-[var(--measure-record)]">
         <span
           aria-hidden
           className="pointer-events-none absolute inset-y-0 w-px bg-[var(--color-rule-strong)]"

@@ -2,10 +2,11 @@
 
 import { EmptyState, Skeleton } from '@tc/ui-web';
 import { useQuery } from '@tanstack/react-query';
-import { CapsuleCard } from '../../../components/CapsuleCard';
+import { CapsuleRow } from '../../../components/capsule/CapsuleRow';
 import { capsulesApi } from '../../../lib/api-client';
+import { PageTitle, appFrame } from '../../../components/page-frame';
 
-/** Archive view per 02-UX-DESIGN.md §5.10 — a filtered timeline, same grid CapsuleCard uses elsewhere. */
+/** Archive view per 02-UX-DESIGN.md §5.10 — the same capsule representation every other surface uses. */
 export default function ArchivePage() {
   const { data, isLoading } = useQuery({
     queryKey: ['capsules', 'archived'],
@@ -15,26 +16,23 @@ export default function ArchivePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4 px-8 py-10">
+      <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-        </div>
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col gap-6 px-8 py-10">
-      <h1 className="font-[var(--font-display)] text-2xl text-foreground">Archive</h1>
+    <div className={appFrame('flex flex-col gap-6')}>
+      <PageTitle>Archive</PageTitle>
       {capsules.length === 0 ? (
         <EmptyState title="Nothing archived yet." />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-col gap-2">
           {capsules.map((capsule) => (
-            <CapsuleCard key={capsule.id} capsule={capsule} />
+            <CapsuleRow key={capsule.id} capsule={capsule} />
           ))}
         </div>
       )}

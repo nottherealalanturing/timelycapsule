@@ -74,6 +74,7 @@ import {
   SessionsResponseSchema,
   SetContactGroupMemberRequestSchema,
   SetInitialPasswordRequestSchema,
+  SetOwnerKeyWrapRequestSchema,
   SignupRequestSchema,
   StorageResponseSchema,
   TagResponseSchema,
@@ -318,6 +319,13 @@ export const capsulesApi = {
       method: 'PATCH',
       auth: true,
       body: PatchCapsuleRequestSchema.partial().parse(input),
+    }),
+
+  setOwnerKeyWrap: (id: string, ownerKeyWrap: string) =>
+    request(`/capsules/${id}/owner-key-wrap`, CapsuleResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: SetOwnerKeyWrapRequestSchema.parse({ ownerKeyWrap }),
     }),
 
   seal: (id: string) => request(`/capsules/${id}/seal`, CapsuleResponseSchema, { method: 'POST', auth: true, body: {} }),

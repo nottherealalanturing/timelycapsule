@@ -1,3 +1,25 @@
+import type { CapsuleListItem } from '@tc/contracts';
+
+/**
+ * Resolves a capsule's unlock instant regardless of unlockMode — recipient_local
+ * capsules don't have a single instant until a recipient's tz is known, so this
+ * falls back to interpreting unlockLocal in the *browser's* tz as a best-effort
+ * owner-side estimate.
+ *
+ * Lives here rather than beside a component: it is schedule logic, and it was
+ * imported from `CapsuleCard` by three unrelated surfaces, which made deleting
+ * that component harder than it should have been.
+ */
+export function resolveUnlockDate(
+  capsule: Pick<CapsuleListItem, 'unlockMode' | 'unlockAt' | 'unlockLocal'>,
+): Date | null {
+  if (capsule.unlockMode === 'recipient_local') {
+    if (!capsule.unlockLocal) return null;
+    return new Date(`${capsule.unlockLocal.date}T${capsule.unlockLocal.time}:00`);
+  }
+  return capsule.unlockAt ? new Date(capsule.unlockAt) : null;
+}
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;

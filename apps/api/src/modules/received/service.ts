@@ -48,6 +48,7 @@ export async function listReceived(db: Database, userId: string): Promise<Receiv
       cover: row.capsule.cover as ReceivedCapsule['cover'],
       teaser: row.capsule.teaser,
       unlockAt: isoOrNull(row.capsule.unlockAt),
+      sealedAt: isoOrNull(row.capsule.sealedAt),
       firstOpenedAt: isoOrNull(row.recipient.firstOpenedAt),
     });
   }

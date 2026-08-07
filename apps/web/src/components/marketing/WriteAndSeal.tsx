@@ -143,7 +143,7 @@ export function WriteAndSeal() {
               <TransitStage
                 key={arrivalRun}
                 transit={transit}
-                publicId="TC-84KZQM3P"
+                publicId="84KZQM3P"
                 className="min-h-[24rem] py-10"
               >
                 {/*

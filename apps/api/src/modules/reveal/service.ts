@@ -146,6 +146,7 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
       unlockLocal: capsule.unlockLocal as { date: string; time: string; tz: string } | null,
       seals: buildSealStatuses(capsule, gates, recipient.id),
       recipientDisplayName: recipient.displayName,
+      sealedAt: capsule.sealedAt ? capsule.sealedAt.toISOString() : null,
     };
   }
 
@@ -311,7 +312,7 @@ export async function react(db: Database, rawToken: string, input: ReactRequest)
       await writeNotification(db, {
         userId: capsule.ownerId,
         category: 'social',
-        title: `${recipient.displayName ?? 'Someone'} reacted ${input.emoji}`,
+        title: `${recipient.displayName ?? 'Someone'} replied: "${input.emoji}"`,
         body: input.note ?? undefined,
         data: { capsuleId: capsule.id, recipientId: recipient.id },
       });
