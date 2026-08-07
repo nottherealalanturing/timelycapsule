@@ -1,125 +1,94 @@
 'use client';
 
 import type { ReceivedCapsule } from '@tc/contracts';
-import { Button, EmptyState, Skeleton, formatDuration } from '@tc/ui-web';
+import { Button, Dialog, DualClock, DurationStamp, EmptyState, Hallmark, Skeleton, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { blocksApi, receivedApi } from '../../../lib/api-client';
 import { useCorrectedNow } from '../../../lib/use-corrected-now';
 import { formatAbsoluteDate } from '../../../lib/waiting';
+import { CapsuleObject, StatedReading } from '../../../components/capsule/CapsuleObject';
 import { PageTitle, appFrame } from '../../../components/page-frame';
 
-const SECTION_COPY: Record<ReceivedCapsule['section'], { heading: string; empty: string }> = {
-  waiting: { heading: 'Waiting to open', empty: '' },
-  upcoming: { heading: 'Upcoming', empty: '' },
-  opened: { heading: 'Opened', empty: '' },
+const SECTION_HEADING: Record<ReceivedCapsule['section'], string> = {
+  waiting: 'Ready to open',
+  upcoming: 'Still sealed',
+  opened: 'Opened',
 };
 
-function coverStyle(cover: ReceivedCapsule['cover']): React.CSSProperties {
-  if (cover?.kind === 'gradient') return { background: cover.value };
-  return { background: 'var(--color-bg-raised)' };
-}
+/**
+ * The reading on a received capsule — the same three the owner's side uses,
+ * chosen by where the capsule is in its life.
+ *
+ * `upcoming` is the case that was broken: `ReceivedCapsuleSchema` carried no
+ * `sealedAt`, so this drew half a Dual Clock — a bare `formatDuration` in the
+ * clock's mono idiom with no TRAVELLED beside it. The contract now carries it,
+ * and the recipient sees what the sender sees: how long this has already been
+ * kept, next to how long is left.
+ */
+function ReceivedReading({ item }: { item: ReceivedCapsule }) {
+  const unlockDate = item.unlockAt ? new Date(item.unlockAt) : null;
+  const waiting = item.section === 'upcoming' && unlockDate !== null;
+  const nowMs = useCorrectedNow(waiting ? unlockDate : null);
+  const sealedMs = item.sealedAt ? new Date(item.sealedAt).getTime() : null;
 
-function initial(name: string): string {
-  return name.trim().charAt(0).toUpperCase() || '?';
+  if (waiting && nowMs !== null && sealedMs !== null) {
+    return <DualClock size="sm" elapsedMs={nowMs - sealedMs} remainingMs={unlockDate.getTime() - nowMs} />;
+  }
+
+  // `04 §10.4` — franked at the moment of opening, never during the wait. An
+  // opened capsule has a final duration, so it gets the postmark rather than a
+  // status word.
+  if (item.section === 'opened' && sealedMs !== null && item.firstOpenedAt) {
+    return <DurationStamp elapsedMs={new Date(item.firstOpenedAt).getTime() - sealedMs} />;
+  }
+
+  // `waiting` means the capsule has unlocked and has *not* been opened — so
+  // "Opened <date>" was the one thing that had not happened. The date is the
+  // moment it became readable.
+  if (item.section === 'waiting') {
+    return (
+      <StatedReading
+        label="Status"
+        value={unlockDate ? `Unlocked ${formatAbsoluteDate(item.unlockAt!)}` : 'Ready to open'}
+      />
+    );
+  }
+
+  return <StatedReading label="Status" value={item.section === 'opened' ? 'Opened' : 'Sealed'} />;
 }
 
 /**
- * The remaining figure in the Dual Clock's typographic idiom — mono, tabular,
- * two largest units — rather than V1's prose countdown ("12 years").
+ * A received capsule.
  *
- * Not the full `DualClock`: `ReceivedCapsuleSchema` carries no `sealedAt`, so
- * elapsed is unavailable on every recipient-facing surface. See the note on
- * `LockedWait` in the reveal page — the gap is reported, not faked.
+ * The same object the owner sees, drawn by the same component — what differs
+ * is content, not form. It is identified by who it came from, because that is
+ * what a letter addressed to you *is*, and it does not link anywhere: the key
+ * that opens it lives in the fragment of the original link, which the server
+ * has never held and this list therefore cannot reconstruct.
+ *
+ * V1's version had a coloured avatar circle with the sender's initial — an
+ * identicon on an artifact, and the only place in the authenticated app
+ * drawing a fully-round shape `04 §7` reserves for avatars, dials and the
+ * transit marker. It is gone; the sender is stated in words.
  */
-function RemainingFigure({ unlockAt }: { unlockAt: string }) {
-  const target = new Date(unlockAt);
-  const nowMs = useCorrectedNow(target);
-  if (nowMs === null) return null;
+function ReceivedRow({ item, onManage }: { item: ReceivedCapsule; onManage: (item: ReceivedCapsule) => void }) {
   return (
-    <span className="whitespace-nowrap font-[family-name:var(--font-mono)] tabular-nums">
-      {formatDuration(Math.max(0, target.getTime() - nowMs))}
-    </span>
-  );
-}
-
-function ReceivedRow({ item, onReport }: { item: ReceivedCapsule; onReport: (item: ReceivedCapsule) => void }) {
-  const queryClient = useQueryClient();
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  const blockMutation = useMutation({
-    mutationFn: async () => {
-      if (!item.senderEmail) return;
-      await blocksApi.create({ email: item.senderEmail });
-    },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['received'] }),
-  });
-
-  return (
-    <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-[var(--color-rule)] p-3">
-      <div
-        aria-hidden
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-medium text-foreground"
-        style={coverStyle(item.cover)}
-      >
-        {initial(item.senderName)}
-      </div>
-
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{item.title || 'Untitled capsule'}</p>
-        <p className="truncate text-sm text-secondary">
-          From {item.senderName}
-          {/*
-            The absolute date always accompanies the relative figure
-            (`07 §VIII.4`) — and the figure only appears where there is
-            genuinely something remaining. The `waiting` section is *already
-            unlocked* and merely unopened, so V1's countdown rendered a
-            meaningless `00:00` there; it now states, in the past tense
-            (`09 §XVI`), that the capsule has arrived.
-          */}
-          {item.unlockAt && item.section === 'upcoming' ? (
-            <>
-              {' '}
-              &middot; {formatAbsoluteDate(item.unlockAt)} &middot;{' '}
-              <RemainingFigure unlockAt={item.unlockAt} />
-            </>
-          ) : item.unlockAt && item.section === 'waiting' ? (
-            <> &middot; Unlocked {formatAbsoluteDate(item.unlockAt)}</>
-          ) : null}
-        </p>
-      </div>
-
-      <div className="relative">
-        <Button variant="ghost" size="sm" aria-label="More actions" onClick={() => setMenuOpen((v) => !v)}>
-          ⋯
-        </Button>
-        {menuOpen ? (
-          <div className="absolute right-0 top-full z-10 mt-1 w-40 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] py-1 shadow-md">
-            <button
-              type="button"
-              disabled={!item.senderEmail || blockMutation.isPending}
-              onClick={() => {
-                setMenuOpen(false);
-                void blockMutation.mutate();
-              }}
-              className="block w-full px-3 py-2 text-left text-sm text-foreground hover:bg-[var(--color-bg-base)] disabled:opacity-40"
-            >
-              Block sender
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false);
-                onReport(item);
-              }}
-              className="block w-full px-3 py-2 text-left text-sm text-[var(--color-danger)] hover:bg-[var(--color-bg-base)]"
-            >
-              Report
-            </button>
-          </div>
-        ) : null}
-      </div>
-    </div>
+    <CapsuleObject
+      publicId={item.publicId}
+      name={item.title ? { label: item.title, named: true } : { label: `From ${item.senderName}`, named: false }}
+      detail={item.title ? `From ${item.senderName}` : null}
+      reading={<ReceivedReading item={item} />}
+      trailing={
+        <button
+          type="button"
+          onClick={() => onManage(item)}
+          className="motion-instant text-[length:var(--text-body-s)] text-secondary underline-offset-4 hover:text-foreground hover:underline"
+        >
+          Manage
+        </button>
+      }
+    />
   );
 }
 
@@ -132,20 +101,34 @@ const REPORT_REASONS = [
 
 export default function ReceivedPage() {
   const queryClient = useQueryClient();
-  const [reporting, setReporting] = useState<ReceivedCapsule | null>(null);
+  const { show } = useToast();
+  const [managing, setManaging] = useState<ReceivedCapsule | null>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['received'],
     queryFn: () => receivedApi.list(),
   });
 
-  const reportMutation = useMutation({
-    mutationFn: (input: { reason: (typeof REPORT_REASONS)[number]['value'] }) => {
-      if (!reporting) throw new Error('No capsule selected');
-      return receivedApi.report(reporting.recipientId, input);
+  const blockMutation = useMutation({
+    mutationFn: async () => {
+      if (!managing?.senderEmail) return;
+      await blocksApi.create({ email: managing.senderEmail });
     },
     onSuccess: () => {
-      setReporting(null);
+      setManaging(null);
+      show('Sender blocked');
+      void queryClient.invalidateQueries({ queryKey: ['received'] });
+    },
+  });
+
+  const reportMutation = useMutation({
+    mutationFn: (input: { reason: (typeof REPORT_REASONS)[number]['value'] }) => {
+      if (!managing) throw new Error('No capsule selected');
+      return receivedApi.report(managing.recipientId, input);
+    },
+    onSuccess: () => {
+      setManaging(null);
+      show('Reported');
       void queryClient.invalidateQueries({ queryKey: ['received'] });
     },
   });
@@ -155,10 +138,10 @@ export default function ReceivedPage() {
 
   if (isLoading) {
     return (
-      <div className={appFrame('flex flex-col gap-4')}>
-        <Skeleton className="h-8 w-64" />
-        <Skeleton className="h-16" />
-        <Skeleton className="h-16" />
+      <div className={appFrame('flex flex-col gap-6')}>
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
     );
   }
@@ -166,60 +149,82 @@ export default function ReceivedPage() {
   if (items.length === 0) {
     return (
       <div className={appFrame()}>
-        <EmptyState
-          title="Nothing yet — but the future is long."
-          action={<p className="text-sm text-secondary">Invite someone to exchange capsules.</p>}
-        />
+        <EmptyState title="Nothing has been sent to you yet." />
       </div>
     );
   }
 
   return (
-    <div className={appFrame('flex flex-col gap-8')}>
+    <div className={appFrame('flex flex-col gap-9')}>
       <PageTitle>Received</PageTitle>
 
       {sections.map((section) => {
         const sectionItems = items.filter((item) => item.section === section);
         if (sectionItems.length === 0) return null;
         return (
-          <section key={section} className="flex flex-col gap-3">
-            <h2 className="text-sm font-medium text-secondary">{SECTION_COPY[section].heading}</h2>
-            <div className="flex flex-col gap-2">
-              {sectionItems.map((item) => (
-                <ReceivedRow key={item.recipientId} item={item} onReport={setReporting} />
-              ))}
-            </div>
+          <section key={section} className="flex flex-col gap-2">
+            <Hallmark>{SECTION_HEADING[section]}</Hallmark>
+            {sectionItems.map((item) => (
+              <ReceivedRow key={item.recipientId} item={item} onManage={setManaging} />
+            ))}
           </section>
         );
       })}
 
-      {reporting ? (
-        <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/40" onClick={() => setReporting(null)}>
-          <div
-            className="w-full max-w-sm rounded-[var(--radius-modal)] bg-[var(--color-bg-raised)] p-6 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="font-[var(--font-display)] text-lg text-foreground">Report this capsule</h2>
-            <p className="mt-1 text-sm text-secondary">What’s the issue with “{reporting.title || 'this capsule'}”?</p>
-            <div className="mt-4 flex flex-col gap-2">
+      {/*
+        One shared `Dialog` replaces two hand-rolled things: a popover menu with
+        no focus trap, no escape key and no outside-click, and a bespoke
+        `fixed inset-0` modal built from a div with an onClick. Both actions
+        live here together because both are about the same decision — what to
+        do about a sender.
+      */}
+      <Dialog
+        open={managing !== null}
+        onOpenChange={(open) => !open && setManaging(null)}
+        title={managing ? `From ${managing.senderName}` : ''}
+        width="sm"
+      >
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-2">
+            <Hallmark>Stop hearing from them</Hallmark>
+            <p className="text-[length:var(--text-body-s)] text-secondary">
+              Blocking prevents this sender from addressing anything to you again. Capsules already sealed for you
+              are unaffected — delivery is never gated on our side.
+            </p>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="self-start"
+              disabled={!managing?.senderEmail || blockMutation.isPending}
+              loading={blockMutation.isPending}
+              onClick={() => blockMutation.mutate()}
+            >
+              Block this sender
+            </Button>
+          </div>
+
+          <div className="flex flex-col gap-2 border-t border-[var(--color-rule)] pt-5">
+            <Hallmark>Report it</Hallmark>
+            <p className="text-[length:var(--text-body-s)] text-secondary">
+              We never see what a capsule says, so a report tells us who sent it and why you flagged it — not its
+              contents.
+            </p>
+            <div className="flex flex-wrap gap-2">
               {REPORT_REASONS.map((reason) => (
                 <Button
                   key={reason.value}
-                  variant="secondary"
-                  fullWidth
-                  loading={reportMutation.isPending}
+                  variant="ghost"
+                  size="sm"
+                  disabled={reportMutation.isPending}
                   onClick={() => reportMutation.mutate({ reason: reason.value })}
                 >
                   {reason.label}
                 </Button>
               ))}
-              <Button variant="ghost" fullWidth onClick={() => setReporting(null)}>
-                Cancel
-              </Button>
             </div>
           </div>
         </div>
-      ) : null}
+      </Dialog>
     </div>
   );
 }

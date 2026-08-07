@@ -1,7 +1,7 @@
 'use client';
 
 import type { NotificationCategory } from '@tc/contracts';
-import { Button, Skeleton, useToast } from '@tc/ui-web';
+import { Button, Checkbox, Skeleton, useToast } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiClientError, notificationPrefsApi } from '../../../../lib/api-client';
@@ -69,40 +69,42 @@ export default function NotificationsSettingsPage() {
   return (
     <div className="flex max-w-lg flex-col gap-8">
       <section className="flex flex-col gap-3">
-        <h2 className="font-[var(--font-display)] text-lg text-foreground">Notifications</h2>
-        <div className="flex flex-col gap-2">
+        <h2 className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">Notifications</h2>
+        {/*
+          The shared `Checkbox`, not a bare `<input type="checkbox">`. Its own
+          docstring names this exact failure: a native checkbox "renders in the
+          browser's own accent colour and ignores the design system entirely".
+          Seven of them sat in Settings doing precisely that, in the browser's
+          blue, next to controls that had all been deliberately drawn.
+        */}
+        <div className="flex flex-col gap-2.5">
           {CATEGORIES.map((category) => (
-            <label key={category.value} className="flex items-center justify-between text-sm text-foreground">
-              {category.label}
-              <input
-                type="checkbox"
-                checked={!prefs.emailOptOut.includes(category.value)}
-                onChange={() => toggleCategory(category.value)}
-              />
-            </label>
+            <Checkbox
+              key={category.value}
+              label={category.label}
+              checked={!prefs.emailOptOut.includes(category.value)}
+              onChange={() => toggleCategory(category.value)}
+            />
           ))}
-          <label className="flex items-center justify-between text-sm text-secondary">
-            Security alerts
-            <input type="checkbox" checked disabled />
-          </label>
+          <Checkbox label="Security alerts — always on" checked disabled onChange={() => {}} />
         </div>
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-[var(--font-display)] text-lg text-foreground">Quiet hours</h2>
+        <h2 className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)] text-foreground">Quiet hours</h2>
         <div className="flex items-center gap-2">
           <input
             type="time"
             value={start}
             onChange={(e) => setQuietStart(e.target.value)}
-            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-sm text-foreground"
+            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
           />
           <span className="text-secondary">to</span>
           <input
             type="time"
             value={end}
             onChange={(e) => setQuietEnd(e.target.value)}
-            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-sm text-foreground"
+            className="rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-2 text-[length:var(--text-body-s)] text-foreground"
           />
           <Button size="sm" variant="secondary" onClick={saveQuietHours}>
             Save
