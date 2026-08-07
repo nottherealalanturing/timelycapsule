@@ -150,7 +150,7 @@ export function ShellStage() {
    fixture data to get honest before/after captures during the rebuild. */
 export const FIXTURE_CAPSULE = {
   id: '00000000-0000-4000-8000-000000000001',
-  publicId: 'TC-84KZQM3P',
+  publicId: '84KZQM3P',
   ownerId: '00000000-0000-4000-8000-000000000002',
   type: 'standard',
   state: 'sealed',

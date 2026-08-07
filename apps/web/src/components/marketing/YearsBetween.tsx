@@ -62,7 +62,7 @@ export function YearsBetween() {
       <div className="flex flex-col gap-6 rounded-[var(--radius-card)] border border-[var(--color-rule)] bg-[var(--color-bg-raised)] p-6 sm:p-8">
         <div className="flex items-start justify-between gap-4">
           <div className="flex flex-col gap-1">
-            <Hallmark>TC-84KZQM3P</Hallmark>
+            <Hallmark>84KZQM3P</Hallmark>
             <p className="text-[length:var(--text-title-s)] leading-[var(--lh-heading)]">
               Letter to my daughter
             </p>

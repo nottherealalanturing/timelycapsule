@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CapsuleTypeSchema } from './capsules';
 
 /** Settings v1 (T-18, plan/02-UX-DESIGN.md §5.13) — Storage/Data/avatar-upload schemas not already owned by another module's contracts file. */
 
@@ -8,6 +9,11 @@ export const LargestCapsuleSchema = z.object({
   id: z.string().uuid(),
   publicId: z.string(),
   title: z.string().nullable(),
+  // Lets the client fall back to `capsuleName()`'s "For yourself"/"For
+  // someone else" reading instead of a bare "Untitled capsule" placeholder
+  // (CapsuleRow's `capsuleName()` doc comment explains why that placeholder
+  // was removed everywhere else).
+  type: CapsuleTypeSchema,
   sizeBytes: z.number(),
 });
 export type LargestCapsule = z.infer<typeof LargestCapsuleSchema>;
@@ -46,6 +52,7 @@ export type ExportResponse = z.infer<typeof ExportResponseSchema>;
 export const DeletionPreviewItemSchema = z.object({
   id: z.string().uuid(),
   title: z.string().nullable(),
+  type: CapsuleTypeSchema,
   cover: z
     .object({ kind: z.enum(['gradient', 'image']), value: z.string(), theme: z.string().optional() })
     .nullable(),

@@ -86,7 +86,7 @@ export default function SpecimenPage() {
         note="Paper and serif, permanently, in both themes. Bounded on all four sides with the instrument surround visible — a lit document in a dark room, never a move to a light room."
       >
         <Record as="article" className="max-w-[560px]">
-          <Hallmark>TC-84KZQM3P · sealed 14 March 2026</Hallmark>
+          <Hallmark>84KZQM3P · sealed 14 March 2026</Hallmark>
           <h2 className="mt-3 text-[length:var(--text-title)] leading-[var(--lh-heading)]">Letter to my daughter</h2>
           <p className="mt-4">Amara,</p>
           <p className="mt-3">

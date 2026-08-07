@@ -112,7 +112,12 @@ export const RemindRequestSchema = z.object({ enabled: z.boolean() });
 export type RemindRequest = z.infer<typeof RemindRequestSchema>;
 
 export const ReactRequestSchema = z.object({
-  emoji: z.string().min(1).max(8),
+  // `max(8)` was sized for a literal emoji glyph; the reveal ceremony has
+  // sent named phrases ("This landed", 11 chars) since the reaction chips
+  // moved off emoji, so every real reaction was silently rejected client
+  // -side before ever reaching the network. 40 comfortably fits the current
+  // five phrases plus headroom, without inviting a free-text field.
+  emoji: z.string().min(1).max(40),
   note: z.string().max(500).optional(),
 });
 export type ReactRequest = z.infer<typeof ReactRequestSchema>;

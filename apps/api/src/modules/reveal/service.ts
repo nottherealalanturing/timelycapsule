@@ -312,7 +312,7 @@ export async function react(db: Database, rawToken: string, input: ReactRequest)
       await writeNotification(db, {
         userId: capsule.ownerId,
         category: 'social',
-        title: `${recipient.displayName ?? 'Someone'} reacted ${input.emoji}`,
+        title: `${recipient.displayName ?? 'Someone'} replied: "${input.emoji}"`,
         body: input.note ?? undefined,
         data: { capsuleId: capsule.id, recipientId: recipient.id },
       });

@@ -41,7 +41,7 @@ export function ArrivalDemo() {
         <TransitStage
           key={runId}
           transit={transit}
-          publicId="TC-84KZQM3P"
+          publicId="84KZQM3P"
           className="min-h-[26rem] py-12"
         >
           {/* `TransitStage` renders bare children — the caller supplies the

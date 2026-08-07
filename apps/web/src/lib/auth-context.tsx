@@ -20,8 +20,19 @@ const ME_QUERY_KEY = ['me'] as const;
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
-  /** Resolves with the one-time formatted recovery kit — the caller MUST show it to the user before navigating away (06 §A "mandatory nag"). */
-  signup: (input: { email: string; password: string; displayName: string; guestToken?: string }) => Promise<{ user: User; recoveryKit: string }>;
+  /**
+   * Resolves with the one-time formatted recovery kit — the caller MUST
+   * show it to the user before navigating away (06 §A "mandatory nag").
+   * Also resolves with the raw master key so the caller can, when a guest
+   * capsule is being claimed, re-wrap its on-device key under it (T-15b's
+   * documented gap — see signup/page.tsx).
+   */
+  signup: (input: {
+    email: string;
+    password: string;
+    displayName: string;
+    guestToken?: string;
+  }) => Promise<{ user: User; recoveryKit: string; masterKey: Uint8Array }>;
   login: (input: { email: string; password: string }) => Promise<User>;
   googleOAuth: (idToken: string, guestToken?: string) => Promise<User>;
   logout: () => Promise<void>;
@@ -82,7 +93,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // round-trip through unlockWithPassword.
       setMasterKey(masterKey);
       track('signup_completed');
-      return { user: newUser, recoveryKit };
+      return { user: newUser, recoveryKit, masterKey };
     },
     [setUser, setMasterKey],
   );

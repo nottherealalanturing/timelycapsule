@@ -6,6 +6,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiClientError, settingsApi } from '../../../../lib/api-client';
 import { useAuth } from '../../../../lib/auth-context';
+import { capsuleName } from '../../../../components/capsule/CapsuleRow';
 
 function ExportSection() {
   const { show } = useToast();
@@ -117,7 +118,7 @@ function DeleteAccountSection() {
           ) : (
             needsDecision.map((capsule) => (
               <div key={capsule.id} className="rounded-[var(--radius-input)] border border-[var(--color-rule)] p-3">
-                <p className="text-sm font-medium text-foreground">{capsule.title || 'Untitled capsule'}</p>
+                <p className="text-sm font-medium text-foreground">{capsuleName(capsule).label}</p>
                 <p className="mb-2 text-sm text-secondary">{capsule.recipientCount} recipient(s)</p>
                 <div className="flex gap-4 text-sm text-foreground">
                   <label className="flex items-center gap-1.5">

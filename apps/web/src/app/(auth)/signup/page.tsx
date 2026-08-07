@@ -1,13 +1,14 @@
 'use client';
 
 import { Button, Checkbox, Input, PasswordStrengthMeter } from '@tc/ui-web';
+import { fromBase64Url, wrapCapsuleKeyForOwner } from '@tc/crypto';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, type FormEvent } from 'react';
 import { GoogleSignInButton } from '../../../components/GoogleSignInButton';
-import { ApiClientError } from '../../../lib/api-client';
+import { ApiClientError, capsulesApi } from '../../../lib/api-client';
 import { useAuth } from '../../../lib/auth-context';
-import { clearGuestSession, getGuestToken } from '../../../lib/guest-store';
+import { clearGuestSession, getGuestCapsule, getGuestToken } from '../../../lib/guest-store';
 import { RecoveryKit } from '../../../components/RecoveryKit';
 
 export default function SignupPage() {
@@ -38,8 +39,30 @@ function SignupForm() {
     setError(null);
     setLoading(true);
     try {
-      const { recoveryKit: kit } = await signup({ email, password, displayName, guestToken });
-      if (guestToken) clearGuestSession();
+      const { recoveryKit: kit, masterKey } = await signup({ email, password, displayName, guestToken });
+      if (guestToken) {
+        // T-15b's documented gap: `claimGuestSession` transfers ownership
+        // but never attaches an `ownerKeyWrap`, so a claimed guest capsule
+        // was permanently unreadable by the very account that just claimed
+        // it — "Keep it safe with a free account" silently didn't. If this
+        // device still holds the raw capsule key (it does, unless the
+        // guest session outlived this tab), re-wrap it under the freshly
+        // generated master key before the guest cache below is cleared.
+        // Best-effort only: the endpoint (`setOwnerKeyWrap`) is one-time
+        // and the capsule always remains readable via its original link,
+        // so a failure here is a silent fallback to that, not a broken flow.
+        const cached = getGuestToken() === guestToken ? getGuestCapsule() : null;
+        if (cached) {
+          try {
+            const capsuleKey = fromBase64Url(cached.capsuleKeyB64);
+            const ownerKeyWrap = await wrapCapsuleKeyForOwner(capsuleKey, masterKey);
+            await capsulesApi.setOwnerKeyWrap(cached.capsuleId, ownerKeyWrap);
+          } catch {
+            // Non-fatal — see comment above.
+          }
+        }
+        clearGuestSession();
+      }
       setRecoveryKit(kit);
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : 'Something went wrong. Please try again.');
