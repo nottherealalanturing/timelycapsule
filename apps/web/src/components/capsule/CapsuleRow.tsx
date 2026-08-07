@@ -27,7 +27,14 @@ export function capsuleName(capsule: Pick<CapsuleListItem, 'title' | 'type'>): {
   named: boolean;
 } {
   if (capsule.title) return { label: capsule.title, named: true };
-  return { label: capsule.type === 'self' ? 'For yourself' : 'For someone else', named: false };
+  // `micro` (T-15b's guest capsule type) has no "who is this for" question
+  // in its Address movement at all — the composer frames it as "FOR
+  // YOURSELF" throughout, unconditionally. Falling through to "For someone
+  // else" here read as a real contradiction once a claimed guest capsule
+  // reached the dashboard: written and sealed as unmistakably for yourself,
+  // then relabelled otherwise.
+  const isSelfFramed = capsule.type === 'self' || capsule.type === 'micro';
+  return { label: isSelfFramed ? 'For yourself' : 'For someone else', named: false };
 }
 
 /** Non-waiting states have no wait to describe, so they state themselves plainly. */

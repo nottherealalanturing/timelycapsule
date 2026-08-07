@@ -45,7 +45,7 @@ export function describeSealFailure(error: unknown): SealProblem {
     case 'guest_capsule_limit':
       return {
         message:
-          'This device already holds a capsule, and a guest can keep one. Your letter stays here — a free account can seal it, and keeps the first one too.',
+          'A guest can keep one capsule at a time, and this device already has one. Your letter stays here — a free account can seal it, and keeps the first one too.',
         action: { label: 'Create a free account', href: '/signup' },
         retryable: false,
       };
