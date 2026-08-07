@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
       // Authenticated app surfaces and the private-link reveal pages have
       // nothing for a crawler to usefully index and shouldn't appear in
       // search results.
-      disallow: ['/home', '/capsule/', '/settings/', '/c/', '/try/capsule/', '/received', '/people', '/collections', '/archive', '/trash', '/search'],
+      disallow: ['/home', '/capsule/', '/settings/', '/c/', '/try/capsule/', '/received', '/people', '/collections', '/archive', '/trash'],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

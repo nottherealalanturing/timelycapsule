@@ -1,16 +1,11 @@
 'use client';
 
-import { Button, Dialog, EmptyState, Input, Skeleton } from '@tc/ui-web';
+import { Button, Dialog, EmptyState, Hallmark, Input, Skeleton } from '@tc/ui-web';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useState } from 'react';
 import { collectionsApi } from '../../../lib/api-client';
 import { PageTitle, appFrame } from '../../../components/page-frame';
-
-function coverStyle(cover: { kind: 'gradient' | 'image'; value: string } | null): React.CSSProperties {
-  if (cover?.kind === 'gradient') return { background: cover.value };
-  return { background: 'var(--color-bg-raised)' };
-}
 
 /** Collections grid per 02-UX-DESIGN.md §5.10 — create/rename/delete here, detail view is a filtered timeline. */
 export default function CollectionsPage() {
@@ -37,10 +32,8 @@ export default function CollectionsPage() {
     return (
       <div className={appFrame('flex flex-col gap-4')}>
         <Skeleton className="h-8 w-64" />
-        <div className="grid grid-cols-3 gap-4">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-        </div>
+        <Skeleton className="h-16 w-full" />
+        <Skeleton className="h-16 w-full" />
       </div>
     );
   }
@@ -55,20 +48,34 @@ export default function CollectionsPage() {
       {collections.length === 0 ? (
         <EmptyState title="No collections yet." action={<Button onClick={() => setCreateOpen(true)}>Create your first collection</Button>} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        /*
+          A list in the same grammar as every other list behind the login,
+          not a grid of picture cards. The 96px cover band each card wore was
+          the last of the decorative gradients — the same ornament cut from
+          the capsule card and the capsule detail page, surviving here only
+          because nothing had been through this surface yet. Empty of any
+          gradient it was simply a grey rectangle above every name.
+
+          What replaces it is what a collection actually is: a name, and how
+          much is in it — stated in the reading slot the capsule rows use, so
+          a shelf and the documents on it are described the same way.
+        */
+        <div className="flex flex-col gap-2">
           {collections.map((collection) => (
             <Link
               key={collection.id}
               href={`/collections/${collection.id}`}
-              className="flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--color-rule)] transition hover:shadow-md"
+              className="motion-instant flex items-center justify-between gap-4 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-4 py-3 hover:border-[var(--color-rule-strong)]"
             >
-              <div className="h-24 shrink-0" style={coverStyle(collection.cover)} />
-              <div className="flex flex-col gap-1 p-4">
-                <h3 className="truncate font-[var(--font-display)] text-base text-foreground">{collection.name}</h3>
-                <p className="text-sm text-secondary">
-                  {collection.capsuleCount} capsule{collection.capsuleCount === 1 ? '' : 's'}
-                </p>
-              </div>
+              <span className="truncate text-[length:var(--text-body)] text-foreground">{collection.name}</span>
+              <span className="flex shrink-0 flex-col gap-0.5 text-right">
+                <Hallmark>Holding</Hallmark>
+                <span className="text-[length:var(--text-body-s)] text-secondary">
+                  {collection.capsuleCount === 0
+                    ? 'Nothing yet'
+                    : `${collection.capsuleCount} capsule${collection.capsuleCount === 1 ? '' : 's'}`}
+                </span>
+              </span>
             </Link>
           ))}
         </div>
