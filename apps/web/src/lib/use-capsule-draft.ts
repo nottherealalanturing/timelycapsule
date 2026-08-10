@@ -57,6 +57,55 @@ function clearCache(capsuleId: string): void {
   localStorage.removeItem(draftCacheKey(capsuleId));
 }
 
+/**
+ * recipientId -> the one-time raw access token returned by `POST
+ * .../recipients` — the server hashes it at rest and never returns the raw
+ * form again (T-09 decisions log), so the *only* copy that will ever exist
+ * anywhere is whatever the browser is holding right after creation. This
+ * used to live only in a `useRef` Map, deliberately never persisted — but
+ * "never persisted" meant a reload between adding a recipient and sealing
+ * silently and permanently lost the ability to notify them at all: not just
+ * at seal time, but forever, since `resendInvite` also needs a raw token to
+ * build its link from. Persisting it client-side is the same accepted
+ * tradeoff `lib/guest-store.ts` already makes for the guest capsule key
+ * (documented there as "no way around this... an accepted tradeoff") — a
+ * *different* keyspace from the content-draft cache above, because that one
+ * is cleared after every successful autosave (line ~220 below) and a
+ * recipient token needs to survive from "added" all the way to "announced,"
+ * which spans many autosave cycles.
+ */
+function recipientTokensCacheKey(capsuleId: string): string {
+  return `tc:draft:${capsuleId}:recipient-tokens`;
+}
+
+function readRecipientTokens(capsuleId: string): Map<string, string> {
+  if (typeof window === 'undefined') return new Map();
+  try {
+    const raw = localStorage.getItem(recipientTokensCacheKey(capsuleId));
+    if (!raw) return new Map();
+    return new Map(Object.entries(JSON.parse(raw) as Record<string, string>));
+  } catch {
+    return new Map();
+  }
+}
+
+function writeRecipientTokens(capsuleId: string, tokens: Map<string, string>): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(recipientTokensCacheKey(capsuleId), JSON.stringify(Object.fromEntries(tokens)));
+}
+
+function clearRecipientTokens(capsuleId: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(recipientTokensCacheKey(capsuleId));
+}
+
+export interface AnnounceResult {
+  total: number;
+  succeeded: number;
+  /** Recipient ids whose announce call failed — surfaced so a caller can say honestly that sealing worked but notifying didn't, rather than implying delivery happened. */
+  failedRecipientIds: string[];
+}
+
 export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
 
 export interface CapsuleDraft {
@@ -76,10 +125,10 @@ export interface CapsuleDraft {
   /** Wraps this capsule's key under a passphrase (Passphrase Seal) — base64, safe to send to the server. */
   wrapForPassphrase: (passphrase: string) => Promise<string>;
   /**
-   * Remembers a just-created recipient's one-time raw access token in
-   * memory (never persisted) so `sendAnnounceToAll`/`resendInvite` can
-   * later build that recipient's full magic link — call right after
-   * `recipientsApi.create` resolves, while the token is still in hand.
+   * Remembers a just-created recipient's one-time raw access token — call
+   * right after `recipientsApi.create` resolves, while the token is still
+   * in hand. Persisted client-side (see `writeRecipientTokens` above) so a
+   * reload before sealing doesn't lose the only copy that will ever exist.
    */
   registerRecipientToken: (recipientId: string, accessToken: string) => void;
   /**
@@ -87,9 +136,12 @@ export interface CapsuleDraft {
    * added this session (via `registerRecipientToken`), immediately after a
    * successful seal. The capsule key never leaves this hook — only the
    * fully-assembled link (built here, client-side) is sent to the server,
-   * which drops it into the email unparsed (T-14 decisions log).
+   * which drops it into the email unparsed (T-14 decisions log). Resolves
+   * with a summary rather than swallowing per-recipient failures, so the
+   * seal flow can tell a writer honestly when sealing worked but notifying
+   * someone didn't.
    */
-  sendAnnounceToAll: (capsuleId: string) => Promise<void>;
+  sendAnnounceToAll: (capsuleId: string) => Promise<AnnounceResult>;
 }
 
 const AUTOSAVE_IDLE_MS = 3000;
@@ -112,9 +164,10 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
 
   const capsuleKeyRef = useRef<Uint8Array | null>(null);
   const pendingPatchRef = useRef<PatchCapsuleRequest>({});
-  // recipientId -> one-time raw access token, held only for this browser session (T-14
-  // decisions log) — never persisted, since it's what lets sendAnnounceToAll build each
-  // recipient's magic link without the server ever holding the capsule key.
+  // recipientId -> one-time raw access token, mirrored to localStorage (see
+  // readRecipientTokens/writeRecipientTokens above) — the capsule key itself
+  // (used to build the `#k=` link fragment) still never leaves this hook and
+  // never reaches the server, per T-14's decisions log.
   const recipientTokensRef = useRef<Map<string, string>>(new Map());
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Guards against overlapping autosave requests: without this, a slow
@@ -157,6 +210,7 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
         loaded.ownerKeyWrap = patched.ownerKeyWrap;
       }
       capsuleKeyRef.current = capsuleKey;
+      recipientTokensRef.current = readRecipientTokens(capsuleId);
 
       const cached = readCache(capsuleId);
       if (cached) {
@@ -301,21 +355,52 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
     return wrapCapsuleKeyWithPassphrase(capsuleKeyRef.current, passphrase);
   }, []);
 
-  const registerRecipientToken = useCallback((recipientId: string, accessToken: string) => {
-    recipientTokensRef.current.set(recipientId, accessToken);
-  }, []);
+  const registerRecipientToken = useCallback(
+    (recipientId: string, accessToken: string) => {
+      recipientTokensRef.current.set(recipientId, accessToken);
+      if (capsuleId) writeRecipientTokens(capsuleId, recipientTokensRef.current);
+    },
+    [capsuleId],
+  );
 
-  const sendAnnounceToAll = useCallback(async (capsuleIdForLink: string) => {
-    if (!capsuleKeyRef.current) return;
-    const fragment = encodeCapsuleKeyForLink(capsuleKeyRef.current);
-    const entries = Array.from(recipientTokensRef.current.entries());
-    await Promise.allSettled(
-      entries.map(([recipientId, accessToken]) => {
-        const link = `${window.location.origin}/c/${accessToken}#${fragment}`;
-        return recipientsApi.announce(capsuleIdForLink, recipientId, link);
-      }),
-    );
-  }, []);
+  const sendAnnounceToAll = useCallback(
+    async (capsuleIdForLink: string): Promise<AnnounceResult> => {
+      const entries = Array.from(recipientTokensRef.current.entries());
+      if (!capsuleKeyRef.current || entries.length === 0) {
+        return { total: 0, succeeded: 0, failedRecipientIds: [] };
+      }
+      const fragment = encodeCapsuleKeyForLink(capsuleKeyRef.current);
+      const results = await Promise.allSettled(
+        entries.map(([recipientId, accessToken]) => {
+          const link = `${window.location.origin}/c/${accessToken}#${fragment}`;
+          return recipientsApi.announce(capsuleIdForLink, recipientId, link);
+        }),
+      );
+
+      const failedRecipientIds: string[] = [];
+      results.forEach((result, i) => {
+        if (result.status === 'rejected') {
+          const recipientId = entries[i]![0];
+          failedRecipientIds.push(recipientId);
+          // Promise.allSettled already stops these from becoming an unhandled
+          // rejection, but silently stopping there is what let a real
+          // provider/network failure disappear with no trace at all — logged
+          // so it's at least visible in the browser console, and returned so
+          // the caller (Composer's seal handler) can tell the difference
+          // between "sealed and notified" and "sealed, notify failed."
+          console.error(`Failed to announce capsule to recipient ${recipientId}:`, result.reason);
+        }
+      });
+
+      // The tokens have done their one job (or had their one chance) — the
+      // capsule is sealed by the time this runs, so nothing else in this
+      // composer session will ever call announce for it again.
+      if (capsuleIdForLink) clearRecipientTokens(capsuleIdForLink);
+
+      return { total: entries.length, succeeded: entries.length - failedRecipientIds.length, failedRecipientIds };
+    },
+    [],
+  );
 
   return {
     capsule,

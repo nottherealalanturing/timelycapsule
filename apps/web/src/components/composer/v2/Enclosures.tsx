@@ -1,7 +1,7 @@
 'use client';
 
 import type { MediaItem } from '@tc/contracts';
-import { cn, Hallmark } from '@tc/ui-web';
+import { Button, cn, Hallmark } from '@tc/ui-web';
 import { useEffect, useRef, useState } from 'react';
 import type { PlaceMemory } from '../../../lib/letter-envelope';
 import type { ComposerCapabilities } from './capabilities';
@@ -12,6 +12,8 @@ export interface UploadingItem {
   partsDone: number;
   partsTotal: number;
   error?: string;
+  /** Set once the server has created a ticket row — needed so a removed failed upload can also be deleted server-side. */
+  mediaId?: string;
 }
 
 export interface EnclosuresProps {
@@ -23,6 +25,7 @@ export interface EnclosuresProps {
   onRecord: () => void;
   onAddPlace: () => void;
   onRemoveMedia: (item: MediaItem) => void;
+  onRemoveUploading: (id: string) => void;
   onRemovePlace: () => void;
   onCaption: (item: MediaItem, caption: string) => void;
   onReorder: (item: MediaItem, direction: -1 | 1) => void;
@@ -69,6 +72,7 @@ export function Enclosures({
   onRecord,
   onAddPlace,
   onRemoveMedia,
+  onRemoveUploading,
   onRemovePlace,
   onCaption,
   onReorder,
@@ -186,63 +190,95 @@ export function Enclosures({
                     this is a reading of how much has actually landed. */}
                 {u.error ?? `${u.partsDone} of ${u.partsTotal}`}
               </span>
+              {/* A failed upload used to sit here forever — nothing ever took
+                  it out of this list, and Seal counts everything in it as
+                  still in flight, so one failure could make sealing
+                  permanently impossible with no way out. */}
+              {u.error ? (
+                <button
+                  type="button"
+                  onClick={() => onRemoveUploading(u.id)}
+                  aria-label={`Remove ${u.name}`}
+                  className="shrink-0 px-1 text-[length:var(--text-caption)] text-secondary"
+                >
+                  Remove
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
       )}
 
       {nothingAvailable ? null : (
-        <div ref={menuRef} className="relative self-start">
-          <button
-            type="button"
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
-            className="text-[length:var(--text-body-s)] text-[var(--color-interactive)] underline-offset-2 hover:underline"
-          >
-            Enclose something
-          </button>
-
-          {menuOpen ? (
-            <div
-              role="menu"
-              className="absolute left-0 top-full z-20 mt-1 w-64 rounded-[var(--radius-input)] border border-[var(--color-rule-strong)] bg-[var(--color-bg-raised)] p-1 shadow-md"
-            >
-              {/* Only offered kinds this entry point actually supports —
-                  see the note above on why an unavailable kind is omitted
-                  rather than shown disabled. */}
-              {capabilities.enclosures ? (
-                <>
-                  <MenuItem
-                    glyph="▣"
-                    label="A photograph, video or file"
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      fileRef.current?.click();
-                    }}
-                  />
-                  <MenuItem
-                    glyph="♪"
-                    label={recording ? 'Stop recording' : 'A voice note'}
-                    onSelect={() => {
-                      setMenuOpen(false);
-                      onRecord();
-                    }}
-                  />
-                </>
-              ) : null}
-              {capabilities.placeMemory ? (
-                <MenuItem
-                  glyph="⌖"
-                  label={writtenAt ? 'Change where this was written' : 'Where this was written'}
-                  onSelect={() => {
-                    setMenuOpen(false);
-                    onAddPlace();
-                  }}
-                />
-              ) : null}
-            </div>
+        <div className="flex flex-col gap-2">
+          {/*
+            First-visit context only — once something's enclosed, the list
+            above already shows what kinds exist, and repeating this line
+            would be the duplicated-decision noise this composer pass keeps
+            cutting elsewhere. Stated, not implied by a bare "+", per the
+            brief: optional, and there's more than one kind.
+          */}
+          {isEmpty ? (
+            <p className="text-[length:var(--text-caption)] text-secondary">
+              Optional — a photo, a voice note, or where you wrote this.
+            </p>
           ) : null}
+          <div ref={menuRef} className="relative self-start">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((v) => !v)}
+            >
+              <span aria-hidden className="mr-1.5 font-[var(--font-mono)]">
+                +
+              </span>
+              Enclose something
+            </Button>
+
+            {menuOpen ? (
+              <div
+                role="menu"
+                className="absolute left-0 top-full z-20 mt-1 w-64 rounded-[var(--radius-input)] border border-[var(--color-rule-strong)] bg-[var(--color-bg-raised)] p-1 shadow-md"
+              >
+                {/* Only offered kinds this entry point actually supports —
+                    see the note above on why an unavailable kind is omitted
+                    rather than shown disabled. */}
+                {capabilities.enclosures ? (
+                  <>
+                    <MenuItem
+                      glyph="▣"
+                      label="A photograph, video or file"
+                      onSelect={() => {
+                        setMenuOpen(false);
+                        fileRef.current?.click();
+                      }}
+                    />
+                    <MenuItem
+                      glyph="♪"
+                      label={recording ? 'Stop recording' : 'A voice note'}
+                      onSelect={() => {
+                        setMenuOpen(false);
+                        onRecord();
+                      }}
+                    />
+                  </>
+                ) : null}
+                {capabilities.placeMemory ? (
+                  <MenuItem
+                    glyph="⌖"
+                    label={writtenAt ? 'Change where this was written' : 'Where this was written'}
+                    onSelect={() => {
+                      setMenuOpen(false);
+                      onAddPlace();
+                    }}
+                  />
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         </div>
       )}
 

@@ -132,9 +132,16 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
     router.push('/home');
   }
 
+  // Set when sendAnnounceToAll reports a partial failure, and read by
+  // handleCeremonyDone once the ceremony finishes — kept off `sealProblem`
+  // deliberately, since sealing itself already succeeded by the time this
+  // can be set; it's a delivery-notice problem, not a seal-blocking one.
+  const announceFailureRef = useRef<{ failed: number; total: number } | null>(null);
+
   async function handleConfirmSeal() {
     setSealing(true);
     setSealProblem(null);
+    announceFailureRef.current = null;
     try {
       await draft.flush();
       await capsulesApi.seal(capsuleId);
@@ -143,7 +150,14 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
       // The link is built from the capsule key still held in this session's memory; the
       // server never sees it (T-14 decisions log).
       if (draft.capsule?.announceOnSeal) {
-        await draft.sendAnnounceToAll(capsuleId);
+        const result = await draft.sendAnnounceToAll(capsuleId);
+        // Sealing succeeded regardless — the capsule *will* deliver on
+        // schedule either way (hard rule: delivery never depends on this
+        // email). What can genuinely fail here is only the early heads-up,
+        // so a failure here must never read as "sealing didn't work."
+        if (result.failedRecipientIds.length > 0) {
+          announceFailureRef.current = { failed: result.failedRecipientIds.length, total: result.total };
+        }
       }
       setCeremonyOpen(true);
     } catch (error) {
@@ -160,6 +174,19 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
     const unlockAt = draft.capsule?.unlockAt;
     const sentence = unlockAt ? new Date(unlockAt).toLocaleDateString(undefined, { dateStyle: 'long' }) : '';
     show(sentence ? `Sealed. See you on ${sentence}.` : 'Sealed.');
+
+    const announceFailure = announceFailureRef.current;
+    if (announceFailure) {
+      const who = announceFailure.failed === announceFailure.total ? 'them' : `${announceFailure.failed} of them`;
+      // A second, distinct toast rather than folding this into the seal
+      // message above — the two are different facts (sealed vs. notified)
+      // and collapsing them into one line is exactly what would let this
+      // read as "sealing partially failed," which isn't true.
+      show(`We couldn't reach ${who} just now to say something's waiting — they'll still get it when it opens.`, {
+        variant: 'danger',
+      });
+    }
+
     router.push('/home');
   }
 

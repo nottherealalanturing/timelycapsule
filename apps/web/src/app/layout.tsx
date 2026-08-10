@@ -52,23 +52,26 @@ export const metadata: Metadata = {
   description: 'Send it to the future.',
 };
 
-// Applies the persisted theme choice before paint, so there's no flash of
-// the wrong theme while React hydrates (data-theme drives packages/ui-web's
+// Applies the resolved theme before paint, so there's no flash of the wrong
+// theme while React hydrates (data-theme drives packages/ui-web's
 // tokens.css — see the [data-theme] rules there).
 //
-// Light is the default for anyone with no stored preference — including a
-// brand-new visitor and, unavoidably, a returning user whose browser never
-// happened to write tc-theme (there's no separate "has visited before" flag
-// to tell those two apart; a stored value is the only signal that exists).
-// This is a deliberate product decision superseding `02 §6`'s older "system
-// default" language, not a bug fix — previously the app followed
-// prefers-color-scheme and defaulted to dark whenever the OS expressed no
-// preference.
+// Product Quality Pass (2026-08): restores system-preference as the default,
+// superseding the earlier "light always, even with no stored preference"
+// decision recorded lower in this file's history. Precedence, in order:
+// an explicit stored choice (from ThemeToggle, anywhere it's rendered) wins
+// outright; failing that, the OS's own prefers-color-scheme; failing that
+// (matchMedia unavailable), light. ThemeToggle itself keeps following the OS
+// live for as long as nothing has been explicitly chosen — this script only
+// owns the pre-paint instant.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem('tc-theme');
-    document.documentElement.setAttribute('data-theme', stored === 'dark' ? 'dark' : 'light');
+    var theme = stored === 'dark' || stored === 'light'
+      ? stored
+      : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {
     document.documentElement.setAttribute('data-theme', 'light');
   }

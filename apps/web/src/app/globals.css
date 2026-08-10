@@ -218,3 +218,31 @@ body {
   outline: 1px solid var(--color-interactive);
   outline-offset: 4px;
 }
+
+/*
+ * iOS Safari auto-zooms the page on focus for any text input under 16px,
+ * and there's no way to opt out of that from the page side — the fix is to
+ * not be under 16px. `Input`/`ExactMoment`'s date+time fields use
+ * `--text-body-s` (14px), which is the right density on a mouse-driven
+ * desktop layout and the wrong one under a thumb (Product Quality Pass,
+ * 2026-08 — this is what read as "the composer overflows on iPhone 15": it
+ * doesn't, the zoom does, and panning back out looks identical to overflow).
+ *
+ * Scoped to `pointer: coarse` so desktop's actual 14px density is untouched
+ * — this is a touch-target correction, not a type-scale change.
+ */
+@media (pointer: coarse) {
+  input[type='text'],
+  input[type='email'],
+  input[type='tel'],
+  input[type='password'],
+  input[type='search'],
+  input[type='date'],
+  input[type='time'],
+  input[type='number'],
+  input:not([type]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}

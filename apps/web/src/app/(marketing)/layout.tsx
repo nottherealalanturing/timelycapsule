@@ -1,23 +1,25 @@
 import Link from 'next/link';
-import { Lockup } from '@tc/ui-web';
+import { Lockup, ThemeToggle } from '@tc/ui-web';
+import { MarketingNavAuth } from '../../components/MarketingNavAuth';
 
 /**
  * Marketing shell — header and footer shared by the landing, pricing,
- * occasion, help and legal pages (T-21).
+ * occasion, help, careers and legal pages (T-21).
  *
- * Server component throughout: these pages are the SEO surface and the
- * Lighthouse target (`05-BUILD-PLAYBOOK` T-21 DoD ≥95), so the shell ships no
- * client JS of its own. The header is sticky but opaque from the start —
- * `02 §5.1`'s transparent-over-hero treatment predates the Meridian rebuild,
- * and a translucent bar over the thesis clock would put chrome in front of
- * the one thing `07 §X.1` says opens the page.
+ * Mostly a server component — these pages are the SEO surface and the
+ * Lighthouse target (`05-BUILD-PLAYBOOK` T-21 DoD ≥95) — with two small
+ * client islands (`ThemeToggle`, `MarketingNavAuth`) rather than converting
+ * the whole shell to client JS. The header is sticky but opaque from the
+ * start — `02 §5.1`'s transparent-over-hero treatment predates the Meridian
+ * rebuild, and a translucent bar over the thesis clock would put chrome in
+ * front of the one thing `07 §X.1` says opens the page.
  */
 const FOOTER_LINKS: { href: string; label: string }[] = [
   { href: '/pricing', label: 'Pricing' },
   { href: '/help', label: 'Help' },
+  { href: '/careers', label: 'Careers' },
   { href: '/legal/terms', label: 'Terms' },
   { href: '/legal/privacy', label: 'Privacy' },
-  { href: '/login', label: 'Log in' },
 ];
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
@@ -35,9 +37,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
             <Link href="/help" className="motion-instant text-secondary hover:text-foreground">
               Help
             </Link>
-            <Link href="/login" className="motion-instant text-secondary hover:text-foreground">
-              Log in
-            </Link>
+            <MarketingNavAuth className="motion-instant text-secondary hover:text-foreground" />
+            <ThemeToggle />
           </nav>
         </div>
       </header>
@@ -48,12 +49,13 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
         <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6 px-4 py-10 sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-6">
             <Lockup size={20} />
-            <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2 text-[length:var(--text-body-s)]">
+            <nav aria-label="Footer" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[length:var(--text-body-s)]">
               {FOOTER_LINKS.map((link) => (
                 <Link key={link.href} href={link.href} className="motion-instant text-secondary hover:text-foreground">
                   {link.label}
                 </Link>
               ))}
+              <MarketingNavAuth className="motion-instant text-secondary hover:text-foreground" />
             </nav>
           </div>
           <p className="text-[length:var(--text-caption)] text-secondary">

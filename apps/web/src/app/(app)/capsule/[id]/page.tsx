@@ -84,8 +84,15 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
 
   const { data: collectionsData } = useQuery({ queryKey: ['collections'], queryFn: () => collectionsApi.list() });
   const allCollections = collectionsData?.data ?? [];
+  // Keying on the actual set of collection ids (not just `id`) — creating a
+  // collection from inside this same dialog changes what "membership" even
+  // means to compute (a new collection the capsule was just added to), and
+  // the old key considered that identical to before, so React Query kept
+  // serving the stale empty-set result until something unrelated happened
+  // to invalidate it.
+  const collectionIdsKey = allCollections.map((c) => c.id).sort().join(',');
   const { data: membershipData } = useQuery({
-    queryKey: ['collection-membership', id],
+    queryKey: ['collection-membership', id, collectionIdsKey],
     queryFn: async () => {
       const memberOf = await Promise.all(
         allCollections.map(async (c) => ({ id: c.id, isMember: (await capsulesApi.list({ collectionId: c.id, limit: 100 })).data.some((cap) => cap.id === id) })),
@@ -95,6 +102,25 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
     enabled: collectionsOpen && allCollections.length > 0,
   });
   const membership = membershipData ?? [];
+
+  const [newCollectionName, setNewCollectionName] = useState('');
+  const createCollectionMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const { collection } = await collectionsApi.create({ name });
+      // The whole reason this dialog is open is to add *this* capsule
+      // somewhere — creating a collection and leaving it empty would just
+      // move the dead end one step later instead of removing it.
+      await collectionsApi.addItem(collection.id, { capsuleId: id });
+      return collection;
+    },
+    onSuccess: async () => {
+      setNewCollectionName('');
+      await queryClient.invalidateQueries({ queryKey: ['collections'] });
+      await queryClient.invalidateQueries({ queryKey: ['collection-membership', id] });
+      show('Collection created and capsule added');
+    },
+    onError: (err) => show(err instanceof ApiClientError ? err.message : 'Could not create that collection', { variant: 'danger' }),
+  });
 
   const favoriteMutation = useMutation({
     mutationFn: (value: boolean) => favoritesApi.set(id, value),
@@ -479,9 +505,33 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
       </Dialog>
 
       <Dialog open={collectionsOpen} onOpenChange={setCollectionsOpen} title="Add to collection" width="sm">
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
+          <form
+            className="flex gap-2"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (newCollectionName.trim()) createCollectionMutation.mutate(newCollectionName.trim());
+            }}
+          >
+            <input
+              value={newCollectionName}
+              onChange={(e) => setNewCollectionName(e.target.value)}
+              placeholder="New collection name"
+              className="flex-1 rounded-[var(--radius-input)] border border-[var(--color-rule)] bg-transparent px-3 py-1.5 text-[length:var(--text-body-s)] text-foreground"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              variant="secondary"
+              loading={createCollectionMutation.isPending}
+              disabled={!newCollectionName.trim()}
+            >
+              Create
+            </Button>
+          </form>
+
           {allCollections.length === 0 ? (
-            <p className="text-[length:var(--text-body-s)] text-secondary">No collections yet — create one from the Collections page.</p>
+            <p className="text-[length:var(--text-body-s)] text-secondary">No collections yet — create your first one above.</p>
           ) : (
             allCollections.map((collection) => {
               const isMember = membership.find((m) => m.id === collection.id)?.isMember ?? false;

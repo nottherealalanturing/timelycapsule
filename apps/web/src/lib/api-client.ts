@@ -56,6 +56,8 @@ import {
   PatchTagRequestSchema,
   PlaceCheckRequestSchema,
   PlaceCheckResponseSchema,
+  ReverseGeocodeRequestSchema,
+  ReverseGeocodeResponseSchema,
   PutCapsuleTagsRequestSchema,
   PutFavoriteRequestSchema,
   ReactRequestSchema,
@@ -117,6 +119,7 @@ import {
   type PatchRecipientRequest,
   type PatchTagRequest,
   type PlaceCheckRequest,
+  type ReverseGeocodeRequest,
   type ReactRequest,
   type ReorderCollectionItemsRequest,
   type ReportRequest,
@@ -640,6 +643,20 @@ export const settingsApi = {
 
   deleteAccount: (input: DeleteAccountRequest) =>
     request('/me', z.unknown(), { method: 'DELETE', auth: true, body: DeleteAccountRequestSchema.parse(input) }),
+};
+
+/**
+ * A single, explicit action (PlaceMemoryDialog's "Look up this place"
+ * button) — never called just because coordinates exist. See
+ * packages/contracts/src/places.ts for why this is stateless server-side.
+ */
+export const placesApi = {
+  reverseGeocode: (input: ReverseGeocodeRequest) =>
+    request('/places/reverse-geocode', ReverseGeocodeResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: ReverseGeocodeRequestSchema.parse(input),
+    }),
 };
 
 export type { AuthResponse, MeResponse };

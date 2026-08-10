@@ -21,7 +21,14 @@ function AvatarUploader() {
     mutationFn: async (file: File) => {
       const contentType = file.type as 'image/jpeg' | 'image/png' | 'image/webp';
       const { uploadUrl, avatarKey } = await settingsApi.createAvatarUpload({ contentType });
-      await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file });
+      const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Content-Type': contentType }, body: file });
+      // A rejected presigned PUT (bad/expired signature, a bucket CORS
+      // policy that blocks the request) still resolves rather than
+      // throwing — without this check, `patchMe` below would point the
+      // account at an avatarKey that was never actually written to R2.
+      if (!res.ok) {
+        throw new Error(`Avatar upload failed: ${res.status} ${res.statusText}`);
+      }
       await authApi.patchMe({ avatarKey });
     },
     onSuccess: async () => {
