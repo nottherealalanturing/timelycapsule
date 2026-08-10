@@ -122,6 +122,7 @@ export function ComposeMovement({
         onRecord={enclosures.onRecord}
         onAddPlace={() => setPlaceOpen(true)}
         onRemoveMedia={enclosures.onRemoveMedia}
+        onRemoveUploading={enclosures.onRemoveUploading}
         onRemovePlace={() => writeEnvelope({ writtenAt: null })}
         onCaption={enclosures.onCaption}
         onReorder={enclosures.onReorder}

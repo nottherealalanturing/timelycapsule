@@ -1,7 +1,7 @@
 'use client';
 
 import { encryptBytes, generateCapsuleKey, toBase64Url } from '@tc/crypto';
-import { Button, useToast } from '@tc/ui-web';
+import { Button, ThemeToggle, useToast } from '@tc/ui-web';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { guestApi } from '../../lib/api-client';
@@ -218,7 +218,9 @@ export default function GuestComposerPage() {
           No account needed
         </p>
         <MovementNav current={movement} available={reachable} onGo={setMovement} className="col-start-2 justify-self-center" />
-        <div aria-hidden />
+        <div className="justify-self-end">
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* `w-full` is load-bearing: `mx-auto` inside a flex-column body turns off

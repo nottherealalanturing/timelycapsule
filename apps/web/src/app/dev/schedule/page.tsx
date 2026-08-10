@@ -96,7 +96,7 @@ export default function ComposerHarness() {
     encryptForCapsule: async (b) => b,
     wrapForPassphrase: async () => 'wrapped',
     registerRecipientToken: () => {},
-    sendAnnounceToAll: async () => {},
+    sendAnnounceToAll: async () => ({ total: 0, succeeded: 0, failedRecipientIds: [] }),
   };
 
   const capabilities = asGuest ? GUEST_CAPABILITIES : ACCOUNT_CAPABILITIES;

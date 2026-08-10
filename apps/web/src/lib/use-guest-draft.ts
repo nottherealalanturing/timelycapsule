@@ -145,6 +145,6 @@ export function useGuestDraft(): GuestDraft {
       throw new Error('Guest capsules cannot carry a passphrase seal');
     },
     registerRecipientToken: () => {},
-    sendAnnounceToAll: async () => {},
+    sendAnnounceToAll: async () => ({ total: 0, succeeded: 0, failedRecipientIds: [] }),
   };
 }

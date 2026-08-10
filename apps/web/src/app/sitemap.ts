@@ -13,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [
     { url: SITE_URL, lastModified: now, changeFrequency: 'weekly', priority: 1 },
     { url: `${SITE_URL}/pricing`, lastModified: now, changeFrequency: 'monthly', priority: 0.9 },
+    { url: `${SITE_URL}/careers`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
     ...OCCASIONS.map((o) => ({
       url: `${SITE_URL}/for/${o.slug}`,
       lastModified: now,

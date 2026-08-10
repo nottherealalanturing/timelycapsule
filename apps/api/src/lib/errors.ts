@@ -140,4 +140,8 @@ export class ApiError extends Error {
   static passwordAlreadySet(): ApiError {
     return new ApiError('password_already_set', 'This account already has a password — use change password instead', 409);
   }
+
+  static geocodingUnavailable(message = 'Could not look up that place right now'): ApiError {
+    return new ApiError('geocoding_unavailable', message, 502);
+  }
 }

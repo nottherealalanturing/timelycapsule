@@ -2,6 +2,7 @@
 
 import { Button, Dialog, Input } from '@tc/ui-web';
 import { useState } from 'react';
+import { placesApi } from '../../../lib/api-client';
 import type { PlaceMemory } from '../../../lib/letter-envelope';
 
 export interface PlaceMemoryDialogProps {
@@ -11,7 +12,8 @@ export interface PlaceMemoryDialogProps {
   onSave: (place: PlaceMemory) => void;
 }
 
-type Status = 'idle' | 'locating' | 'denied' | 'unavailable';
+type LocateStatus = 'idle' | 'locating' | 'denied' | 'unavailable' | 'timeout' | 'insecure';
+type LookupStatus = 'idle' | 'looking-up' | 'failed';
 
 /**
  * Where this was written — a **memory**, not a lock.
@@ -29,29 +31,63 @@ type Status = 'idle' | 'locating' | 'denied' | 'unavailable';
  * can be drawn from later, and stated in mono because a reading is a hallmark.
  *
  * This is content: it travels inside the letter's encrypted envelope, never as
- * a column. The server is not told where its users write from.
+ * a column. The server is not told where its users write from — *unless* they
+ * press "Look up this place," which is the one and only path a coordinate can
+ * take off this device. Nothing calls it automatically, and the coordinate is
+ * never stored anywhere server-side even then: it's a stateless lookup
+ * (`modules/places`), the returned name comes straight back into this dialog,
+ * and the client is what writes it into the envelope.
  */
 export function PlaceMemoryDialog({ open, onOpenChange, initial, onSave }: PlaceMemoryDialogProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
     initial ? { lat: initial.lat, lng: initial.lng } : null,
   );
-  const [status, setStatus] = useState<Status>('idle');
+  const [locateStatus, setLocateStatus] = useState<LocateStatus>('idle');
+  const [lookupStatus, setLookupStatus] = useState<LookupStatus>('idle');
 
   function locate() {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      setStatus('unavailable');
+    // getCurrentPosition itself would just hang or throw an opaque error in
+    // an insecure context (plain http, not localhost) — most visible when
+    // testing over a LAN IP from a phone, where it's easy to mistake for the
+    // feature being broken rather than the page needing https.
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      setLocateStatus('insecure');
       return;
     }
-    setStatus('locating');
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setLocateStatus('unavailable');
+      return;
+    }
+    setLocateStatus('locating');
+    setLookupStatus('idle');
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setStatus('idle');
+        setLocateStatus('idle');
       },
-      () => setStatus('denied'),
+      (err) => {
+        // GeolocationPositionError codes: 1 PERMISSION_DENIED, 2 POSITION_UNAVAILABLE, 3 TIMEOUT —
+        // collapsing all three into "denied" told a person whose GPS simply
+        // timed out indoors to go change a permission that was never the problem.
+        if (err.code === err.PERMISSION_DENIED) setLocateStatus('denied');
+        else if (err.code === err.TIMEOUT) setLocateStatus('timeout');
+        else setLocateStatus('unavailable');
+      },
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
     );
+  }
+
+  async function lookUpName() {
+    if (!coords) return;
+    setLookupStatus('looking-up');
+    try {
+      const result = await placesApi.reverseGeocode(coords);
+      setName(result.name);
+      setLookupStatus('idle');
+    } catch {
+      setLookupStatus('failed');
+    }
   }
 
   const canSave = name.trim().length > 0 && coords !== null;
@@ -66,28 +102,64 @@ export function PlaceMemoryDialog({ open, onOpenChange, initial, onSave }: Place
     >
       <div className="flex flex-col gap-4">
         {coords ? (
-          <div className="flex flex-col gap-1 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2">
-            <span className="font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary">
-              Fix
-            </span>
-            <span className="font-[var(--font-mono)] text-[length:var(--text-body-s)] tabular-nums text-foreground">
-              {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
-            </span>
+          <div className="flex flex-col gap-3 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2">
+            <div className="flex flex-col gap-1">
+              <span className="font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary">
+                Fix
+              </span>
+              <span className="font-[var(--font-mono)] text-[length:var(--text-body-s)] tabular-nums text-foreground">
+                {coords.lat.toFixed(4)}, {coords.lng.toFixed(4)}
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-1.5 border-t border-[var(--color-rule)] pt-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => void lookUpName()}
+                loading={lookupStatus === 'looking-up'}
+              >
+                Look up this place
+              </Button>
+              {/* Stated before the click matters, not after — this is the
+                  one moment a coordinate can leave the device. */}
+              <p className="text-[length:var(--text-caption)] text-secondary">
+                Sends this fix to our lookup service to find a name. Nothing else is shared, and it isn&apos;t stored
+                there.
+              </p>
+              {lookupStatus === 'failed' ? (
+                <p role="alert" className="text-[length:var(--text-caption)] text-secondary">
+                  Couldn&apos;t look that up just now. You can still name it yourself below.
+                </p>
+              ) : null}
+            </div>
           </div>
         ) : (
-          <Button type="button" variant="secondary" onClick={locate} loading={status === 'locating'}>
+          <Button type="button" variant="secondary" onClick={locate} loading={locateStatus === 'locating'}>
             Use my current location
           </Button>
         )}
 
-        {status === 'denied' ? (
+        {locateStatus === 'denied' ? (
           <p role="alert" className="text-[length:var(--text-body-s)] text-secondary">
             Location access was refused. Allow it for this site in your browser settings, then try again.
           </p>
         ) : null}
-        {status === 'unavailable' ? (
+        {locateStatus === 'timeout' ? (
           <p role="alert" className="text-[length:var(--text-body-s)] text-secondary">
-            This browser cannot report a location.
+            That took too long to answer — a weak signal indoors can cause this. Try again, or name the place
+            yourself below.
+          </p>
+        ) : null}
+        {locateStatus === 'unavailable' ? (
+          <p role="alert" className="text-[length:var(--text-body-s)] text-secondary">
+            This browser cannot report a location. You can still name the place yourself below.
+          </p>
+        ) : null}
+        {locateStatus === 'insecure' ? (
+          <p role="alert" className="text-[length:var(--text-body-s)] text-secondary">
+            Location needs a secure (https) connection. You can still name the place yourself below.
           </p>
         ) : null}
 

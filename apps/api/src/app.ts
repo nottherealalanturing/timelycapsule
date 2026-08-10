@@ -15,6 +15,7 @@ import { emailWebhookRouter } from './modules/email/index.js';
 import { favoritesRouter } from './modules/favorites/index.js';
 import { mediaRouter } from './modules/media/index.js';
 import { notificationsRouter } from './modules/notifications/index.js';
+import { placesRouter } from './modules/places/index.js';
 import { receivedRouter } from './modules/received/index.js';
 import { blocksRouter, recipientsRouter } from './modules/recipients/index.js';
 import { revealRouter } from './modules/reveal/index.js';
@@ -59,6 +60,7 @@ export function createApp(db: Database): express.Express {
   app.use('/v1', collectionsRouter(db));
   app.use('/v1', searchRouter(db));
   app.use('/v1', settingsRouter(db));
+  app.use('/v1', placesRouter(db));
   app.use('/v1', emailWebhookRouter(db));
 
   app.get('/health', (_req, res) => {

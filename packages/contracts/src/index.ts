@@ -11,3 +11,4 @@ export * from './received';
 export * from './organization';
 export * from './search';
 export * from './settings';
+export * from './places';

@@ -54,6 +54,8 @@ export const ERROR_CODES = [
   'password_already_set',
   // T-22 hardening — sender velocity limit
   'velocity_limit_exceeded',
+  // Product quality pass (2026-08) — reverse geocoding
+  'geocoding_unavailable',
 ] as const;
 export type ErrorCode = (typeof ERROR_CODES)[number];
 
