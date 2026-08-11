@@ -16,6 +16,8 @@ import { GUEST_CAPABILITIES } from '../../components/composer/v2/capabilities';
 import { noEnclosures } from '../../components/composer/v2/use-enclosures';
 import { firstCompletenessBlocker } from '../../components/composer/completeness';
 import { describeSealFailure, type SealProblem } from '../../components/composer/v2/seal-errors';
+import { describeScheduleProblem, selectedInstant } from '../../components/composer/v2/schedule-validity';
+import { useCorrectedNow } from '../../lib/use-corrected-now';
 import { envelopeText } from '../../lib/letter-envelope';
 import { clearGuestDraft, useGuestDraft } from '../../lib/use-guest-draft';
 import { browserZone } from '../../lib/zoned-time';
@@ -49,7 +51,6 @@ export default function GuestComposerPage() {
   const [sessionError, setSessionError] = useState(false);
   const [sealProblem, setSealProblem] = useState<SealProblem | null>(null);
   const [handoff, setHandoff] = useState<{ url: string; capsuleId: string } | null>(null);
-  const [mountedAtMs] = useState(() => Date.now());
   const sealedHeadingRef = useRef<HTMLHeadingElement>(null);
 
   // Same pattern as the reveal's `RecordAtRest` heading: without this, sealing
@@ -111,10 +112,14 @@ export default function GuestComposerPage() {
   const tz = browserZone();
   // The Horizon writes the chosen instant onto the draft; validation of it
   // lives there too, so this only needs to know whether one has been chosen.
-  const unlockAt = draft.capsule?.unlockAt ? new Date(draft.capsule.unlockAt) : null;
-  const horizonMs = unlockAt ? unlockAt.getTime() - mountedAtMs : null;
-  const withinRange =
-    horizonMs !== null && horizonMs >= 5 * 60 * 1000 && horizonMs <= GUEST_CAPABILITIES.maxHorizonMs;
+  // The same live reading the authenticated composer uses. This page had its
+  // own copy of the check against `mountedAtMs` — a clock frozen when the tab
+  // opened — so a guest who chose a near moment and then spent time writing
+  // was told the range was fine right up until the seal request failed.
+  const scheduleTarget = draft.capsule ? selectedInstant(draft.capsule) : null;
+  const scheduleNowMs = useCorrectedNow(scheduleTarget);
+  const scheduleProblem = describeScheduleProblem(scheduleTarget, scheduleNowMs, GUEST_CAPABILITIES.maxHorizonMs);
+  const withinRange = scheduleTarget !== null && scheduleProblem === null;
 
   const written = envelopeText(draft.contentDoc).trim();
   const blocker = draft.capsule ? firstCompletenessBlocker(draft.capsule, written.length > 0) : 'Loading';
@@ -125,7 +130,7 @@ export default function GuestComposerPage() {
   if (!blocker) reachable.push('seal');
 
   async function seal() {
-    if (!guestToken || !unlockAt || !withinRange || written.length === 0) return;
+    if (!guestToken || !scheduleTarget || !withinRange || written.length === 0) return;
     setSealing(true);
     setSealProblem(null);
     try {
@@ -139,7 +144,7 @@ export default function GuestComposerPage() {
       );
       const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
 
-      await guestApi.patchCapsule(guestToken, created.id, { contentDocEnc, unlockAt: unlockAt.toISOString() });
+      await guestApi.patchCapsule(guestToken, created.id, { contentDocEnc, unlockAt: scheduleTarget.toISOString() });
       await guestApi.sealCapsule(guestToken, created.id);
 
       const capsuleKeyB64 = toBase64Url(capsuleKey);
@@ -251,6 +256,7 @@ export default function GuestComposerPage() {
           <AddressMovement
             draft={draft}
             capabilities={GUEST_CAPABILITIES}
+            scheduleProblem={scheduleProblem}
             recipients={[]}
             contacts={[]}
             onAddRecipient={async () => {}}
@@ -273,7 +279,7 @@ export default function GuestComposerPage() {
             capabilities={GUEST_CAPABILITIES}
             enclosures={noEnclosures()}
             addressee={null}
-            opensAt={unlockAt}
+            opensAt={scheduleTarget}
             tz={tz}
             footer={
               <div className="flex justify-end pt-2">
@@ -292,12 +298,14 @@ export default function GuestComposerPage() {
               capabilities={GUEST_CAPABILITIES}
               enclosures={[]}
               addressee={null}
-              opensAt={unlockAt}
+              opensAt={scheduleTarget}
               tz={tz}
               hasRecipients={false}
               sealing={sealing}
               onSeal={() => void seal()}
               problem={sealProblem}
+              scheduleProblem={scheduleProblem}
+              onGoToAddress={() => setMovement('address')}
             />
             {sessionError ? (
               <p role="alert" className="pt-4 text-[length:var(--text-body-s)] text-[var(--color-danger)]">

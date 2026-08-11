@@ -90,6 +90,7 @@ export default function ComposerHarness() {
     loading: false,
     ready: true,
     autosaveStatus: 'idle',
+    saveRejection: null,
     patch: (fields: PatchCapsuleRequest) => setCapsule((prev) => ({ ...prev, ...fields }) as Capsule),
     setContentDoc,
     flush: async () => {},

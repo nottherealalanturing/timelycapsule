@@ -11,8 +11,7 @@ import { ExactMoment } from './ExactMoment';
 import { Horizon } from './Horizon';
 import { RECIPIENT_LOCAL } from './ZonePicker';
 import type { ComposerCapabilities } from './capabilities';
-
-const MIN_MS = 5 * 60 * 1000;
+import type { ScheduleProblem } from './schedule-validity';
 
 export interface AddressMovementProps {
   draft: CapsuleDraft;
@@ -22,6 +21,11 @@ export interface AddressMovementProps {
   onAddRecipient: (input: { email?: string; phone?: string; displayName?: string }) => Promise<void>;
   onRemoveRecipient: (id: string) => void;
   recipientError?: string | null;
+  /**
+   * The live schedule reading, computed once in the container and shared with
+   * Seal so the two can never disagree about whether this capsule is sealable.
+   */
+  scheduleProblem?: ScheduleProblem | null;
   /** The writer's own birthday, so a capsule to yourself can offer your own milestones. */
   selfBirthday?: string | null;
   footer?: ReactNode;
@@ -51,6 +55,7 @@ export function AddressMovement({
   onAddRecipient,
   onRemoveRecipient,
   recipientError,
+  scheduleProblem = null,
   selfBirthday = null,
   footer,
   className,
@@ -111,17 +116,6 @@ export function AddressMovement({
     [candidates, person, tz, now],
   );
 
-  const validationError = useMemo(() => {
-    if (!selected) return null;
-    const delta = selected.getTime() - now.getTime();
-    if (delta < MIN_MS) return 'That moment has already passed. Choose one at least five minutes from now.';
-    if (delta > capabilities.maxHorizonMs) {
-      return capabilities.maxHorizonMs < 2 * 365 * 24 * 3600_000
-        ? 'Guests can travel up to a year. An account goes to fifty.'
-        : 'A capsule can travel up to fifty years.';
-    }
-    return null;
-  }, [selected, now, capabilities.maxHorizonMs]);
 
   function commit(at: Date) {
     if (recipientLocal) {
@@ -194,14 +188,12 @@ export function AddressMovement({
             onZoneChange={changeZone}
             recipientLocal={recipientLocal}
             allowRecipientLocal={capabilities.recipients && !isSelf}
-            error={validationError}
+            // Stated once, beside the controls that resolve it. `ExactMoment`
+            // already renders this with `role="alert"`; the duplicate
+            // paragraph that used to sit below it announced the same problem
+            // to a screen reader twice.
+            error={scheduleProblem?.message ?? null}
           />
-
-          {validationError ? (
-            <p role="alert" className="text-[length:var(--text-body-s)] text-[var(--color-danger)]">
-              {validationError}
-            </p>
-          ) : null}
         </section>
       ) : null}
 
