@@ -2,22 +2,24 @@
 
 import type { MediaItem } from '@tc/contracts';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { mediaApi } from '../../../lib/api-client';
 import type { CapsuleDraft } from '../../../lib/use-capsule-draft';
-import type { UploadingItem } from './Enclosures';
+import type { PendingEnclosure } from './enclosure-lifecycle';
 
 const PART_SIZE_BYTES = 8 * 1024 * 1024;
 
 export interface EnclosureController {
   items: MediaItem[];
-  uploading: UploadingItem[];
-  recording: boolean;
+  pending: PendingEnclosure[];
   onFiles: (files: FileList | null) => void;
-  onRecord: () => void;
+  /** Encloses an already-prepared blob — the voice recorder's accepted take. */
+  onEnclose: (file: File) => void;
   onRemoveMedia: (item: MediaItem) => void;
-  /** Clears a failed upload from the in-flight list — see the note on `error` below for why this exists. */
-  onRemoveUploading: (id: string) => void;
+  /** Clears a stopped enclosure, and the server row it may have left behind. */
+  onRemovePending: (id: string) => void;
+  /** Tries a stopped enclosure again, without asking for the file back. */
+  onRetryPending: (id: string) => void;
   onCaption: (item: MediaItem, caption: string) => void;
   onReorder: (item: MediaItem, direction: -1 | 1) => void;
 }
@@ -26,26 +28,30 @@ export interface EnclosureController {
 export function noEnclosures(): EnclosureController {
   return {
     items: [],
-    uploading: [],
-    recording: false,
+    pending: [],
     onFiles: () => {},
-    onRecord: () => {},
+    onEnclose: () => {},
     onRemoveMedia: () => {},
-    onRemoveUploading: () => {},
+    onRemovePending: () => {},
+    onRetryPending: () => {},
     onCaption: () => {},
     onReorder: () => {},
   };
 }
 
 /**
- * Upload, record, order and caption — the parts of enclosing that talk to the
- * API, lifted out of the old `MediaBlock` so the presentation can be shared
- * between the authenticated composer and the guest flow while the transport
- * stays with whoever actually has one.
+ * Enclosing, as a stated sequence rather than a wait.
  *
- * Every file is encrypted under the capsule key before a byte leaves the
- * browser (`draft.encryptForCapsule`), which is why the upload ticket is asked
- * for the *ciphertext* length rather than the file's own.
+ * Every file walks one road — encrypted on this device, sent, finished,
+ * enclosed — and each step is named while it happens. The transport itself is
+ * unchanged and deliberately so: the multipart flow, the CORS/ETag diagnosis
+ * and the orphaned-ticket recovery below were all learned from real failures
+ * and are kept exactly. What changed is that the work became visible.
+ *
+ * Recording no longer lives here. A voice note is not enclosed the moment you
+ * stop speaking — it is prepared, offered back, and enclosed only once the
+ * writer accepts it — so the recorder owns its own take and calls `onEnclose`
+ * when there is a decision to act on.
  */
 export function useEnclosures(capsuleId: string, draft: CapsuleDraft): EnclosureController {
   const queryClient = useQueryClient();
@@ -57,45 +63,56 @@ export function useEnclosures(capsuleId: string, draft: CapsuleDraft): Enclosure
 
   // `listMedia` returns every row for the capsule regardless of status, with
   // no distinction from the shape of a finished one. Rendering all of it as
-  // `items` meant a ticket whose upload was abandoned mid-flight — page
+  // `items` meant a ticket whose transfer was abandoned mid-flight — page
   // closed, tab crashed, an earlier session before this fix existed — showed
   // up identically to a real enclosure: full caption/reorder/remove controls,
   // a size, nothing to say it never actually arrived. It also permanently
   // blocked sealing with no visible cause, since the seal endpoint rejects
   // any non-'ready' row for the capsule. Splitting on `status` here is what
-  // makes both symptoms fixable client-side: unfinished rows are surfaced the
-  // same way an in-session failed upload is, with a Remove that actually
-  // clears the block.
+  // makes both symptoms fixable client-side.
   const items = allRows.filter((i) => i.status === 'ready');
   const orphanedRows = allRows.filter((i) => i.status !== 'ready');
 
-  const [uploading, setUploading] = useState<UploadingItem[]>([]);
-  const [recording, setRecording] = useState(false);
-  const recorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const [pending, setPending] = useState<PendingEnclosure[]>([]);
 
-  const orphanedAsUploading: UploadingItem[] = orphanedRows
-    // Don't double-list a row this same session is still actively uploading —
-    // that one already has a live entry in `uploading` with real progress.
-    .filter((row) => !uploading.some((u) => u.mediaId === row.id))
+  const orphaned: PendingEnclosure[] = orphanedRows
+    // Don't double-list a row this same session is still working on — that one
+    // already has a live entry in `pending` with a real stage.
+    .filter((row) => !pending.some((p) => p.mediaId === row.id))
     .map((row) => ({
       id: row.id,
-      name: row.originalName ?? 'Untitled',
+      name: row.originalName ?? 'A file',
+      stage: 'failed' as const,
       partsDone: 0,
       partsTotal: 1,
-      error: "Didn't finish uploading",
+      // Past tense, and specific: this is a row from a session that ended
+      // before its bytes did, not something still trying.
+      error: 'Never finished arriving',
       mediaId: row.id,
     }));
-  const combinedUploading = [...uploading, ...orphanedAsUploading];
 
   async function refresh() {
     await queryClient.invalidateQueries({ queryKey });
   }
 
-  async function uploadFile(file: File) {
-    const uploadId = `${file.name}-${crypto.randomUUID()}`;
-    setUploading((prev) => [...prev, { id: uploadId, name: file.name, partsDone: 0, partsTotal: 1 }]);
+  function update(id: string, patch: Partial<PendingEnclosure>) {
+    setPending((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  async function enclose(file: File, existingId?: string) {
+    const id = existingId ?? `${file.name}-${crypto.randomUUID()}`;
+    if (existingId) {
+      update(id, { stage: 'encrypting', partsDone: 0, partsTotal: 1, error: undefined });
+    } else {
+      setPending((prev) => [
+        ...prev,
+        { id, name: file.name, stage: 'encrypting', partsDone: 0, partsTotal: 1, file },
+      ]);
+    }
+
     try {
+      // The slowest step for a large file, and the one that used to report
+      // nothing at all — the row simply sat at `0 of 1` until it finished.
       const bytes = new Uint8Array(await file.arrayBuffer());
       const encrypted = await draft.encryptForCapsule(bytes);
 
@@ -105,11 +122,10 @@ export function useEnclosures(capsuleId: string, draft: CapsuleDraft): Enclosure
         sizeBytes: encrypted.length,
       });
 
-      // Recorded on the item so a later `onRemoveUploading` can also clean
-      // up this ticket's row server-side — the row already exists in the
-      // database from the instant `createTicket` returns, well before any
-      // bytes are sent.
-      setUploading((prev) => prev.map((u) => (u.id === uploadId ? { ...u, mediaId: ticket.mediaId, partsTotal: ticket.parts.length } : u)));
+      // Recorded on the item so a later removal can also clean up this
+      // ticket's row server-side — the row exists from the instant
+      // `createTicket` returns, well before any bytes are sent.
+      update(id, { stage: 'sending', mediaId: ticket.mediaId, partsTotal: ticket.parts.length, partsDone: 0 });
 
       const completedParts: { partNumber: number; eTag: string }[] = [];
       for (const part of ticket.parts) {
@@ -121,95 +137,78 @@ export function useEnclosures(capsuleId: string, draft: CapsuleDraft): Enclosure
         // rejected presigned PUT comes back as a 403 with an XML body, not a
         // thrown exception either way. Without this check, `res.headers.get`
         // silently returned an empty ETag and the loop carried on as if the
-        // byte range had actually landed, so `complete()` below was called
-        // with fabricated part data — R2 rejects that at completion time,
-        // several steps away from where the upload actually failed.
+        // byte range had actually landed.
         if (!res.ok) {
-          throw new Error(`Upload PUT failed for part ${part.partNumber}: ${res.status} ${res.statusText}`);
+          throw new Error(`PUT failed for part ${part.partNumber}: ${res.status} ${res.statusText}`);
         }
         const eTag = res.headers.get('etag');
         if (!eTag) {
-          // The PUT itself succeeded, but the browser can't see the ETag
-          // it needs to hand back — this is what a CORS policy allowing the
-          // PUT but missing `ExposeHeaders: ["ETag"]` looks like from here.
-          throw new Error(`Upload part ${part.partNumber} succeeded but returned no ETag (check bucket CORS ExposeHeaders)`);
+          // The PUT itself succeeded, but the browser can't see the ETag it
+          // needs to hand back — this is what a CORS policy allowing the PUT
+          // but missing `ExposeHeaders: ["ETag"]` looks like from here.
+          throw new Error(`Part ${part.partNumber} returned no ETag (check bucket CORS ExposeHeaders)`);
         }
         completedParts.push({ partNumber: part.partNumber, eTag });
-        setUploading((prev) => prev.map((u) => (u.id === uploadId ? { ...u, partsDone: u.partsDone + 1 } : u)));
+        setPending((prev) => prev.map((p) => (p.id === id ? { ...p, partsDone: p.partsDone + 1 } : p)));
       }
 
+      // Every part has landed; the store is assembling them into one object
+      // and the row is being marked ready. Real work, and on a large file
+      // real time — so it is named rather than left as a gap in which the row
+      // looks finished but the list has not caught up.
+      update(id, { stage: 'finishing' });
       await mediaApi.complete(ticket.mediaId, { parts: completedParts });
-      setUploading((prev) => prev.filter((u) => u.id !== uploadId));
+
+      update(id, { stage: 'enclosed' });
       await refresh();
+      // Dropped only after the refetch, so the row never disappears from one
+      // list before appearing in the other.
+      setPending((prev) => prev.filter((p) => p.id !== id));
     } catch (err) {
-      console.error('Enclosure upload failed:', err);
-      setUploading((prev) => prev.map((u) => (u.id === uploadId ? { ...u, error: "Couldn't upload" } : u)));
+      console.error('Enclosure failed:', err);
+      update(id, { stage: 'failed', error: 'Stopped before it finished' });
     }
-  }
-
-  async function startRecording() {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream);
-    chunksRef.current = [];
-    recorder.ondataavailable = (e) => chunksRef.current.push(e.data);
-    recorder.onstop = () => {
-      stream.getTracks().forEach((t) => t.stop());
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      void uploadFile(new File([blob], `voice-note-${Date.now()}.webm`, { type: 'audio/webm' }));
-    };
-    recorder.start();
-    recorderRef.current = recorder;
-    setRecording(true);
-  }
-
-  function stopRecording() {
-    recorderRef.current?.stop();
-    recorderRef.current = null;
-    setRecording(false);
   }
 
   return {
     items,
-    uploading: combinedUploading,
-    recording,
+    pending: [...pending, ...orphaned],
     onFiles: (files) => {
       if (!files) return;
-      for (const file of Array.from(files)) void uploadFile(file);
+      for (const file of Array.from(files)) void enclose(file);
     },
-    onRecord: () => (recording ? stopRecording() : void startRecording()),
+    onEnclose: (file) => void enclose(file),
     onRemoveMedia: (item) => {
       void mediaApi.delete(item.id).then(refresh);
     },
-    // A failed upload previously stayed in `uploading` forever — the catch
-    // block in uploadFile annotates the item with `.error` but never removes
-    // it, and SealMovement counts *every* entry in `uploading` (error or not)
-    // as still in flight and disables Seal on that count. Found by actually
-    // uploading against an unconfigured R2 bucket CORS policy and hitting a
-    // real dead end: no server-side failure should ever be able to make
-    // sealing permanently impossible with no way out.
-    //
-    // Clearing the item locally isn't enough on its own: `createTicket`
-    // already wrote a `status: 'uploading'` row before any bytes went out,
-    // and the seal endpoint blocks on *any* non-'ready' media row for the
-    // capsule regardless of what the client's `uploading` array says. Left
-    // alone that row is orphaned forever and every future seal attempt fails
-    // with the same "still arriving" error — found by removing a failed item
-    // here and then still hitting `upload_incomplete` on a fresh Seal click.
-    onRemoveUploading: (id) => {
-      const item = combinedUploading.find((u) => u.id === id);
-      setUploading((prev) => prev.filter((u) => u.id !== id));
+    // A stopped enclosure previously stayed in the list forever, and Seal
+    // counted every entry as still in flight — so one failure could make
+    // sealing permanently impossible with no way out. Clearing it locally
+    // isn't enough either: `createTicket` already wrote a row before any
+    // bytes went out, and the seal endpoint blocks on *any* non-ready row
+    // for the capsule regardless of what the client thinks.
+    onRemovePending: (id) => {
+      const item = [...pending, ...orphaned].find((p) => p.id === id);
+      setPending((prev) => prev.filter((p) => p.id !== id));
       if (item?.mediaId) {
-        // Covers both a same-session failure and a row orphaned from an
-        // earlier session (`orphanedAsUploading` above) — either way this is
-        // the only thing that actually unblocks sealing, since the block is
-        // keyed off the server row, not local state.
         void mediaApi
           .delete(item.mediaId)
           .then(refresh)
           .catch((err) => {
-            console.error('Failed to clean up orphaned upload ticket:', err);
+            console.error('Failed to clean up an abandoned enclosure ticket:', err);
           });
       }
+    },
+    onRetryPending: (id) => {
+      const item = pending.find((p) => p.id === id);
+      if (!item?.file) return;
+      // The previous attempt may have left a half-written row behind; drop it
+      // before starting again, so the capsule is never blocked by a ticket
+      // nothing is working on.
+      if (item.mediaId) {
+        void mediaApi.delete(item.mediaId).then(refresh).catch(() => {});
+      }
+      void enclose(item.file, id);
     },
     onCaption: (item, caption) => {
       void mediaApi.patch(item.id, { caption }).then(refresh);

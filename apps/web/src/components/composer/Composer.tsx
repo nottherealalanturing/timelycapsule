@@ -337,7 +337,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             tz={tz}
             recipientLocal={recipientLocal}
             hasRecipients={recipients.length > 0}
-            uploadsInFlight={enclosures.uploading.length}
+            enclosuresInFlight={enclosures.pending.filter((p) => p.stage !== 'failed').length}
             sealing={sealing}
             onSeal={handleConfirmSeal}
             problem={sealProblem}

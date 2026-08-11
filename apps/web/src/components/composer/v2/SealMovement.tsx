@@ -22,8 +22,8 @@ export interface SealMovementProps {
   tz: string;
   recipientLocal?: boolean;
   hasRecipients: boolean;
-  /** True while media is still uploading — sealing would strand it. */
-  uploadsInFlight?: number;
+  /** How many enclosures are still travelling — sealing would strand them. */
+  enclosuresInFlight?: number;
   sealing: boolean;
   onSeal: () => void;
   /** Takes the writer to where a lapsed moment is actually fixed. */
@@ -87,7 +87,7 @@ export function SealMovement({
   tz,
   recipientLocal = false,
   hasRecipients,
-  uploadsInFlight = 0,
+  enclosuresInFlight = 0,
   sealing,
   onSeal,
   onGoToAddress,
@@ -212,9 +212,9 @@ export function SealMovement({
       ) : null}
 
       <div className="flex flex-col gap-4">
-        {uploadsInFlight > 0 ? (
+        {enclosuresInFlight > 0 ? (
           <p role="status" className="text-[length:var(--text-body-s)] text-secondary">
-            {uploadsInFlight === 1 ? 'One enclosure is' : `${uploadsInFlight} enclosures are`} still arriving. Sealing
+            {enclosuresInFlight === 1 ? 'One enclosure is' : `${enclosuresInFlight} enclosures are`} still arriving. Sealing
             waits for them.
           </p>
         ) : null}
@@ -267,7 +267,7 @@ export function SealMovement({
           loading={sealing}
           // A limit already reached does not become unreached by pressing the
           // button again; leaving it live would invite a retry that cannot work.
-          disabled={uploadsInFlight > 0 || scheduleProblem !== null || problem?.retryable === false}
+          disabled={enclosuresInFlight > 0 || scheduleProblem !== null || problem?.retryable === false}
           onClick={onSeal}
         >
           Seal capsule

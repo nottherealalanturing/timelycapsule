@@ -5,31 +5,23 @@ import { Button, cn, Hallmark } from '@tc/ui-web';
 import { useEffect, useRef, useState } from 'react';
 import type { PlaceMemory } from '../../../lib/letter-envelope';
 import type { ComposerCapabilities } from './capabilities';
-
-export interface UploadingItem {
-  id: string;
-  name: string;
-  partsDone: number;
-  partsTotal: number;
-  error?: string;
-  /** Set once the server has created a ticket row — needed so a removed failed upload can also be deleted server-side. */
-  mediaId?: string;
-}
+import { stageReading, type PendingEnclosure } from './enclosure-lifecycle';
+import { VoiceRecorder } from './VoiceRecorder';
 
 export interface EnclosuresProps {
   items: MediaItem[];
-  uploading: UploadingItem[];
+  pending: PendingEnclosure[];
   writtenAt: PlaceMemory | null;
   capabilities: ComposerCapabilities;
   onFiles: (files: FileList | null) => void;
-  onRecord: () => void;
+  onEnclose: (file: File) => void;
   onAddPlace: () => void;
   onRemoveMedia: (item: MediaItem) => void;
-  onRemoveUploading: (id: string) => void;
+  onRemovePending: (id: string) => void;
+  onRetryPending: (id: string) => void;
   onRemovePlace: () => void;
   onCaption: (item: MediaItem, caption: string) => void;
   onReorder: (item: MediaItem, direction: -1 | 1) => void;
-  recording?: boolean;
   className?: string;
 }
 
@@ -65,21 +57,22 @@ function formatBytes(n: number | null): string {
  */
 export function Enclosures({
   items,
-  uploading,
+  pending,
   writtenAt,
   capabilities,
   onFiles,
-  onRecord,
+  onEnclose,
   onAddPlace,
   onRemoveMedia,
-  onRemoveUploading,
+  onRemovePending,
+  onRetryPending,
   onRemovePlace,
   onCaption,
   onReorder,
-  recording = false,
   className,
 }: EnclosuresProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [recorderOpen, setRecorderOpen] = useState(false);
   const [captioning, setCaptioning] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -94,7 +87,7 @@ export function Enclosures({
   }, [menuOpen]);
 
   const nothingAvailable = !capabilities.enclosures && !capabilities.placeMemory;
-  const isEmpty = items.length === 0 && uploading.length === 0 && !writtenAt;
+  const isEmpty = items.length === 0 && pending.length === 0 && !writtenAt && !recorderOpen;
 
   // Nothing enclosed and nothing enclosable — the whole section is omitted
   // rather than left as an empty shell announcing a limit.
@@ -118,7 +111,11 @@ export function Enclosures({
 
           {items.map((item, index) => (
             <li key={item.id} className="flex flex-col gap-2 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2.5">
-              <div className="flex items-center gap-3">
+              {/* Wraps rather than truncates. On a phone the single-line row
+                  squeezed every name to three characters and an ellipsis —
+                  "voice-r…", "a-ph…" — which is the one thing on the row a
+                  writer actually needs to recognise. */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span aria-hidden className="w-4 shrink-0 text-center font-[var(--font-mono)] text-secondary">
                   {item.kind === 'audio' ? '♪' : item.kind === 'video' ? '▤' : '▣'}
                 </span>
@@ -128,7 +125,7 @@ export function Enclosures({
                 <span className="shrink-0 font-[var(--font-mono)] text-[length:var(--text-caption)] text-secondary">
                   {formatBytes(item.sizeBytes)}
                 </span>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex shrink-0 items-center gap-1 max-sm:w-full max-sm:justify-end">
                   <RowAction label="Move up" disabled={index === 0} onClick={() => onReorder(item, -1)}>
                     ↑
                   </RowAction>
@@ -177,37 +174,60 @@ export function Enclosures({
             </li>
           ))}
 
-          {uploading.map((u) => (
+          {pending.map((p) => (
             <li
-              key={u.id}
-              className="flex items-center justify-between gap-3 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2.5 text-[length:var(--text-body-s)]"
+              key={p.id}
+              className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-[var(--radius-input)] border border-[var(--color-rule)] px-3 py-2.5 text-[length:var(--text-body-s)]"
             >
-              <span className="min-w-0 truncate text-foreground">{u.name}</span>
+              <span className="min-w-0 flex-1 truncate text-foreground">{p.name}</span>
+
+              {/*
+                One reading for every kind of enclosure, at every step. A
+                counted set of parts where there is more than one, and a named
+                stage otherwise — never a bar, which `03 §V.2` reserves for
+                nothing in this product, and never a spinner (`07 §XVI`).
+              */}
               <span
-                className={cn('shrink-0 font-[var(--font-mono)] text-[length:var(--text-caption)]', u.error ? 'text-[var(--color-danger)]' : 'text-secondary')}
+                className={cn(
+                  'shrink-0 font-[var(--font-mono)] text-[length:var(--text-caption)]',
+                  p.stage === 'failed' ? 'text-[var(--color-danger)]' : 'text-secondary',
+                )}
               >
-                {/* A count of parts, not a bar. `03 §V.2` bans progress grammar;
-                    this is a reading of how much has actually landed. */}
-                {u.error ?? `${u.partsDone} of ${u.partsTotal}`}
+                {stageReading(p)}
               </span>
-              {/* A failed upload used to sit here forever — nothing ever took
-                  it out of this list, and Seal counts everything in it as
-                  still in flight, so one failure could make sealing
-                  permanently impossible with no way out. */}
-              {u.error ? (
-                <button
-                  type="button"
-                  onClick={() => onRemoveUploading(u.id)}
-                  aria-label={`Remove ${u.name}`}
-                  className="shrink-0 px-1 text-[length:var(--text-caption)] text-secondary"
-                >
-                  Remove
-                </button>
+
+              {p.stage === 'failed' ? (
+                <span className="flex shrink-0 items-center gap-1">
+                  {/* A stopped enclosure is recoverable where the file is
+                      still in hand — a network blip should not cost the
+                      writer the trouble of finding it again. */}
+                  {p.file ? (
+                    <button
+                      type="button"
+                      onClick={() => onRetryPending(p.id)}
+                      className="px-1 text-[length:var(--text-caption)] text-[var(--color-interactive)]"
+                    >
+                      Try again
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={() => onRemovePending(p.id)}
+                    aria-label={`Remove ${p.name}`}
+                    className="px-1 text-[length:var(--text-caption)] text-secondary"
+                  >
+                    Remove
+                  </button>
+                </span>
               ) : null}
             </li>
           ))}
         </ul>
       )}
+
+      {recorderOpen ? (
+        <VoiceRecorder onAccept={onEnclose} onCancel={() => setRecorderOpen(false)} />
+      ) : null}
 
       {nothingAvailable ? null : (
         <div className="flex flex-col gap-2">
@@ -258,10 +278,10 @@ export function Enclosures({
                     />
                     <MenuItem
                       glyph="♪"
-                      label={recording ? 'Stop recording' : 'A voice note'}
+                      label="A voice recording"
                       onSelect={() => {
                         setMenuOpen(false);
-                        onRecord();
+                        setRecorderOpen(true);
                       }}
                     />
                   </>
