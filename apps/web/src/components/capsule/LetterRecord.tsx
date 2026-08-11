@@ -3,10 +3,12 @@
 import type { Capsule } from '@tc/contracts';
 import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 import { Button, Record } from '@tc/ui-web';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { mediaApi } from '../../lib/api-client';
+import { capsulesApi, mediaApi } from '../../lib/api-client';
 import { decryptEnclosure } from '../../lib/enclosure-media';
+import { sealReply } from '../../lib/reply-crypto';
+import { Correspondence } from '../reply/Correspondence';
 import { EnclosureViewer } from '../enclosure/EnclosureViewer';
 import { decodeIvCiphertext } from '../../lib/capsule-crypto';
 import { envelopeText } from '../../lib/letter-envelope';
@@ -95,11 +97,42 @@ function RecordBed({ children }: { children: React.ReactNode }) {
 
 function OpenLetter({ capsule }: { capsule: Capsule }) {
   const { masterKey } = useMasterKey();
+  const queryClient = useQueryClient();
 
   const { data: media = [] } = useQuery({
     queryKey: ['media', capsule.id],
     queryFn: async () => (await mediaApi.list(capsule.id)).data,
   });
+
+  /*
+   * The capsule key, unwrapped once and held for the render.
+   *
+   * Both the enclosures and the replies need it, and it was previously
+   * unwrapped inside each enclosure's `load` — fine for a click, wasteful for
+   * a conversation, which needs it to decrypt every entry. It is derived from
+   * the master key already in memory and never persisted; when the master key
+   * goes, so does this.
+   */
+  const { data: capsuleKey } = useQuery({
+    queryKey: ['capsule-key', capsule.id],
+    queryFn: async () => {
+      if (!capsule.ownerKeyWrap || !masterKey) return null;
+      return unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
+    },
+    enabled: Boolean(masterKey && capsule.ownerKeyWrap),
+    gcTime: 0,
+  });
+
+  const { data: threads = [] } = useQuery({
+    queryKey: ['replies', capsule.id],
+    queryFn: async () => (await capsulesApi.replies(capsule.id)).data,
+  });
+
+  async function sendReply(recipientId: string, text: string) {
+    if (!capsuleKey) throw new Error('Capsule is locked');
+    await capsulesApi.reply(capsule.id, recipientId, await sealReply(capsuleKey, text));
+    await queryClient.invalidateQueries({ queryKey: ['replies', capsule.id] });
+  }
 
   const { data: letter, isLoading } = useQuery({
     queryKey: ['capsule-contents', capsule.id],
@@ -155,6 +188,30 @@ function OpenLetter({ capsule }: { capsule: Capsule }) {
             ))}
           </div>
         ) : null}
+
+        {/*
+          What came back, under what went out.
+
+          The replies live inside the record with the letter that provoked
+          them, after the enclosures, in the order the capsule was read: the
+          words, the things that travelled with them, then the answer. A
+          separate "messages" screen would sever an answer from the thing it
+          answers, and a reply to a letter written ten years ago is close to
+          meaningless without the letter beside it.
+        */}
+        {threads.map((thread) => (
+          <Correspondence
+            key={thread.recipientId}
+            replies={thread.replies}
+            capsuleKey={capsuleKey ?? null}
+            theirName={thread.recipientLabel ?? 'Them'}
+            viewerIs="sender"
+            // Writing back is possible only once the capsule has opened —
+            // before that the recipient has not read the letter, so there is
+            // nothing yet to be answering.
+            onSend={capsule.state === 'unlocked' && capsuleKey ? (text) => sendReply(thread.recipientId, text) : undefined}
+          />
+        ))}
       </Record>
     </RecordBed>
   );

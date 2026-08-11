@@ -1,7 +1,8 @@
 'use client';
 
 import { Button, DualClock, Hallmark, MeridianApproach, useToast } from '@tc/ui-web';
-import type { GuestCapsuleResponse } from '@tc/contracts';
+import type { GuestCapsuleResponse, ReplyThread } from '@tc/contracts';
+import { fromBase64Url } from '@tc/crypto';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import { guestApi } from '../../../../lib/api-client';
 import { useCorrectedNow } from '../../../../lib/use-corrected-now';
 import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
 import { getGuestCapsule, getGuestToken } from '../../../../lib/guest-store';
+import { Correspondence } from '../../../../components/reply/Correspondence';
 
 /** The guest's view of their own wait — the same reading the owner gets, minus the account. */
 function GuestWait({
@@ -56,8 +58,18 @@ export default function GuestCapsuleStatusPage() {
   const [capsule, setCapsule] = useState<GuestCapsuleResponse | null>(null);
   const [error, setError] = useState(false);
 
+  const [threads, setThreads] = useState<ReplyThread[]>([]);
+
   const guestToken = getGuestToken();
   const cache = getGuestCapsule();
+  // The guest's copy of the capsule key, cached on this device when they
+  // sealed — the same key the recipient got in the link, and the only reason
+  // a guest can read a reply at all.
+  // `fromBase64Url`, not `decodeCapsuleKeyFromLink`: the cache holds the bare
+  // key, while that helper parses a whole `#k=…` fragment and throws on
+  // anything else — which took the entire page down rather than the one
+  // section that needed the key.
+  const capsuleKey = cache && cache.capsuleId === params.id ? fromBase64Url(cache.capsuleKeyB64) : null;
   const shareUrl = cache && cache.capsuleId === params.id ? `${typeof window !== 'undefined' ? window.location.origin : ''}/c/${cache.recipientToken}#k=${cache.capsuleKeyB64}` : null;
 
   useEffect(() => {
@@ -70,6 +82,12 @@ export default function GuestCapsuleStatusPage() {
         .getCapsule(guestToken, params.id)
         .then(setCapsule)
         .catch(() => setError(true));
+      guestApi
+        .replies(guestToken, params.id)
+        .then((res) => setThreads(res.data))
+        // A correspondence that will not load must not take the capsule down
+        // with it.
+        .catch(() => {});
     }, 0);
     return () => clearTimeout(timer);
   }, [guestToken, params.id]);
@@ -129,6 +147,29 @@ export default function GuestCapsuleStatusPage() {
       ) : (
         <p className="text-sm text-secondary">The share link isn&apos;t cached on this device anymore — check wherever you originally sent it.</p>
       )}
+
+      {/*
+        Anything written back, readable here.
+
+        A guest can send a capsule, so a guest can be replied to — and without
+        this the reply would sit encrypted on a server with the only person
+        able to read it unable to reach it. Left-aligned inside the centred
+        page because it is prose, and prose is read from a margin.
+      */}
+      {threads.length > 0 ? (
+        <div className="w-full text-left">
+          {threads.map((thread) => (
+            <Correspondence
+              key={thread.recipientId}
+              replies={thread.replies}
+              capsuleKey={capsuleKey}
+              theirName={thread.recipientLabel ?? 'Them'}
+              viewerIs="sender"
+              closedReason="Keep this with a free account to write back."
+            />
+          ))}
+        </div>
+      ) : null}
 
       <div className="w-full border-t border-[var(--color-rule)] pt-6">
         <p className="mb-3 text-sm text-secondary">Keep it safe with a free account — get five capsules, media, and email delivery.</p>

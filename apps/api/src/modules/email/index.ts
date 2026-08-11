@@ -7,7 +7,7 @@ export {
   sendCapsuleUnlocked,
   sendPreUnlockReminder,
   sendOpenedNotice,
-  sendReactionReceived,
+  sendReplyReceived,
   sendBounceAlert,
 } from './service.js';
 export { emailWebhookRouter } from './webhook.js';

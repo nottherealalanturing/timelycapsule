@@ -149,3 +149,12 @@ export const otpPurposeEnum = pgEnum('otp_purpose', ['verify_email', 'password_r
 
 /** Owner's choice for a sealed capsule with real (non-suppressed) recipients when they request account deletion (F8) — 02-UX-DESIGN.md §7. */
 export const deletionDecisionEnum = pgEnum('deletion_decision', ['deliver', 'withdraw']);
+
+/**
+ * Which side of a capsule wrote a reply.
+ *
+ * Not `actor_type`: that one is an audit vocabulary of five kinds and admits a
+ * `system` and an `admin`, neither of which can ever author a reply — nothing
+ * but the two people on either end of a capsule may write into it.
+ */
+export const replyAuthorEnum = pgEnum('reply_author', ['sender', 'recipient']);

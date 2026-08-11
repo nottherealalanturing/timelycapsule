@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import '../../env.js';
 import { createApp } from '../../app.js';
 import { db, pool } from '../../db/client.js';
-import { capsuleRecipients, capsules, notifications, outboundMessages, reactions, recipientOtpCodes, users } from '../../db/schema/index.js';
+import { capsuleRecipients, capsules, notifications, recipientOtpCodes, users } from '../../db/schema/index.js';
 import { generateAccessToken, hashAccessToken } from '../recipients/index.js';
 
 const app = createApp(db);
@@ -55,7 +55,7 @@ async function createRecipientCapsule(overrides: Partial<typeof capsules.$inferI
 
 describe('reveal module (T-15)', () => {
   afterAll(async () => {
-    // capsule_recipients / reactions / recipient_otp_codes all cascade off capsules; notifications cascade off users.
+    // capsule_recipients / capsule_replies / recipient_otp_codes all cascade off capsules; notifications cascade off users.
     for (const id of trackedCapsuleIds) {
       await db.delete(capsules).where(eq(capsules.id, id));
     }
@@ -153,23 +153,6 @@ describe('reveal module (T-15)', () => {
     const wrong = await request(app).post(`/v1/r/${rawToken}/verify`).send({ code: '000000' });
     expect(wrong.status).toBe(400);
     void otpRow;
-  });
-
-  it('react: writes a reaction row and notifies the owner (only once capsule is unlocked)', async () => {
-    const { owner, capsule, rawToken } = await createRecipientCapsule({ state: 'sealed' });
-    const beforeUnlock = await request(app).post(`/v1/r/${rawToken}/react`).send({ emoji: '❤️' });
-    expect(beforeUnlock.status).toBe(403);
-
-    await db.update(capsules).set({ state: 'unlocked' }).where(eq(capsules.id, capsule.id));
-    const res = await request(app).post(`/v1/r/${rawToken}/react`).send({ emoji: '❤️', note: 'Thank you' });
-    expect(res.status).toBe(204);
-
-    const rows = await db.select().from(reactions).where(eq(reactions.capsuleId, capsule.id));
-    expect(rows).toHaveLength(1);
-    expect(rows[0]?.emoji).toBe('❤️');
-
-    const mail = await db.select().from(outboundMessages).where(eq(outboundMessages.template, 'reaction-received'));
-    expect(mail.some((m) => m.toRef === owner.email)).toBe(true);
   });
 
   it('report: writes an audit event without requiring auth', async () => {

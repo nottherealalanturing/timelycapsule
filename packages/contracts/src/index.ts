@@ -5,6 +5,7 @@ export * from './recipients';
 export * from './media';
 export * from './notifications';
 export * from './reveal';
+export * from './replies';
 export * from './guest';
 export * from './contacts';
 export * from './received';

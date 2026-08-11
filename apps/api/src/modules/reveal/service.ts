@@ -2,7 +2,6 @@ import { randomInt } from 'node:crypto';
 import type {
   Cover,
   PlaceCheckResponse,
-  ReactRequest,
   ReportRequest,
   RevealResponse,
   SealStatus,
@@ -16,12 +15,11 @@ import {
   capsuleRecipients,
   capsules,
   mediaItems,
-  reactions,
   recipientOtpCodes,
   users,
 } from '../../db/schema/index.js';
 import { hashAccessToken } from '../recipients/index.js';
-import { sendOpenedNotice, sendReactionReceived, sendVerifyEmailCode } from '../email/index.js';
+import { sendOpenedNotice, sendVerifyEmailCode } from '../email/index.js';
 import { writeNotification } from '../notifications/index.js';
 import { getStorageAdapter } from '../media/index.js';
 import { issueGateToken, verifyGateToken, type GateSealType } from './gate-token.js';
@@ -299,36 +297,6 @@ export async function placeCheck(db: Database, rawToken: string, lat: number, ln
 export async function setReminderOptIn(db: Database, rawToken: string, enabled: boolean): Promise<void> {
   const { recipient } = await findRecipientOrThrow(db, rawToken);
   await db.update(capsuleRecipients).set({ reminderOptIn: { enabled } }).where(eq(capsuleRecipients.id, recipient.id));
-}
-
-export async function react(db: Database, rawToken: string, input: ReactRequest): Promise<void> {
-  const { recipient, capsule } = await findRecipientOrThrow(db, rawToken);
-  if (capsule.state !== 'unlocked') throw ApiError.forbidden('Cannot react before the capsule unlocks');
-
-  await db.insert(reactions).values({ capsuleId: capsule.id, recipientId: recipient.id, emoji: input.emoji, note: input.note });
-
-  try {
-    if (capsule.ownerId) {
-      await writeNotification(db, {
-        userId: capsule.ownerId,
-        category: 'social',
-        title: `${recipient.displayName ?? 'Someone'} replied: "${input.emoji}"`,
-        body: input.note ?? undefined,
-        data: { capsuleId: capsule.id, recipientId: recipient.id },
-      });
-      const [ownerUser] = await db.select({ email: users.email }).from(users).where(eq(users.id, capsule.ownerId)).limit(1);
-      if (ownerUser) {
-        await sendReactionReceived(db, ownerUser.email, {
-          recipientName: recipient.displayName ?? recipient.email ?? 'Someone',
-          emoji: input.emoji,
-          note: input.note ?? null,
-          dashboardUrl: await ownerDashboardUrl(capsule.id),
-        });
-      }
-    }
-  } catch {
-    // Best-effort — the recipient's reaction is already saved regardless of whether the owner's notice sends.
-  }
 }
 
 export async function saveToAccount(db: Database, rawToken: string, userId: string): Promise<void> {

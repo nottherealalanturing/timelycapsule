@@ -24,6 +24,7 @@ import {
   mediaKindEnum,
   mediaStatusEnum,
   recipientStatusEnum,
+  replyAuthorEnum,
   unlockModeEnum,
 } from './enums';
 
@@ -193,6 +194,54 @@ export const mediaItems = pgTable(
   (t) => [index('media_items_capsule_id_idx').on(t.capsuleId)],
 );
 
+/**
+ * A reply, written into a capsule after it opened.
+ *
+ * **`bodyEnc` is ciphertext and nothing here is readable by this server.**
+ * The predecessor (`reactions`, below) stored its `note` in a plain `text`
+ * column, so every reply anyone ever wrote sat in our database in the clear —
+ * in a product whose first hard rule is that capsule contents never reach
+ * servers in plaintext. A reply is capsule content. It is the half of the
+ * correspondence the letter was written to provoke, and it is frequently the
+ * more intimate half.
+ *
+ * It is encrypted with the **capsule key**, which needs no new key exchange
+ * because both parties already hold it: the recipient has it in the `#k=`
+ * fragment of their link, and the owner unwraps it with their master key.
+ * One key, one conversation, and the server is not a party to it.
+ *
+ * `recipientId` is the thread. A capsule addressed to four people is four
+ * separate correspondences, not a group chat — none of them can read another's
+ * reply, which is also true of the paper this product is imitating.
+ */
+export const capsuleReplies = pgTable(
+  'capsule_replies',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    capsuleId: uuid('capsule_id')
+      .notNull()
+      .references(() => capsules.id, { onDelete: 'cascade' }),
+    recipientId: uuid('recipient_id')
+      .notNull()
+      .references(() => capsuleRecipients.id, { onDelete: 'cascade' }),
+    author: replyAuthorEnum('author').notNull(),
+    /** iv||ciphertext, base64 — the same wire format as `capsules.contentDocEnc`. */
+    bodyEnc: text('body_enc').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    // Read is always "this thread, oldest first" — a conversation is only
+    // meaningful in order.
+    index('capsule_replies_recipient_id_created_at_idx').on(t.recipientId, t.createdAt),
+    index('capsule_replies_capsule_id_idx').on(t.capsuleId),
+  ],
+);
+
+/**
+ * @deprecated Superseded by `capsuleReplies`. Retained only so existing rows
+ * are not destroyed by the change; nothing writes here any more, and the
+ * plaintext `note` column is exactly why it was replaced.
+ */
 export const reactions = pgTable(
   'reactions',
   {

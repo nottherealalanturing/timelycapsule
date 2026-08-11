@@ -1,6 +1,5 @@
 import {
   PlaceCheckRequestSchema,
-  ReactRequestSchema,
   RemindRequestSchema,
   ReportRequestSchema,
   TzInferRequestSchema,
@@ -16,7 +15,6 @@ import {
   getReveal,
   inferTimezone,
   placeCheck,
-  react,
   report,
   requestIdentityCode,
   saveToAccount,
@@ -84,15 +82,6 @@ export function revealRouter(db: Database): Router {
   router.post('/r/:token/remind', validate({ params: TokenParamsSchema, body: RemindRequestSchema }), async (req, res, next) => {
     try {
       await setReminderOptIn(db, req.params.token as string, req.body.enabled);
-      res.status(204).end();
-    } catch (err) {
-      next(err);
-    }
-  });
-
-  router.post('/r/:token/react', validate({ params: TokenParamsSchema, body: ReactRequestSchema }), async (req, res, next) => {
-    try {
-      await react(db, req.params.token as string, req.body);
       res.status(204).end();
     } catch (err) {
       next(err);
