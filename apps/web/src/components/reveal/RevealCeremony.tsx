@@ -1,11 +1,12 @@
 'use client';
 
 import type { RevealMedia } from '@tc/contracts';
-import { decryptBytes } from '@tc/crypto';
 import { Button, Hallmark, Record, useToast } from '@tc/ui-web';
 import { zipSync } from 'fflate';
 import { useEffect, useRef, useState } from 'react';
 import { revealApi } from '../../lib/api-client';
+import { decryptEnclosure } from '../../lib/enclosure-media';
+import { EnclosureViewer } from '../enclosure/EnclosureViewer';
 import { envelopeText } from '../../lib/letter-envelope';
 import { TransitStage } from './TransitStage';
 import { segment, useTransit } from './use-transit';
@@ -24,48 +25,6 @@ const renderDoc = envelopeText;
  * a glyph does not.
  */
 const REACTIONS = ['Thank you', 'I miss you', 'I remember', 'This landed', 'I love you'] as const;
-
-async function decryptMedia(item: RevealMedia, capsuleKey: Uint8Array): Promise<Uint8Array> {
-  const res = await fetch(item.viewUrl);
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  const iv = bytes.slice(0, 12);
-  const ciphertext = bytes.slice(12);
-  return decryptBytes(capsuleKey, iv, ciphertext);
-}
-
-function MediaTile({ item, capsuleKey }: { item: RevealMedia; capsuleKey: Uint8Array }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function reveal() {
-    setLoading(true);
-    try {
-      const plaintext = await decryptMedia(item, capsuleKey);
-      const blob = new Blob([plaintext as unknown as BlobPart], { type: item.mime ?? 'application/octet-stream' });
-      setBlobUrl(URL.createObjectURL(blob));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (blobUrl && item.kind === 'image') {
-    // eslint-disable-next-line @next/next/no-img-element -- decrypted blob: URL, next/image can't optimize this
-    return <img src={blobUrl} alt={item.caption ?? ''} className="w-full rounded-[var(--radius-record)] object-cover" />;
-  }
-  if (blobUrl) {
-    return (
-      <a href={blobUrl} download={item.originalName ?? undefined} className="text-[length:var(--text-body-s)] underline underline-offset-4">
-        Download {item.originalName ?? item.kind}
-      </a>
-    );
-  }
-
-  return (
-    <Button variant="secondary" size="sm" onClick={() => void reveal()} loading={loading}>
-      Open {item.kind}
-    </Button>
-  );
-}
 
 /**
  * The record, at rest. Everything after the crossing lives here.
@@ -125,7 +84,7 @@ function RecordAtRest({
     try {
       const files: Record<string, Uint8Array> = { 'letter.txt': new TextEncoder().encode(letterText) };
       for (const item of media) {
-        files[item.originalName ?? `${item.id}.${item.kind}`] = await decryptMedia(item, capsuleKey);
+        files[item.originalName ?? `${item.id}.${item.kind}`] = await decryptEnclosure(item.viewUrl, capsuleKey);
       }
       const blob = new Blob([zipSync(files) as unknown as BlobPart], { type: 'application/zip' });
       const url = URL.createObjectURL(blob);
@@ -165,9 +124,14 @@ function RecordAtRest({
       </div>
 
       {media.length > 0 ? (
-        <section className="grid grid-cols-2 gap-3">
+        <section className="flex flex-col gap-3">
           {media.map((item) => (
-            <MediaTile key={item.id} item={item} capsuleKey={capsuleKey} />
+            <EnclosureViewer
+              key={item.id}
+              enclosure={item}
+              allowDownload={allowDownload}
+              load={() => decryptEnclosure(item.viewUrl, capsuleKey)}
+            />
           ))}
         </section>
       ) : null}

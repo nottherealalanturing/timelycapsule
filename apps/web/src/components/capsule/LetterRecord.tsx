@@ -1,11 +1,13 @@
 'use client';
 
-import type { Capsule, MediaItem } from '@tc/contracts';
+import type { Capsule } from '@tc/contracts';
 import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 import { Button, Record } from '@tc/ui-web';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { mediaApi } from '../../lib/api-client';
+import { decryptEnclosure } from '../../lib/enclosure-media';
+import { EnclosureViewer } from '../enclosure/EnclosureViewer';
 import { decodeIvCiphertext } from '../../lib/capsule-crypto';
 import { envelopeText } from '../../lib/letter-envelope';
 import { useMasterKey } from '../../lib/master-key-context';
@@ -111,24 +113,6 @@ function OpenLetter({ capsule }: { capsule: Capsule }) {
     enabled: Boolean(masterKey),
   });
 
-  async function viewMedia(item: MediaItem) {
-    if (!masterKey || !capsule.ownerKeyWrap) return;
-    const capsuleKey = await unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
-    const { url } = await mediaApi.view(item.id);
-    const res = await fetch(url);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const iv = bytes.slice(0, 12);
-    const ciphertext = bytes.slice(12);
-    const plaintext = await decryptBytes(capsuleKey, iv, ciphertext);
-    // TS's DOM lib types BlobPart's ArrayBufferView as Uint8Array<ArrayBuffer>
-    // specifically, excluding the wider Uint8Array<ArrayBufferLike> that
-    // decryptBytes returns — same lib-version quirk as packages/crypto's
-    // buffer-source.ts `bs()` cast, not a real runtime distinction here.
-    const blob = new Blob([plaintext as unknown as BlobPart], { type: item.mime ?? 'application/octet-stream' });
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, '_blank');
-  }
-
   const paragraphs = (letter ?? '').split('\n').filter((line) => line.trim().length > 0);
 
   return (
@@ -149,24 +133,26 @@ function OpenLetter({ capsule }: { capsule: Capsule }) {
         )}
 
         {media.length > 0 ? (
-          <div className="flex flex-col gap-2 border-t border-[var(--color-rule)] pt-5">
+          <div className="flex flex-col gap-3 border-t border-[var(--color-rule)] pt-5">
             <span className="font-[family-name:var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Enclosed
             </span>
-            <ul className="flex flex-col gap-1">
-              {media.map((item) => (
-                <li key={item.id} className="flex items-baseline justify-between gap-4">
-                  <span className="text-[length:var(--text-body-s)]">{item.originalName ?? item.kind}</span>
-                  <button
-                    type="button"
-                    onClick={() => void viewMedia(item)}
-                    className="shrink-0 text-[length:var(--text-body-s)] text-[var(--color-interactive)] underline underline-offset-2"
-                  >
-                    Open
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {/* The same viewer the recipient gets. The owner used to open an
+                enclosure in a new browser tab — which is to say, outside the
+                letter it belongs to, in a window the product does not own. */}
+            {media.map((item) => (
+              <EnclosureViewer
+                key={item.id}
+                enclosure={item}
+                allowDownload={capsule.allowDownload}
+                load={async () => {
+                  if (!masterKey || !capsule.ownerKeyWrap) throw new Error('Capsule is locked');
+                  const capsuleKey = await unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
+                  const { url } = await mediaApi.view(item.id);
+                  return decryptEnclosure(url, capsuleKey);
+                }}
+              />
+            ))}
           </div>
         ) : null}
       </Record>

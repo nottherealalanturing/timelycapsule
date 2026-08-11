@@ -3,6 +3,7 @@
 import type { MediaItem } from '@tc/contracts';
 import { Button, cn, Hallmark } from '@tc/ui-web';
 import { useEffect, useRef, useState } from 'react';
+import { formatBytes } from '../../../lib/enclosure-media';
 import type { PlaceMemory } from '../../../lib/letter-envelope';
 import type { ComposerCapabilities } from './capabilities';
 import { stageReading, type PendingEnclosure } from './enclosure-lifecycle';
@@ -23,13 +24,6 @@ export interface EnclosuresProps {
   onCaption: (item: MediaItem, caption: string) => void;
   onReorder: (item: MediaItem, direction: -1 | 1) => void;
   className?: string;
-}
-
-function formatBytes(n: number | null): string {
-  if (n === null) return '';
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 /**
