@@ -138,8 +138,25 @@ export function useTransit(active: boolean, runId = 0): TransitState {
       opened: elapsedMs >= marks.crossEnd,
       emptyFrame: elapsedMs >= marks.recedeEnd && elapsedMs < marks.emptyFrameEnd,
       done: elapsedMs >= end,
+      /**
+       * Ends the sequence *now*, without waiting for a frame.
+       *
+       * This used to set the ref alone and leave the jump to the next
+       * `requestAnimationFrame`. That is fine while frames are arriving and
+       * useless when they are not — rAF is suspended in a backgrounded tab,
+       * on a bfcache restore, and under low-power throttling, which is
+       * exactly when a stalled ceremony is most likely to be the reason
+       * someone reaches for the skip in the first place. The one guarantee
+       * `07 §V.7` makes about the reveal is that the document is never gated
+       * by the animation, only the animation is; a skip that needs the
+       * animation to be running in order to work does not keep it.
+       *
+       * The ref stays: it is what a frame *already in flight* reads, so a
+       * late frame lands on `end` rather than rewinding past it.
+       */
       skip: () => {
         skipped.current = true;
+        setElapsedMs(end);
       },
     }),
     [elapsedMs, marks, end],
