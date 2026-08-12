@@ -1,9 +1,9 @@
 import type { CapsuleDeletionDecision, DeletionPreviewItem, StorageResponse } from '@tc/contracts';
-import { and, desc, eq, ne, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, isNotNull, ne, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
-import { capsuleRecipients, capsules, scheduledActions, users } from '../../db/schema/index.js';
+import { capsuleRecipients, capsules, mediaItems, scheduledActions, users } from '../../db/schema/index.js';
 import { getPlanLimits, withdrawCapsule } from '../capsules/index.js';
 import { verifyPassword } from '../auth/index.js';
 import { getStorageAdapter } from '../media/index.js';
@@ -49,7 +49,42 @@ export async function getStorage(db: Database, userId: string): Promise<StorageR
     .orderBy(desc(capsules.sizeBytes))
     .limit(5);
 
-  return { usedBytes: usedRow?.value ?? 0, quotaBytes: limits.storageBytes, largest };
+  // M4. Released bytes are no longer *in* storage — `capsules.size_bytes`
+  // was decremented when they went — so they are reported separately rather
+  // than folded into usage. Summed from the media rows, which deliberately
+  // keep their `size_bytes` after release precisely so the account can still
+  // say what it once held.
+  const [releasedRow] = await db
+    .select({
+      bytes: sql<number>`coalesce(sum(${mediaItems.sizeBytes}), 0)`.mapWith(Number),
+      capsuleCount: sql<number>`count(distinct ${mediaItems.capsuleId})`.mapWith(Number),
+    })
+    .from(mediaItems)
+    .innerJoin(capsules, eq(capsules.id, mediaItems.capsuleId))
+    .where(and(eq(capsules.ownerId, userId), eq(mediaItems.status, 'released')));
+
+  const [next] = await db
+    .select({
+      capsuleId: capsules.id,
+      title: capsules.title,
+      type: capsules.type,
+      releaseAt: capsules.mediaRetentionUntil,
+    })
+    .from(capsules)
+    .where(and(eq(capsules.ownerId, userId), isNotNull(capsules.mediaRetentionUntil), gt(capsules.mediaRetentionUntil, new Date())))
+    .orderBy(capsules.mediaRetentionUntil)
+    .limit(1);
+
+  return {
+    usedBytes: usedRow?.value ?? 0,
+    quotaBytes: limits.storageBytes,
+    largest,
+    releasedBytes: releasedRow?.bytes ?? 0,
+    releasedCapsuleCount: releasedRow?.capsuleCount ?? 0,
+    nextRelease: next?.releaseAt
+      ? { capsuleId: next.capsuleId, title: next.title, type: next.type, releaseAt: next.releaseAt.toISOString() }
+      : null,
+  };
 }
 
 export async function createAvatarUploadTicket(

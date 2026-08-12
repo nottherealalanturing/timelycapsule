@@ -58,4 +58,40 @@ export default [
       ],
     },
   },
+  {
+    /**
+     * **Delivery must never consult payment state** — `plan/00-INDEX.md`
+     * hard rule 5, and the promise the whole product rests on: *delivery is
+     * never paywalled.*
+     *
+     * The unlock handlers are clean today, and a prose rule in a plan
+     * document is not what will keep them that way in three years. This is
+     * the rule made mechanical: the two handlers that actually deliver a
+     * capsule cannot import entitlement, plan or quota code at all. A future
+     * session reaching for `getPlanLimits` here — with the best of
+     * intentions, to "check the owner is still premium before sending" —
+     * fails CI instead of quietly shipping.
+     *
+     * Scoped to the delivery path only. Everywhere else may read
+     * entitlements freely; that is what they are for.
+     */
+    files: [
+      'src/modules/scheduler/handlers/capsule-unlock.ts',
+      'src/modules/scheduler/handlers/recipient-unlock.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/capsules/entitlements*', '**/entitlements.js', '**/entitlements'],
+              message:
+                'Delivery must never consult payment, plan or quota state (plan/00-INDEX.md hard rule 5). A sealed capsule is delivered on the terms it was sealed with, regardless of the owner’s subscription.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];

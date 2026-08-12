@@ -132,6 +132,9 @@ export function useGuestDraft(): GuestDraft {
     loading,
     ready: !loading,
     autosaveStatus,
+    // A guest draft lives in session storage until seal — there is no
+    // server to refuse it while writing.
+    saveRejection: null,
     patch,
     setContentDoc,
     flush: async () => {},

@@ -114,15 +114,15 @@ export function ComposeMovement({
 
       <Enclosures
         items={enclosures.items}
-        uploading={enclosures.uploading}
-        recording={enclosures.recording}
+        pending={enclosures.pending}
         writtenAt={envelope.writtenAt}
         capabilities={capabilities}
         onFiles={enclosures.onFiles}
-        onRecord={enclosures.onRecord}
+        onEnclose={enclosures.onEnclose}
         onAddPlace={() => setPlaceOpen(true)}
         onRemoveMedia={enclosures.onRemoveMedia}
-        onRemoveUploading={enclosures.onRemoveUploading}
+        onRemovePending={enclosures.onRemovePending}
+        onRetryPending={enclosures.onRetryPending}
         onRemovePlace={() => writeEnvelope({ writtenAt: null })}
         onCaption={enclosures.onCaption}
         onReorder={enclosures.onReorder}

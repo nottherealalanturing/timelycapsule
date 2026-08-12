@@ -10,6 +10,7 @@ import { zoneOffsetLabel } from '../../../lib/zoned-time';
 import { zoneChoice } from '../../../lib/zones';
 import { ConditionsPanel } from './ConditionsPanel';
 import type { SealProblem } from './seal-errors';
+import type { ScheduleProblem } from './schedule-validity';
 import type { ComposerCapabilities } from './capabilities';
 
 export interface SealMovementProps {
@@ -21,12 +22,26 @@ export interface SealMovementProps {
   tz: string;
   recipientLocal?: boolean;
   hasRecipients: boolean;
-  /** True while media is still uploading — sealing would strand it. */
-  uploadsInFlight?: number;
+  /** How many enclosures are still travelling — sealing would strand them. */
+  enclosuresInFlight?: number;
   sealing: boolean;
   onSeal: () => void;
+  /** Takes the writer to where a lapsed moment is actually fixed. */
+  onGoToAddress?: () => void;
   /** Why the last seal attempt did not happen, if one did not. */
   problem?: SealProblem | null;
+  /**
+   * The chosen moment, read live rather than remembered.
+   *
+   * Seal used to block only on the *outcome* of a failed attempt, which meant
+   * a capsule whose moment had quietly passed looked perfectly sealable until
+   * the request came back — and then stayed unsealable afterwards, because the
+   * thing that recorded the failure was also the thing that had to be cleared
+   * by a successful one. Blocking on the live reading instead means the button
+   * is honest before the attempt and recovers by itself after the writer picks
+   * a new moment, with nothing to reset.
+   */
+  scheduleProblem?: ScheduleProblem | null;
   className?: string;
 }
 
@@ -72,10 +87,12 @@ export function SealMovement({
   tz,
   recipientLocal = false,
   hasRecipients,
-  uploadsInFlight = 0,
+  enclosuresInFlight = 0,
   sealing,
   onSeal,
+  onGoToAddress,
   problem = null,
+  scheduleProblem = null,
   className,
 }: SealMovementProps) {
   const capsule = draft.capsule!;
@@ -195,9 +212,9 @@ export function SealMovement({
       ) : null}
 
       <div className="flex flex-col gap-4">
-        {uploadsInFlight > 0 ? (
+        {enclosuresInFlight > 0 ? (
           <p role="status" className="text-[length:var(--text-body-s)] text-secondary">
-            {uploadsInFlight === 1 ? 'One enclosure is' : `${uploadsInFlight} enclosures are`} still arriving. Sealing
+            {enclosuresInFlight === 1 ? 'One enclosure is' : `${enclosuresInFlight} enclosures are`} still arriving. Sealing
             waits for them.
           </p>
         ) : null}
@@ -209,7 +226,25 @@ export function SealMovement({
         {/* Stated where the decision is made, not thrown as a toast that
             leaves before it can be acted on — some of these carry the only
             way forward the writer has. */}
-        {problem ? (
+        {scheduleProblem ? (
+          <div
+            role="alert"
+            className="flex flex-col items-start gap-2 border-l-2 border-[var(--color-danger)] pl-4 text-[length:var(--text-body-s)]"
+          >
+            <p className="text-foreground">{scheduleProblem.message}</p>
+            {onGoToAddress ? (
+              <button
+                type="button"
+                onClick={onGoToAddress}
+                className="text-[var(--color-interactive)] underline underline-offset-2"
+              >
+                Choose a new moment
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {problem && !scheduleProblem ? (
           <div
             role="alert"
             className="flex flex-col items-start gap-2 border-l-2 border-[var(--color-danger)] pl-4 text-[length:var(--text-body-s)]"
@@ -232,7 +267,7 @@ export function SealMovement({
           loading={sealing}
           // A limit already reached does not become unreached by pressing the
           // button again; leaving it live would invite a retry that cannot work.
-          disabled={uploadsInFlight > 0 || problem?.retryable === false}
+          disabled={enclosuresInFlight > 0 || scheduleProblem !== null || problem?.retryable === false}
           onClick={onSeal}
         >
           Seal capsule

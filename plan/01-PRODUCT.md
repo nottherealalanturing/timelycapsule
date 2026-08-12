@@ -317,8 +317,9 @@ All types are the same entity with a `type` preset that pre-configures schedulin
 - **Purpose:** Ingest, store, process, and serve rich content durably for decades.
 - **Features:** Images (JPEG/PNG/HEIC/WebP), video (MP4/MOV → H.264/HEVC ladder), audio/voice (AAC/M4A/MP3, in-app recorder with waveform), documents (PDF, docx/xlsx/pptx with preview render, ZIP as opaque attachment), links (unfurled preview card), location pin (lat/lng + name, rendered map snapshot), text/markdown blocks. Per-item captions. Ordering. Client-side compression choices, background/resumable uploads (tus-style via S3 multipart), thumbnail + preview generation, EXIF stripping (privacy default; capture-date preserved into metadata field).
 - **Limits:** Free: 100 MB/account, 25 MB/file, 1 min video. Premium: 100 GB/account, 5 GB/file, 30 min 4K video. Business: 1 TB pooled.
+- **Media retention (M4):** enclosed files are kept for **1 year after the capsule opens** on Free, and **forever** on paid tiers. When the term ends the encrypted media is *released* — the bytes are reclaimed from storage while the capsule, letter, metadata, history, replies and the enclosure record (name, size, caption) are kept permanently. Releasing is never silent: the record says what was enclosed and when it went. The term is captured in the capsule's **sealed entitlement snapshot** at seal time and is a property of that capsule thereafter — changing, downgrading or cancelling a plan later cannot shorten it, and a capsule sealed before this system existed is kept forever. Distinct from **Archive**, which is the owner's reversible shelf and touches no storage.
 - **Validation (E2E-adjusted, 06 §A):** size/duration caps enforced at presign by plan; content-level checks (type validation, decompression-bomb guard, EXIF strip) run client-side pre-encryption; server serves user files attachment-only from an isolated origin in lieu of server-side AV.
-- **States (media item):** `uploading → processing → ready | failed`. A capsule cannot seal until all media `ready`.
+- **States (media item):** `uploading → processing → ready | failed`, and `ready → released` once the retention term ends (M4). A capsule cannot seal until all media `ready`. A released item keeps its row and its metadata; only the stored bytes are gone.
 
 ### 4.7 Scheduling
 Full engine design in `03-ARCHITECTURE.md §Scheduling Engine`. Product surface: date+time picker with timezone selector (creator's tz, recipient's tz, or fixed UTC), natural-language shortcuts ("in 1 year", "on her 18th birthday"), min 5 minutes ahead, max 50 years, DST-safe wall-clock semantics, recurrence for series (yearly), seal deadline separate from unlock, edit schedule allowed until seal (after seal: unlock date is immutable except *extending* is allowed once by ≤ 30 days — prevents "surprise ruined" but allows life adjustments; shortening is never allowed).
@@ -376,6 +377,7 @@ Full design in `03-ARCHITECTURE.md §Notification System`. Product surface: per-
 |---|---|---|---|---|---|
 | Active sealed capsules | 5 | Unlimited | Unlimited | Unlimited | Unlimited |
 | Storage | 100 MB | 100 GB | 200 GB pooled + per-member privacy | 1 TB pooled | Custom |
+| Media retention | 1 yr after opening | Forever | Forever | Forever | Forever |
 | Video | 1 min / 720p | 30 min / 4K | 30 min / 4K | 30 min | Custom |
 | Recipients/capsule | 3 | 20 | 20 | 1000/campaign | Custom |
 | Legacy & trustees | — | ✓ | ✓ | — | — |

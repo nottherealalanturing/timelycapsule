@@ -11,7 +11,8 @@ import { NewDeviceAlert } from './templates/NewDeviceAlert.js';
 import { OpenedNotice } from './templates/OpenedNotice.js';
 import { PasswordReset } from './templates/PasswordReset.js';
 import { PreUnlockReminder, type PreUnlockReminderProps } from './templates/PreUnlockReminder.js';
-import { ReactionReceived } from './templates/ReactionReceived.js';
+import { MediaReleaseWarning, type MediaReleaseWarningProps } from './templates/MediaReleaseWarning.js';
+import { ReplyReceived } from './templates/ReplyReceived.js';
 import { SomethingWaiting } from './templates/SomethingWaiting.js';
 import { VerifyEmail } from './templates/VerifyEmail.js';
 
@@ -125,6 +126,29 @@ export async function sendPreUnlockReminder(db: Database, to: string, input: Pre
   });
 }
 
+/**
+ * The 30d/7d notice before a capsule's enclosures are released (M4).
+ *
+ * `payload` is persisted to the `outbound_messages` ledger by
+ * `sendTemplatedOrThrow`, which is exactly why this template's props carry
+ * no capsule content: anything passed here is written to the database a
+ * second time. M3 fixed this same class of leak for replies; the rule holds
+ * for every template added after it.
+ */
+export async function sendMediaReleaseWarning(
+  db: Database,
+  to: string,
+  input: MediaReleaseWarningProps,
+): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'media-release-warning',
+    subject: input.daysUntilRelease <= 7 ? 'Enclosures released next week' : 'Enclosures released next month',
+    node: MediaReleaseWarning(input),
+    payload: input,
+  });
+}
+
 export async function sendOpenedNotice(
   db: Database,
   to: string,
@@ -139,16 +163,22 @@ export async function sendOpenedNotice(
   });
 }
 
-export async function sendReactionReceived(
+/**
+ * The subject line is as bare as the body deliberately: a subject is the part
+ * of an email most likely to be read over someone's shoulder on a lock screen,
+ * so it says who wrote and stops there.
+ */
+export async function sendReplyReceived(
   db: Database,
   to: string,
-  input: { recipientName: string; emoji: string; note: string | null; dashboardUrl: string },
+  input: { recipientName: string; capsuleUrl: string },
 ): Promise<void> {
   await sendTemplatedOrThrow(db, {
     to,
-    template: 'reaction-received',
-    subject: `${input.recipientName} reacted to your capsule`,
-    node: ReactionReceived(input),
+    template: 'reply-received',
+    subject: `${input.recipientName} replied to your capsule`,
+    node: ReplyReceived(input),
+    // Safe to persist in full only because there is no reply content in it.
     payload: input,
   });
 }

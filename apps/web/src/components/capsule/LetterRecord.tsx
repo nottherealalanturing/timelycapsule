@@ -1,11 +1,15 @@
 'use client';
 
-import type { Capsule, MediaItem } from '@tc/contracts';
+import type { Capsule } from '@tc/contracts';
 import { decryptBytes, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 import { Button, Record } from '@tc/ui-web';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { mediaApi } from '../../lib/api-client';
+import { capsulesApi, mediaApi } from '../../lib/api-client';
+import { decryptEnclosure } from '../../lib/enclosure-media';
+import { sealReply } from '../../lib/reply-crypto';
+import { Correspondence } from '../reply/Correspondence';
+import { EnclosureViewer } from '../enclosure/EnclosureViewer';
 import { decodeIvCiphertext } from '../../lib/capsule-crypto';
 import { envelopeText } from '../../lib/letter-envelope';
 import { useMasterKey } from '../../lib/master-key-context';
@@ -93,11 +97,42 @@ function RecordBed({ children }: { children: React.ReactNode }) {
 
 function OpenLetter({ capsule }: { capsule: Capsule }) {
   const { masterKey } = useMasterKey();
+  const queryClient = useQueryClient();
 
   const { data: media = [] } = useQuery({
     queryKey: ['media', capsule.id],
     queryFn: async () => (await mediaApi.list(capsule.id)).data,
   });
+
+  /*
+   * The capsule key, unwrapped once and held for the render.
+   *
+   * Both the enclosures and the replies need it, and it was previously
+   * unwrapped inside each enclosure's `load` — fine for a click, wasteful for
+   * a conversation, which needs it to decrypt every entry. It is derived from
+   * the master key already in memory and never persisted; when the master key
+   * goes, so does this.
+   */
+  const { data: capsuleKey } = useQuery({
+    queryKey: ['capsule-key', capsule.id],
+    queryFn: async () => {
+      if (!capsule.ownerKeyWrap || !masterKey) return null;
+      return unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
+    },
+    enabled: Boolean(masterKey && capsule.ownerKeyWrap),
+    gcTime: 0,
+  });
+
+  const { data: threads = [] } = useQuery({
+    queryKey: ['replies', capsule.id],
+    queryFn: async () => (await capsulesApi.replies(capsule.id)).data,
+  });
+
+  async function sendReply(recipientId: string, text: string) {
+    if (!capsuleKey) throw new Error('Capsule is locked');
+    await capsulesApi.reply(capsule.id, recipientId, await sealReply(capsuleKey, text));
+    await queryClient.invalidateQueries({ queryKey: ['replies', capsule.id] });
+  }
 
   const { data: letter, isLoading } = useQuery({
     queryKey: ['capsule-contents', capsule.id],
@@ -110,24 +145,6 @@ function OpenLetter({ capsule }: { capsule: Capsule }) {
     },
     enabled: Boolean(masterKey),
   });
-
-  async function viewMedia(item: MediaItem) {
-    if (!masterKey || !capsule.ownerKeyWrap) return;
-    const capsuleKey = await unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
-    const { url } = await mediaApi.view(item.id);
-    const res = await fetch(url);
-    const bytes = new Uint8Array(await res.arrayBuffer());
-    const iv = bytes.slice(0, 12);
-    const ciphertext = bytes.slice(12);
-    const plaintext = await decryptBytes(capsuleKey, iv, ciphertext);
-    // TS's DOM lib types BlobPart's ArrayBufferView as Uint8Array<ArrayBuffer>
-    // specifically, excluding the wider Uint8Array<ArrayBufferLike> that
-    // decryptBytes returns — same lib-version quirk as packages/crypto's
-    // buffer-source.ts `bs()` cast, not a real runtime distinction here.
-    const blob = new Blob([plaintext as unknown as BlobPart], { type: item.mime ?? 'application/octet-stream' });
-    const blobUrl = URL.createObjectURL(blob);
-    window.open(blobUrl, '_blank');
-  }
 
   const paragraphs = (letter ?? '').split('\n').filter((line) => line.trim().length > 0);
 
@@ -149,26 +166,58 @@ function OpenLetter({ capsule }: { capsule: Capsule }) {
         )}
 
         {media.length > 0 ? (
-          <div className="flex flex-col gap-2 border-t border-[var(--color-rule)] pt-5">
+          <div className="flex flex-col gap-3 border-t border-[var(--color-rule)] pt-5">
             <span className="font-[family-name:var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.14em] text-[var(--color-text-secondary)]">
               Enclosed
             </span>
-            <ul className="flex flex-col gap-1">
-              {media.map((item) => (
-                <li key={item.id} className="flex items-baseline justify-between gap-4">
-                  <span className="text-[length:var(--text-body-s)]">{item.originalName ?? item.kind}</span>
-                  <button
-                    type="button"
-                    onClick={() => void viewMedia(item)}
-                    className="shrink-0 text-[length:var(--text-body-s)] text-[var(--color-interactive)] underline underline-offset-2"
-                  >
-                    Open
-                  </button>
-                </li>
-              ))}
-            </ul>
+            {/* The same viewer the recipient gets. The owner used to open an
+                enclosure in a new browser tab — which is to say, outside the
+                letter it belongs to, in a window the product does not own. */}
+            {media.map((item) => (
+              <EnclosureViewer
+                key={item.id}
+                // A released enclosure keeps its place in the record and
+                // says what happened to it (M4). Before this, the row was
+                // still listed but its Open button called a view endpoint
+                // that answered "still uploading or processing" — a false
+                // explanation for a capsule whose bytes were deliberately
+                // reclaimed years earlier.
+                enclosure={{ ...item, released: item.status === 'released', releasedAt: item.releasedAt }}
+                allowDownload={capsule.allowDownload}
+                load={async () => {
+                  if (!masterKey || !capsule.ownerKeyWrap) throw new Error('Capsule is locked');
+                  const capsuleKey = await unwrapCapsuleKeyForOwner(capsule.ownerKeyWrap, masterKey);
+                  const { url } = await mediaApi.view(item.id);
+                  return decryptEnclosure(url, capsuleKey);
+                }}
+              />
+            ))}
           </div>
         ) : null}
+
+        {/*
+          What came back, under what went out.
+
+          The replies live inside the record with the letter that provoked
+          them, after the enclosures, in the order the capsule was read: the
+          words, the things that travelled with them, then the answer. A
+          separate "messages" screen would sever an answer from the thing it
+          answers, and a reply to a letter written ten years ago is close to
+          meaningless without the letter beside it.
+        */}
+        {threads.map((thread) => (
+          <Correspondence
+            key={thread.recipientId}
+            replies={thread.replies}
+            capsuleKey={capsuleKey ?? null}
+            theirName={thread.recipientLabel ?? 'Them'}
+            viewerIs="sender"
+            // Writing back is possible only once the capsule has opened —
+            // before that the recipient has not read the letter, so there is
+            // nothing yet to be answering.
+            onSend={capsule.state === 'unlocked' && capsuleKey ? (text) => sendReply(thread.recipientId, text) : undefined}
+          />
+        ))}
       </Record>
     </RecordBed>
   );

@@ -19,6 +19,7 @@ import { placesRouter } from './modules/places/index.js';
 import { receivedRouter } from './modules/received/index.js';
 import { blocksRouter, recipientsRouter } from './modules/recipients/index.js';
 import { revealRouter } from './modules/reveal/index.js';
+import { guestRepliesRouter, repliesRouter, senderRepliesRouter } from './modules/replies/index.js';
 import { guestRouter } from './modules/guest/index.js';
 import { searchRouter } from './modules/search/index.js';
 import { settingsRouter } from './modules/settings/index.js';
@@ -52,6 +53,9 @@ export function createApp(db: Database): express.Express {
   app.use('/v1', mediaRouter(db));
   app.use('/v1', notificationsRouter(db));
   app.use('/v1', revealRouter(db));
+  app.use('/v1', repliesRouter(db));
+  app.use('/v1', senderRepliesRouter(db));
+  app.use('/v1', guestRepliesRouter(db));
   app.use('/v1', guestRouter(db));
   app.use('/v1', contactsRouter(db));
   app.use('/v1', receivedRouter(db));

@@ -22,6 +22,19 @@ export const StorageResponseSchema = z.object({
   usedBytes: z.number(),
   quotaBytes: z.number().nullable(), // null = unlimited plan
   largest: z.array(LargestCapsuleSchema),
+  /** M4 — bytes reclaimed from capsules whose storage term has ended. Stated as a fact of the account's history, not subtracted silently. */
+  releasedBytes: z.number(),
+  /** How many capsules hold at least one released enclosure. */
+  releasedCapsuleCount: z.number(),
+  /** The next capsule due to have its enclosures released, if any. Null when nothing is scheduled. */
+  nextRelease: z
+    .object({
+      capsuleId: z.string().uuid(),
+      title: z.string().nullable(),
+      type: CapsuleTypeSchema,
+      releaseAt: z.string(),
+    })
+    .nullable(),
 });
 export type StorageResponse = z.infer<typeof StorageResponseSchema>;
 

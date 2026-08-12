@@ -46,6 +46,7 @@ export function toCapsule(row: CapsuleRow, extra: CapsuleOrgExtra = {}): Capsule
     expiryStrict: row.expiryStrict ?? false,
     expiredAt: isoOrNull(row.expiredAt),
     archivedAt: isoOrNull(row.archivedAt),
+    mediaRetentionUntil: isoOrNull(row.mediaRetentionUntil),
     trashedAt: isoOrNull(row.trashedAt),
     purgeAfter: isoOrNull(row.purgeAfter),
     withdrawnAt: isoOrNull(row.withdrawnAt),

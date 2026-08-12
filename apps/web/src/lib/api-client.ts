@@ -60,7 +60,11 @@ import {
   ReverseGeocodeResponseSchema,
   PutCapsuleTagsRequestSchema,
   PutFavoriteRequestSchema,
-  ReactRequestSchema,
+  ReplyListResponseSchema,
+  ReplySchema,
+  ReplyThreadListResponseSchema,
+  SenderWriteReplyRequestSchema,
+  WriteReplyRequestSchema,
   ReceivedListResponseSchema,
   RecipientResponseSchema,
   RecipientsListResponseSchema,
@@ -120,7 +124,6 @@ import {
   type PatchTagRequest,
   type PlaceCheckRequest,
   type ReverseGeocodeRequest,
-  type ReactRequest,
   type ReorderCollectionItemsRequest,
   type ReportRequest,
   type ResetPasswordRequest,
@@ -356,6 +359,15 @@ export const capsulesApi = {
 
   activity: (id: string) => request(`/capsules/${id}/activity`, CapsuleActivityResponseSchema, { auth: true }),
 
+  replies: (id: string) => request(`/capsules/${id}/replies`, ReplyThreadListResponseSchema, { auth: true }),
+
+  reply: (id: string, recipientId: string, bodyEnc: string) =>
+    request(`/capsules/${id}/replies`, z.object({ reply: ReplySchema }), {
+      method: 'POST',
+      auth: true,
+      body: SenderWriteReplyRequestSchema.parse({ recipientId, bodyEnc }),
+    }),
+
   purge: (id: string) => request(`/capsules/${id}/purge`, z.void(), { method: 'POST', auth: true, body: {} }),
 };
 
@@ -426,6 +438,18 @@ export const mediaApi = {
   delete: (mediaId: string) => request(`/media/${mediaId}`, z.void(), { method: 'DELETE', auth: true }),
 
   view: (mediaId: string) => request(`/media/${mediaId}/view`, MediaViewResponseSchema, { auth: true }),
+
+  /**
+   * Releases every enclosure this capsule still holds in storage (M4).
+   * Capsule-level and irreversible: the letter, the record and the replies
+   * survive, the files do not.
+   */
+  release: (capsuleId: string) =>
+    request(
+      `/capsules/${capsuleId}/media/release`,
+      z.object({ released: z.number(), alreadyReleased: z.number(), bytesReclaimed: z.number() }),
+      { method: 'POST', auth: true },
+    ),
 };
 
 export const revealApi = {
@@ -455,8 +479,13 @@ export const revealApi = {
   remind: (token: string, enabled: boolean) =>
     request(`/r/${token}/remind`, z.void(), { method: 'POST', body: RemindRequestSchema.parse({ enabled }) }),
 
-  react: (token: string, input: ReactRequest) =>
-    request(`/r/${token}/react`, z.void(), { method: 'POST', body: ReactRequestSchema.parse(input) }),
+  listReplies: (token: string) => request(`/r/${token}/replies`, ReplyListResponseSchema),
+
+  reply: (token: string, bodyEnc: string) =>
+    request(`/r/${token}/replies`, z.object({ reply: ReplySchema }), {
+      method: 'POST',
+      body: WriteReplyRequestSchema.parse({ bodyEnc }),
+    }),
 
   report: (token: string, input: ReportRequest) =>
     request(`/r/${token}/report`, z.void(), { method: 'POST', body: ReportRequestSchema.parse(input) }),
@@ -486,6 +515,9 @@ export const guestApi = {
 
   sealCapsule: (guestToken: string, capsuleId: string) =>
     request(`/guest/capsules/${capsuleId}/seal`, GuestCapsuleResponseSchema, { method: 'POST', bearer: guestToken, body: {} }),
+
+  replies: (guestToken: string, capsuleId: string) =>
+    request(`/guest/capsules/${capsuleId}/replies`, ReplyThreadListResponseSchema, { bearer: guestToken }),
 
   getCapsule: (guestToken: string, capsuleId: string) =>
     request(`/guest/capsules/${capsuleId}`, GuestCapsuleResponseSchema, { bearer: guestToken }),

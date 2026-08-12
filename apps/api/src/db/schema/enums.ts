@@ -73,10 +73,18 @@ export const mediaKindEnum = pgEnum('media_kind', [
 
 export const mediaStatusEnum = pgEnum('media_status', [
   'uploading',
+  // @deprecated Never written by any code path and never read. Retained
+  // rather than removed: dropping a member from a PG enum means recreating
+  // the type and rewriting every dependent column, for no functional gain,
+  // and any stale client holding the old contract would fail to parse.
   'processing',
   'ready',
   'failed',
   'infected',
+  // M4. The encrypted bytes have been reclaimed from object storage; the row
+  // survives as the historical record of what was enclosed. Terminal — a
+  // released item never returns to 'ready'.
+  'released',
 ]);
 
 export const actionKindEnum = pgEnum('action_kind', [
@@ -94,6 +102,12 @@ export const actionKindEnum = pgEnum('action_kind', [
   'expire_purge',
   'data_export',
   'account_purge',
+  // M4 storage lifecycle. Two kinds rather than one: both carry
+  // subjectId=capsuleId, so the `reminder` handler's trick of probing two
+  // disjoint UUID spaces to tell owner from recipient is unavailable here,
+  // and a single kind would be genuinely ambiguous at dispatch.
+  'media_release_warning',
+  'media_release',
 ]);
 
 export const actionStateEnum = pgEnum('action_state', [
@@ -149,3 +163,12 @@ export const otpPurposeEnum = pgEnum('otp_purpose', ['verify_email', 'password_r
 
 /** Owner's choice for a sealed capsule with real (non-suppressed) recipients when they request account deletion (F8) — 02-UX-DESIGN.md §7. */
 export const deletionDecisionEnum = pgEnum('deletion_decision', ['deliver', 'withdraw']);
+
+/**
+ * Which side of a capsule wrote a reply.
+ *
+ * Not `actor_type`: that one is an audit vocabulary of five kinds and admits a
+ * `system` and an `admin`, neither of which can ever author a reply — nothing
+ * but the two people on either end of a capsule may write into it.
+ */
+export const replyAuthorEnum = pgEnum('reply_author', ['sender', 'recipient']);

@@ -12,7 +12,7 @@ import {
 } from '@tc/crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { track } from './analytics';
-import { capsulesApi, recipientsApi } from './api-client';
+import { ApiClientError, capsulesApi, recipientsApi } from './api-client';
 import { decodeIvCiphertext, encodeIvCiphertext } from './capsule-crypto';
 import { useMasterKey } from './master-key-context';
 
@@ -106,7 +106,7 @@ export interface AnnounceResult {
   failedRecipientIds: string[];
 }
 
-export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error';
+export type AutosaveStatus = 'idle' | 'pending' | 'saving' | 'saved' | 'error' | 'rejected';
 
 export interface CapsuleDraft {
   capsule: Capsule | null;
@@ -115,6 +115,19 @@ export interface CapsuleDraft {
   /** True once the capsule key is available (unwrapped or freshly generated) — content edits are meaningless until then. */
   ready: boolean;
   autosaveStatus: AutosaveStatus;
+  /**
+   * Why the last save was refused, when the server refused it on its merits
+   * rather than failing to arrive.
+   *
+   * The distinction matters because the two need opposite advice. A transport
+   * failure resolves itself on the next attempt; a rejected value never will,
+   * and `pendingPatchRef` keeps re-sending it — so a capsule whose moment had
+   * slipped into the past stopped saving the writer's words entirely, while
+   * the header cheerfully said "retrying". It self-heals the moment the
+   * offending field is changed, because the new value overwrites the pending
+   * one; what was missing was any way to know which field to change.
+   */
+  saveRejection: ApiClientError | null;
   /** Merges into local state immediately (cached to localStorage) and queues a debounced encrypted sync. */
   patch: (fields: PatchCapsuleRequest) => void;
   setContentDoc: (doc: unknown) => void;
@@ -161,6 +174,7 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   const [autosaveStatus, setAutosaveStatus] = useState<AutosaveStatus>('idle');
+  const [saveRejection, setSaveRejection] = useState<ApiClientError | null>(null);
 
   const capsuleKeyRef = useRef<Uint8Array | null>(null);
   const pendingPatchRef = useRef<PatchCapsuleRequest>({});
@@ -272,10 +286,17 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
             delete (pendingPatchRef.current as Record<string, unknown>)[key];
           }
           clearCache(capsuleId);
+          setSaveRejection(null);
           setAutosaveStatus('saved');
           rerun = Object.keys(pendingPatchRef.current).length > 0;
-        } catch {
-          setAutosaveStatus('error');
+        } catch (err) {
+          // 4xx means the server understood and refused. Retrying identical
+          // bytes cannot change that answer, so it is not reported as if it
+          // could — and the reason is kept so the composer can point at the
+          // field that needs changing.
+          const refused = err instanceof ApiClientError && err.status >= 400 && err.status < 500;
+          setSaveRejection(refused ? (err as ApiClientError) : null);
+          setAutosaveStatus(refused ? 'rejected' : 'error');
         }
       }
       savePromiseRef.current = null;
@@ -408,6 +429,7 @@ export function useCapsuleDraft(capsuleId: string | null): CapsuleDraft {
     loading,
     ready,
     autosaveStatus,
+    saveRejection,
     patch,
     setContentDoc,
     flush,

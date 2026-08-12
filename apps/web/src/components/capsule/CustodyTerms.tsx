@@ -63,6 +63,36 @@ export function CustodyTerms({ capsule, addressee }: { capsule: Capsule; address
     terms.push('You can open it early, after forty-eight hours.');
   }
 
+  /**
+   * M4 — how long the enclosures are kept is a term this capsule is held
+   * under, so it belongs here with the others rather than only in Settings.
+   * Without it the owner could be offered an irreversible "Release
+   * enclosures" button, and warned by email a month ahead, while the
+   * capsule's own page said nothing about when it would happen anyway.
+   *
+   * Gated on the capsule still *holding* bytes rather than on the date
+   * being in the future, for two reasons. An owner who releases early
+   * leaves a retention date still years away against a capsule with
+   * nothing left in storage, and this line would then promise enclosures
+   * were kept until 2027 when they had already gone. And reading the clock
+   * during render is impure (`react-hooks/purity`) and can disagree
+   * between server and client — where `sizeBytes` is a fact the row
+   * already carries. It is also the same condition the Release control
+   * uses, so the statement and the control cannot contradict each other.
+   *
+   * Once released, the enclosures each say "Released from storage on …"
+   * inside the record, which is more precise and per-item anyway.
+   */
+  if (capsule.sizeBytes > 0 && capsule.mediaRetentionUntil) {
+    terms.push(
+      `The enclosures are kept until ${new Date(capsule.mediaRetentionUntil).toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })}. The letter is kept for good.`,
+    );
+  }
+
   if (terms.length === 0) {
     terms.push('Nothing beyond the date.');
   }

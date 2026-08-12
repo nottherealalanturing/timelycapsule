@@ -3,10 +3,11 @@ import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
-import { auditEvents, capsuleRecipients, capsules, mediaItems, scheduledActions } from '../../db/schema/index.js';
+import { auditEvents, capsuleRecipients, capsules, entitlements, mediaItems, scheduledActions } from '../../db/schema/index.js';
 import { assertWithinActiveCapsuleLimit } from './entitlements.js';
 import { validateSeals } from './seals.js';
 import { getPlanLimits } from './entitlements.js';
+import { buildSealedEntitlementSnapshot, getMediaRetention } from './sealed-entitlement.js';
 import {
   assertCanExtend,
   assertCanPurge,
@@ -16,6 +17,7 @@ import {
   assertCanWithdraw,
   assertExtendWithinBounds,
   assertUnlockAtWithinBounds,
+  MAX_UNLOCK_HORIZON_MS,
 } from './state-machine.js';
 import { toCapsule } from './mappers.js';
 import { findOwnedCapsuleOrThrow } from './service.js';
@@ -23,6 +25,15 @@ import { findOwnedCapsuleOrThrow } from './service.js';
 const PURGE_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 const REMINDER_T7D_MS = 7 * 24 * 60 * 60 * 1000;
 const REMINDER_T1D_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * M4 — how far ahead of a media release the owner is warned. Two warnings,
+ * named here rather than inlined at the call site for the same reason the
+ * reminder offsets above are: they are policy, and policy that is buried in
+ * an expression is policy nobody can find to change.
+ */
+const RELEASE_WARNING_T30D_MS = 30 * 24 * 60 * 60 * 1000;
+const RELEASE_WARNING_T7D_MS = 7 * 24 * 60 * 60 * 1000;
 
 type CapsuleRow = typeof capsules.$inferSelect;
 type RecipientRow = typeof capsuleRecipients.$inferSelect;
@@ -89,6 +100,66 @@ async function scheduleReminders(db: Database, capsuleId: string, unlockAt: Date
   }
 }
 
+/**
+ * M4 — schedules the automatic release of this capsule's media, plus the
+ * two warnings that must precede it.
+ *
+ * No-ops entirely when `retentionUntil` is null, which covers both a
+ * `forever` promise and a capsule holding no media: neither has a release
+ * to schedule, and writing rows for them would create retention state that
+ * can only ever fire against nothing.
+ *
+ * `runAt` is included in each idempotency key so a later reschedule (a
+ * retention change, an extend that moves the whole timeline) can cancel and
+ * re-insert without colliding with the unique index on the row it just
+ * cancelled — the same reasoning `scheduleReminders` uses for `unlockAt`.
+ * A warning whose moment has already passed is simply not scheduled, rather
+ * than firing immediately and telling someone their media goes in −3 days.
+ */
+async function scheduleMediaRelease(db: Database, capsuleId: string, retentionUntil: Date | null, now: Date): Promise<void> {
+  if (!retentionUntil) return;
+  const at = retentionUntil.getTime();
+
+  for (const [kind, runAt] of [
+    ['media_release_warning', new Date(at - RELEASE_WARNING_T30D_MS)],
+    ['media_release_warning', new Date(at - RELEASE_WARNING_T7D_MS)],
+    ['media_release', retentionUntil],
+  ] as const) {
+    if (runAt.getTime() <= now.getTime()) continue;
+    await db
+      .insert(scheduledActions)
+      .values({
+        kind,
+        subjectId: capsuleId,
+        runAt,
+        idempotencyKey: `${kind}:${capsuleId}:${runAt.getTime()}`,
+      })
+      .onConflictDoNothing({ target: scheduledActions.idempotencyKey });
+  }
+}
+
+/**
+ * Cancels any pending release/warning rows for a capsule. Called when the
+ * owner releases early (the schedule is moot — the bytes are already gone)
+ * and when a capsule is withdrawn (it is bound for `purgeCapsuleNow`, which
+ * removes objects *and* rows; a release in between would half-erase a
+ * record on its way to being erased completely).
+ */
+async function cancelPendingMediaRelease(db: Database, capsuleId: string): Promise<void> {
+  await db
+    .update(scheduledActions)
+    .set({ state: 'cancelled' })
+    .where(
+      and(
+        inArray(scheduledActions.kind, ['media_release', 'media_release_warning']),
+        eq(scheduledActions.subjectId, capsuleId),
+        eq(scheduledActions.state, 'pending'),
+      ),
+    );
+}
+
+export { cancelPendingMediaRelease };
+
 /** Extend moves unlockAt, so any reminders scheduled against the old date are wrong — cancel before rescheduling. */
 async function cancelPendingReminders(db: Database, capsuleId: string): Promise<void> {
   const recipients = await db.select({ id: capsuleRecipients.id }).from(capsuleRecipients).where(eq(capsuleRecipients.capsuleId, capsuleId));
@@ -141,9 +212,46 @@ export async function sealCapsule(db: Database, ownerId: string, capsuleId: stri
   await assertWithinActiveCapsuleLimit(db, ownerId);
 
   const now = new Date();
+
+  // --- M4: the promise this capsule is being sealed with -----------------
+  //
+  // Captured here, once, and never revisited. From this instant the
+  // capsule's storage behaviour is a property of the capsule, not of
+  // whatever the owner's subscription happens to say next year.
+  const [planRow] = await db.select({ plan: entitlements.plan }).from(entitlements).where(eq(entitlements.userId, ownerId)).limit(1);
+  const hasMedia = media.length > 0;
+  const retentionUntil =
+    hasMedia && limits.mediaRetentionAfterUnlockMs !== null
+      ? new Date(row.unlockAt.getTime() + limits.mediaRetentionAfterUnlockMs)
+      : null;
+
+  // The invariant, enforced server-side rather than trusted to the
+  // composer: media may never be released before the capsule it belongs to
+  // has even opened.
+  if (retentionUntil && retentionUntil.getTime() < row.unlockAt.getTime()) {
+    throw ApiError.validationFailed({ retentionUntil: 'Media retention cannot end before the capsule opens' });
+  }
+
+  const snapshot = buildSealedEntitlementSnapshot({
+    plan: planRow?.plan ?? 'free',
+    limits,
+    sealedAt: now,
+    retentionUntil,
+    hasMedia,
+    maxHorizonMs: MAX_UNLOCK_HORIZON_MS,
+  });
+
   const [sealed] = (await db
     .update(capsules)
-    .set({ state: 'sealed', sealedAt: now, updatedAt: now })
+    .set({
+      state: 'sealed',
+      sealedAt: now,
+      updatedAt: now,
+      sealedEntitlementSnapshot: snapshot,
+      // Denormalised alongside the snapshot in the same statement so the
+      // index can never disagree with the promise it indexes.
+      mediaRetentionUntil: retentionUntil,
+    })
     .where(eq(capsules.id, capsuleId))
     .returning()) as [CapsuleRow];
 
@@ -153,6 +261,8 @@ export async function sealCapsule(db: Database, ownerId: string, capsuleId: stri
     runAt: row.unlockAt,
     idempotencyKey: `capsule_unlock:${capsuleId}`,
   });
+
+  await scheduleMediaRelease(db, capsuleId, retentionUntil, now);
 
   // Announce email is NOT scheduled server-side (T-14 correction to T-13 — see PROGRESS.md
   // decisions log): the "something is waiting" email needs the recipient's magic link, whose
@@ -191,6 +301,10 @@ export async function withdrawCapsule(db: Database, ownerId: string, capsuleId: 
   });
 
   await cancelPendingReminders(db, capsuleId);
+  // Bound for `purgeCapsuleNow`, which removes the objects *and* the rows.
+  // Releasing in the meantime would half-erase a record already on its way
+  // to being erased entirely.
+  await cancelPendingMediaRelease(db, capsuleId);
 
   await audit(db, { actorType: 'user', actorId: ownerId, action: 'capsule.withdrawn', subjectType: 'capsule', subjectId: capsuleId });
   return toCapsule(updated);
@@ -208,9 +322,24 @@ export async function extendCapsule(
   const newUnlockAt = new Date(input.newUnlockAt);
   assertExtendWithinBounds(row.unlockAt!, newUnlockAt);
 
+  // M4: the promise is "kept this long *after it opens*", so moving the
+  // opening moves the retention with it. Re-anchored from the term stored
+  // in the snapshot rather than by shifting the old date, so the result is
+  // exactly what the capsule was sealed promising — the snapshot itself is
+  // never rewritten. A `forever` or legacy capsule yields null and keeps
+  // none of this machinery.
+  const retention = getMediaRetention(row);
+  const newRetentionUntil =
+    retention.afterUnlockMs !== null ? new Date(newUnlockAt.getTime() + retention.afterUnlockMs) : null;
+
   const [updated] = (await db
     .update(capsules)
-    .set({ unlockAt: newUnlockAt, extendedOnce: true, updatedAt: new Date() })
+    .set({
+      unlockAt: newUnlockAt,
+      extendedOnce: true,
+      updatedAt: new Date(),
+      ...(newRetentionUntil ? { mediaRetentionUntil: newRetentionUntil } : {}),
+    })
     .where(eq(capsules.id, capsuleId))
     .returning()) as [CapsuleRow];
 
@@ -221,6 +350,11 @@ export async function extendCapsule(
 
   await cancelPendingReminders(db, capsuleId);
   await scheduleReminders(db, capsuleId, newUnlockAt, new Date());
+
+  if (newRetentionUntil) {
+    await cancelPendingMediaRelease(db, capsuleId);
+    await scheduleMediaRelease(db, capsuleId, newRetentionUntil, new Date());
+  }
 
   await audit(db, {
     actorType: 'user',

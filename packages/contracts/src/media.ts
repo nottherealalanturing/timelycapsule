@@ -5,7 +5,13 @@ import { z } from 'zod';
 export const MediaKindSchema = z.enum(['image', 'video', 'audio', 'voice', 'document', 'archive', 'link', 'location']);
 export type MediaKind = z.infer<typeof MediaKindSchema>;
 
-export const MediaStatusSchema = z.enum(['uploading', 'processing', 'ready', 'failed', 'infected']);
+/**
+ * `released` (M4): the encrypted bytes have been reclaimed from storage
+ * while the enclosure's record — name, size, caption, kind, position —
+ * survives. Terminal. `processing` is dead and kept only so an older
+ * stored value could still parse.
+ */
+export const MediaStatusSchema = z.enum(['uploading', 'processing', 'ready', 'failed', 'infected', 'released']);
 export type MediaStatus = z.infer<typeof MediaStatusSchema>;
 
 export const CreateMediaTicketRequestSchema = z.object({
@@ -68,6 +74,10 @@ export const MediaItemSchema = z.object({
   status: MediaStatusSchema,
   encMeta: z.record(z.string(), z.unknown()).nullable(),
   createdAt: z.string(),
+  /** When the bytes were reclaimed (M4). Null for everything still held. */
+  releasedAt: z.string().nullable(),
+  /** 'retention' (the sealed term came due) or 'owner' (released early, deliberately). */
+  releaseReason: z.string().nullable(),
 });
 export type MediaItem = z.infer<typeof MediaItemSchema>;
 

@@ -35,7 +35,7 @@ function AvatarUploader() {
       await refreshUser();
       show('Avatar updated');
     },
-    onError: (err) => show(err instanceof ApiClientError ? err.message : 'Could not upload avatar', { variant: 'danger' }),
+    onError: (err) => show(err instanceof ApiClientError ? err.message : 'That photograph could not be saved', { variant: 'danger' }),
   });
 
   return (
@@ -57,7 +57,7 @@ function AvatarUploader() {
         }}
       />
       <Button variant="secondary" size="sm" loading={uploadMutation.isPending} onClick={() => fileRef.current?.click()}>
-        Upload avatar
+        Change photograph
       </Button>
     </div>
   );

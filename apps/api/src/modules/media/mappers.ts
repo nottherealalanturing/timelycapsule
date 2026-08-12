@@ -20,5 +20,7 @@ export function toMediaItem(row: MediaRow): MediaItem {
     status: row.status ?? 'uploading',
     encMeta: row.encMeta as Record<string, unknown> | null,
     createdAt: row.createdAt.toISOString(),
+    releasedAt: row.releasedAt ? row.releasedAt.toISOString() : null,
+    releaseReason: row.releaseReason,
   };
 }

@@ -167,7 +167,7 @@ Stages by state:
 
 ### 5.13 Profile & Settings (`/settings/*`)
 - Web: two-pane (settings nav left, panel right). Mobile: stacked lists.
-- Panels per §4.14. Notable UX: Storage panel has a visual meter + "largest capsules" list; Legacy panel is a guided setup (trustees → check-in cadence → preview) with a completion progress ring; Danger zone separated and red-bordered.
+- Panels per §4.14. Notable UX: Storage panel is a **reading, not a dashboard** — no meter or progress bar (M4): what is held and what the account allows are stated in text, alongside what has been released, the next release date where one exists, and the "largest capsules" list. It also states plainly that the current allowance governs only what can be added next, never a capsule already sealed; Legacy panel is a guided setup (trustees → check-in cadence → preview) with a completion progress ring; Danger zone separated and red-bordered.
 
 ### 5.14 Billing & Paywall
 - Pricing page (web `/pricing` + in-app sheet): plan cards, monthly/annual toggle (annual pre-selected, savings badge), feature comparison accordion, FAQ. 

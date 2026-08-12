@@ -52,7 +52,17 @@ const RevealMediaSchema = z.object({
   caption: z.string().nullable(),
   position: z.number(),
   encMeta: z.record(z.string(), z.unknown()).nullable(),
-  viewUrl: z.string(),
+  /**
+   * Null when the enclosure has been released (M4) — there is no object
+   * left to sign a URL for. Previously a required string, which is why the
+   * reveal could only handle media it could serve, and why released
+   * enclosures had to be filtered out of the letter entirely to avoid a
+   * contract violation. A recipient should be told something was here and
+   * is no longer, not shown a letter with a hole in it.
+   */
+  viewUrl: z.string().nullable(),
+  released: z.boolean(),
+  releasedAt: z.string().nullable(),
   mime: z.string().nullable(),
   originalName: z.string().nullable(),
 });

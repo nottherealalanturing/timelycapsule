@@ -37,6 +37,8 @@ export const ERROR_CODES = [
   // T-10 media
   'unsupported_media_type',
   'file_too_large',
+  // M4 storage lifecycle — the encrypted bytes were reclaimed; the record remains.
+  'media_released',
   // T-14 notifications
   'announce_not_allowed',
   // T-15 reveal

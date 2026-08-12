@@ -1,11 +1,14 @@
 'use client';
 
-import type { RevealMedia } from '@tc/contracts';
-import { decryptBytes } from '@tc/crypto';
+import type { Reply, RevealMedia } from '@tc/contracts';
 import { Button, Hallmark, Record, useToast } from '@tc/ui-web';
 import { zipSync } from 'fflate';
 import { useEffect, useRef, useState } from 'react';
 import { revealApi } from '../../lib/api-client';
+import { decryptEnclosure } from '../../lib/enclosure-media';
+import { sealReply } from '../../lib/reply-crypto';
+import { Correspondence } from '../reply/Correspondence';
+import { EnclosureViewer } from '../enclosure/EnclosureViewer';
 import { envelopeText } from '../../lib/letter-envelope';
 import { TransitStage } from './TransitStage';
 import { segment, useTransit } from './use-transit';
@@ -16,56 +19,6 @@ import { segment, useTransit } from './use-transit';
  * after their capsule was sealed.
  */
 const renderDoc = envelopeText;
-
-/**
- * Named reactions, not emoji. `07 §VIII.5` bans emoji absolutely, with no
- * exception carved out for reactions — and a word survives being read aloud by
- * a screen reader, quoted in an email, or set in the record's own serif, which
- * a glyph does not.
- */
-const REACTIONS = ['Thank you', 'I miss you', 'I remember', 'This landed', 'I love you'] as const;
-
-async function decryptMedia(item: RevealMedia, capsuleKey: Uint8Array): Promise<Uint8Array> {
-  const res = await fetch(item.viewUrl);
-  const bytes = new Uint8Array(await res.arrayBuffer());
-  const iv = bytes.slice(0, 12);
-  const ciphertext = bytes.slice(12);
-  return decryptBytes(capsuleKey, iv, ciphertext);
-}
-
-function MediaTile({ item, capsuleKey }: { item: RevealMedia; capsuleKey: Uint8Array }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function reveal() {
-    setLoading(true);
-    try {
-      const plaintext = await decryptMedia(item, capsuleKey);
-      const blob = new Blob([plaintext as unknown as BlobPart], { type: item.mime ?? 'application/octet-stream' });
-      setBlobUrl(URL.createObjectURL(blob));
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  if (blobUrl && item.kind === 'image') {
-    // eslint-disable-next-line @next/next/no-img-element -- decrypted blob: URL, next/image can't optimize this
-    return <img src={blobUrl} alt={item.caption ?? ''} className="w-full rounded-[var(--radius-record)] object-cover" />;
-  }
-  if (blobUrl) {
-    return (
-      <a href={blobUrl} download={item.originalName ?? undefined} className="text-[length:var(--text-body-s)] underline underline-offset-4">
-        Download {item.originalName ?? item.kind}
-      </a>
-    );
-  }
-
-  return (
-    <Button variant="secondary" size="sm" onClick={() => void reveal()} loading={loading}>
-      Open {item.kind}
-    </Button>
-  );
-}
 
 /**
  * The record, at rest. Everything after the crossing lives here.
@@ -99,33 +52,65 @@ function RecordAtRest({
   letterProgress: number;
 }) {
   const { show } = useToast();
-  const [reacted, setReacted] = useState<string | null>(null);
-  const [note, setNote] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [saved, setSaved] = useState(false);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const [replies, setReplies] = useState<Reply[]>([]);
 
   // `06 §Accessibility` — focus moves to the letter heading once it has arrived.
   useEffect(() => {
     if (letterProgress >= 1) headingRef.current?.focus();
   }, [letterProgress]);
 
-  async function sendReaction(reaction: string) {
-    setReacted(reaction);
-    try {
-      await revealApi.react(token, { emoji: reaction, note: note || undefined });
-      show('Sent.');
-    } catch {
-      setReacted(null);
-    }
+  // Whatever has already been said. A recipient coming back a year after
+  // writing should find their own words where they left them, not an empty
+  // box implying nothing was ever sent.
+  useEffect(() => {
+    let live = true;
+    revealApi
+      .listReplies(token)
+      .then((res) => {
+        if (live) setReplies(res.data);
+      })
+      .catch(() => {
+        // A correspondence that will not load must not take the letter down
+        // with it — the letter is the thing they came for.
+      });
+    return () => {
+      live = false;
+    };
+  }, [token]);
+
+  async function sendReply(text: string) {
+    const { reply } = await revealApi.reply(token, await sealReply(capsuleKey, text));
+    setReplies((prev) => [...prev, reply]);
+    show('Sent.');
   }
 
   async function downloadAll() {
     setDownloading(true);
     try {
       const files: Record<string, Uint8Array> = { 'letter.txt': new TextEncoder().encode(letterText) };
+      const released: string[] = [];
       for (const item of media) {
-        files[item.originalName ?? `${item.id}.${item.kind}`] = await decryptMedia(item, capsuleKey);
+        if (!item.viewUrl) {
+          // Named in the zip rather than dropped from it. A recipient
+          // taking their copy away deserves to know a photograph was here
+          // and when it went, not to find a shorter set of files than the
+          // letter they just read described.
+          released.push(
+            `${item.originalName ?? 'An enclosure'} — released from storage${
+              item.releasedAt ? ` on ${new Date(item.releasedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''
+            }.`,
+          );
+          continue;
+        }
+        files[item.originalName ?? `${item.id}.${item.kind}`] = await decryptEnclosure(item.viewUrl, capsuleKey);
+      }
+      if (released.length > 0) {
+        files['released.txt'] = new TextEncoder().encode(
+          ['These were enclosed with the letter, and are no longer kept:', '', ...released, ''].join('\n'),
+        );
       }
       const blob = new Blob([zipSync(files) as unknown as BlobPart], { type: 'application/zip' });
       const url = URL.createObjectURL(blob);
@@ -165,9 +150,21 @@ function RecordAtRest({
       </div>
 
       {media.length > 0 ? (
-        <section className="grid grid-cols-2 gap-3">
+        <section className="flex flex-col gap-3">
           {media.map((item) => (
-            <MediaTile key={item.id} item={item} capsuleKey={capsuleKey} />
+            <EnclosureViewer
+              key={item.id}
+              enclosure={item}
+              allowDownload={allowDownload}
+              load={() => {
+                // Unreachable while `released` is true — the viewer offers
+                // no way to open one — but `viewUrl` is genuinely nullable
+                // now, and a thrown error is a better answer than passing
+                // `null` down into the decrypt path.
+                if (!item.viewUrl) throw new Error('This enclosure was released from storage');
+                return decryptEnclosure(item.viewUrl, capsuleKey);
+              }}
+            />
           ))}
         </section>
       ) : null}
@@ -176,42 +173,21 @@ function RecordAtRest({
         <p className="text-[length:var(--text-body-s)] text-secondary">Written at {location.name}</p>
       ) : null}
 
-      <section className="flex flex-col gap-3 border-t border-[var(--color-rule)] pt-6">
-        <p className="text-[length:var(--text-body-s)] text-secondary">Reply to {senderName}</p>
-        <div className="flex flex-wrap gap-2">
-          {REACTIONS.map((reaction) => (
-            <button
-              key={reaction}
-              type="button"
-              onClick={() => void sendReaction(reaction)}
-              className={`rounded-[var(--radius-record)] border px-3 py-1.5 text-[length:var(--text-body-s)] ${
-                reacted === reaction
-                  ? 'border-[var(--color-rule-strong)] text-foreground'
-                  : 'border-[var(--color-rule)] text-secondary'
-              }`}
-            >
-              {reaction}
-            </button>
-          ))}
-        </div>
-        {replyPrompt ? (
-          <div className="flex flex-col gap-2">
-            <label htmlFor="reply" className="text-[length:var(--text-body-s)] text-secondary">
-              {replyPrompt}
-            </label>
-            <textarea
-              id="reply"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={3}
-              className="rounded-[var(--radius-record)] border border-[var(--color-rule)] bg-transparent p-3 text-[length:var(--text-body-s)]"
-            />
-            <Button size="sm" variant="secondary" onClick={() => void sendReaction(reacted ?? 'Wrote back')}>
-              Send
-            </Button>
-          </div>
-        ) : null}
-      </section>
+      {/*
+        The reply, and everything that has been said since.
+
+        `replyPrompt` is the sender's own invitation ("tell me what you did
+        with it") — a line addressed to the reader, so it belongs above the
+        correspondence rather than as a form label buried under five chips.
+      */}
+      {replyPrompt ? <p className="text-[length:var(--text-body-s)] text-secondary">{replyPrompt}</p> : null}
+      <Correspondence
+        replies={replies}
+        capsuleKey={capsuleKey}
+        theirName={senderName}
+        viewerIs="recipient"
+        onSend={sendReply}
+      />
 
       {/*
         Custody, not marketing (`07 §IV` phase 7: "Export, print, download. It

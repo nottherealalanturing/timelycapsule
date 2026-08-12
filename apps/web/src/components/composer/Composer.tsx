@@ -1,6 +1,6 @@
 'use client';
 
-import { Button, Skeleton, useToast } from '@tc/ui-web';
+import { Button, cn, Skeleton, useToast } from '@tc/ui-web';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -19,6 +19,8 @@ import { useEnclosures } from './v2/use-enclosures';
 import { SealCeremony } from './SealCeremony';
 import { firstCompletenessBlocker } from './completeness';
 import { describeSealFailure, type SealProblem } from './v2/seal-errors';
+import { describeScheduleProblem, selectedInstant } from './v2/schedule-validity';
+import { useCorrectedNow } from '../../lib/use-corrected-now';
 
 function statusText(status: AutosaveStatus): string {
   switch (status) {
@@ -30,6 +32,12 @@ function statusText(status: AutosaveStatus): string {
       return 'Saved just now';
     case 'error':
       return "Couldn't save — retrying";
+    case 'rejected':
+      // Deliberately not "retrying". The server refused this on its merits,
+      // and `pendingPatchRef` will keep re-sending the same value until the
+      // writer changes it — so promising a retry would be describing
+      // something that cannot happen.
+      return 'Not saved — see below';
     default:
       return '';
   }
@@ -108,6 +116,22 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialRecipient, recipients.length]);
   const [movement, setMovement] = useState<Movement>('address');
+
+  /*
+   * One live reading of the chosen moment, computed here and handed to both
+   * Address (where it is fixed) and Seal (where it blocks), so the two cannot
+   * disagree. `useCorrectedNow` is reused rather than a local timer: it is
+   * already the product's server-corrected clock, and a composer whose seal
+   * validity depended on a wrong device clock would fail in exactly the way
+   * this milestone exists to stop.
+   */
+  const scheduleTarget = draft.capsule ? selectedInstant(draft.capsule) : null;
+  const scheduleNowMs = useCorrectedNow(scheduleTarget);
+  const scheduleProblem = describeScheduleProblem(
+    scheduleTarget,
+    scheduleNowMs,
+    ACCOUNT_CAPABILITIES.maxHorizonMs,
+  );
   const [ceremonyOpen, setCeremonyOpen] = useState(false);
   const [sealing, setSealing] = useState(false);
   const [sealProblem, setSealProblem] = useState<SealProblem | null>(null);
@@ -224,7 +248,13 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
         {/* Autosave state is announced, not just shown — a draft silently
             failing to save is exactly the kind of thing a sighted user
             notices in the corner and a screen-reader user never learns. */}
-        <span aria-live="polite" className="hidden text-[length:var(--text-caption)] text-secondary sm:block">
+        <span
+          aria-live="polite"
+          className={cn(
+            'hidden text-[length:var(--text-caption)] sm:block',
+            draft.autosaveStatus === 'rejected' ? 'text-[var(--color-danger)]' : 'text-secondary',
+          )}
+        >
           {statusText(draft.autosaveStatus)}
         </span>
         <div className="relative">
@@ -264,6 +294,7 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             onRemoveRecipient={(id) => void removeRecipient(id)}
             recipientError={recipientError}
             selfBirthday={user?.birthday ?? null}
+            scheduleProblem={scheduleProblem}
             footer={
               // Says why it cannot advance, the same way the Compose footer
               // does with `blocker`. It was previously just dead and silent —
@@ -306,10 +337,12 @@ export function Composer({ capsuleId, initialRecipient }: { capsuleId: string; i
             tz={tz}
             recipientLocal={recipientLocal}
             hasRecipients={recipients.length > 0}
-            uploadsInFlight={enclosures.uploading.length}
+            enclosuresInFlight={enclosures.pending.filter((p) => p.stage !== 'failed').length}
             sealing={sealing}
             onSeal={handleConfirmSeal}
             problem={sealProblem}
+            scheduleProblem={scheduleProblem}
+            onGoToAddress={() => setMovement('address')}
           />
         ) : null}
       </main>
