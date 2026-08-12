@@ -42,7 +42,18 @@ export const ACCOUNT_CAPABILITIES: ComposerCapabilities = {
 };
 
 export const GUEST_CAPABILITIES: ComposerCapabilities = {
-  enclosures: false,
+  // M5 — Guest supports basic media, deliberately narrower than the
+  // account composer: no reorder-by-drag furniture beyond what Enclosures
+  // already renders identically for both, and no place-memory lookup (see
+  // `placeMemory` below). "A photograph, video or file" and "A voice
+  // recording" are the two kinds this unlocks.
+  enclosures: true,
+  // Stays false. Reverse geocoding is account-only for M5 — Guest MUST NOT
+  // have address/place-name lookup, and there is no anonymous geocoding
+  // endpoint to call even if this were flipped. Leaving it false is what
+  // makes `Enclosures.tsx`/`ComposeMovement.tsx` omit the "Where this was
+  // written" option entirely, with no separate `isGuest` check anywhere —
+  // the capability system already does the work.
   placeMemory: false,
   recipients: false,
   conditions: false,

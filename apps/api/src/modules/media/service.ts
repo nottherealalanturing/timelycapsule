@@ -29,7 +29,11 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100);
 }
 
-function buildStorageKey(capsuleId: string, mediaId: string, name: string): string {
+// Exported for `guest-service.ts` (same module — not a cross-module import,
+// so the module-boundary rule doesn't apply) rather than duplicated, so an
+// owner-path and a guest-path storage key can never drift into two
+// different layouts for what is otherwise identical machinery.
+export function buildStorageKey(capsuleId: string, mediaId: string, name: string): string {
   return `media/${capsuleId}/${mediaId}/${sanitizeFilename(name)}`;
 }
 
@@ -48,7 +52,10 @@ async function findOwnedMediaByIdOrThrow(db: Database, ownerId: string, mediaId:
   return { capsule, media };
 }
 
-async function adjustCapsuleSizeBytes(db: Database, capsuleId: string, deltaBytes: number): Promise<void> {
+// Exported for `guest-service.ts` — same reasoning as `buildStorageKey`
+// above: one place that keeps `capsules.size_bytes` in sync, used by both
+// ownership paths, so quota accounting can never disagree between them.
+export async function adjustCapsuleSizeBytes(db: Database, capsuleId: string, deltaBytes: number): Promise<void> {
   await db
     .update(capsules)
     .set({ sizeBytes: sql`greatest(${capsules.sizeBytes} + ${deltaBytes}, 0)` })

@@ -1,11 +1,13 @@
 'use client';
 
-import { encryptBytes, generateCapsuleKey, toBase64Url } from '@tc/crypto';
+import { GUEST_STORAGE_ALLOWANCE_BYTES } from '@tc/contracts';
+import { encryptBytes, toBase64Url } from '@tc/crypto';
 import { Button, ThemeToggle, useToast } from '@tc/ui-web';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { guestApi } from '../../lib/api-client';
 import { encodeIvCiphertext } from '../../lib/capsule-crypto';
+import { formatBytes } from '../../lib/enclosure-media';
 import { getGuestToken, setGuestCapsule, setGuestToken } from '../../lib/guest-store';
 import { DRAFT_KEY } from '../../components/marketing/WriteAndSeal';
 import { AddressMovement } from '../../components/composer/v2/AddressMovement';
@@ -13,7 +15,7 @@ import { ComposeMovement } from '../../components/composer/v2/ComposeMovement';
 import { MovementNav, type Movement } from '../../components/composer/v2/MovementNav';
 import { SealMovement } from '../../components/composer/v2/SealMovement';
 import { GUEST_CAPABILITIES } from '../../components/composer/v2/capabilities';
-import { noEnclosures } from '../../components/composer/v2/use-enclosures';
+import { useGuestEnclosures } from '../../components/composer/v2/use-guest-enclosures';
 import { firstCompletenessBlocker } from '../../components/composer/completeness';
 import { describeSealFailure, type SealProblem } from '../../components/composer/v2/seal-errors';
 import { describeScheduleProblem, selectedInstant } from '../../components/composer/v2/schedule-validity';
@@ -44,8 +46,9 @@ function textToDoc(text: string): object {
 export default function GuestComposerPage() {
   const router = useRouter();
   const { show } = useToast();
-  const draft = useGuestDraft();
   const [guestToken, setGuestTokenState] = useState<string | null>(null);
+  const draft = useGuestDraft(guestToken);
+  const enclosures = useGuestEnclosures(draft, guestToken);
   const [movement, setMovement] = useState<Movement>('address');
   const [sealing, setSealing] = useState(false);
   const [sessionError, setSessionError] = useState(false);
@@ -125,6 +128,23 @@ export default function GuestComposerPage() {
   const blocker = draft.capsule ? firstCompletenessBlocker(draft.capsule, written.length > 0) : 'Loading';
   const hasMoment = Boolean(draft.capsule?.unlockAt);
 
+  // M5 — stated plainly rather than only appearing once the limit is hit.
+  // 80% is a display threshold for switching from "here's the number" to
+  // "here's what to do about it," not a product-decided figure; the actual
+  // limit enforced server-side is the fixed 5 MB in `lib/guest-limits.ts`.
+  const usedBytes = enclosures.items.reduce((sum, item) => sum + (item.sizeBytes ?? 0), 0);
+  const nearAllowance = usedBytes > GUEST_STORAGE_ALLOWANCE_BYTES * 0.8;
+  const allowanceHint =
+    usedBytes === 0
+      ? '5 MB guest allowance'
+      : nearAllowance
+        ? "You're near your 5 MB guest allowance. A free account gives you 100 MB."
+        : // Reused rather than a second, MB-only formatter — found by
+          // actually enclosing a small test file and seeing "0.0 MB of
+          // 5 MB used", which is technically correct and reads as broken.
+          // The same B/KB/MB scaling every enclosure row already uses.
+          `${formatBytes(usedBytes)} of 5 MB used`;
+
   const reachable: Movement[] = ['address'];
   if (hasMoment) reachable.push('compose');
   if (!blocker) reachable.push('seal');
@@ -134,28 +154,38 @@ export default function GuestComposerPage() {
     setSealing(true);
     setSealProblem(null);
     try {
-      const created = await guestApi.createCapsule(guestToken, { title: draft.capsule?.title || undefined });
-      const capsuleKey = generateCapsuleKey();
-      // The guest's letter is encrypted here rather than continuously, because
-      // a guest has no master key to wrap a capsule key under until this point.
+      // Reuses the capsule and key an earlier enclosure already created
+      // (M5) — or creates them fresh, right here, exactly as this always
+      // did for a text-only draft. Either way the letter is encrypted with
+      // the same key as anything already attached to it; there is only ever
+      // one.
+      const { capsuleId, recipientToken, capsuleKey } = await draft.ensureMediaCapsule();
       const { iv, ciphertext } = await encryptBytes(
         capsuleKey,
         new TextEncoder().encode(JSON.stringify(draft.envelope)),
       );
       const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
 
-      await guestApi.patchCapsule(guestToken, created.id, { contentDocEnc, unlockAt: scheduleTarget.toISOString() });
-      await guestApi.sealCapsule(guestToken, created.id);
+      // `title` is sent here too, not just at creation — a capsule created
+      // early (because a photo was enclosed before the writer named it) may
+      // have been titled after the fact, and this is the one guaranteed
+      // patch before sealing.
+      await guestApi.patchCapsule(guestToken, capsuleId, {
+        title: draft.capsule?.title || undefined,
+        contentDocEnc,
+        unlockAt: scheduleTarget.toISOString(),
+      });
+      await guestApi.sealCapsule(guestToken, capsuleId);
 
       const capsuleKeyB64 = toBase64Url(capsuleKey);
-      setGuestCapsule({ capsuleId: created.id, recipientToken: created.recipientToken!, capsuleKeyB64 });
+      setGuestCapsule({ capsuleId, recipientToken, capsuleKeyB64 });
 
       // The draft has become a sealed capsule; leaving it in session storage
       // would re-open the composer with a letter that has already gone.
       clearGuestDraft();
 
-      const url = `${window.location.origin}/c/${created.recipientToken}#k=${capsuleKeyB64}`;
-      setHandoff({ url, capsuleId: created.id });
+      const url = `${window.location.origin}/c/${recipientToken}#k=${capsuleKeyB64}`;
+      setHandoff({ url, capsuleId });
     } catch (error) {
       // Stated on the surface rather than thrown as a toast: the most common
       // real failure here (the one-capsule guest limit) carries the only way
@@ -277,10 +307,11 @@ export default function GuestComposerPage() {
           <ComposeMovement
             draft={draft}
             capabilities={GUEST_CAPABILITIES}
-            enclosures={noEnclosures()}
+            enclosures={enclosures}
             addressee={null}
             opensAt={scheduleTarget}
             tz={tz}
+            allowanceHint={allowanceHint}
             footer={
               <div className="flex justify-end pt-2">
                 <Button onClick={() => setMovement('seal')} disabled={Boolean(blocker)}>
@@ -296,7 +327,8 @@ export default function GuestComposerPage() {
             <SealMovement
               draft={draft}
               capabilities={GUEST_CAPABILITIES}
-              enclosures={[]}
+              enclosures={enclosures.items}
+              enclosuresInFlight={enclosures.pending.filter((p) => p.stage !== 'failed').length}
               addressee={null}
               opensAt={scheduleTarget}
               tz={tz}

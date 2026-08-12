@@ -193,9 +193,13 @@ export const mediaItems = pgTable(
     capsuleId: uuid('capsule_id')
       .notNull()
       .references(() => capsules.id, { onDelete: 'cascade' }),
-    uploaderId: uuid('uploader_id')
-      .notNull()
-      .references(() => users.id),
+    // Nullable since M5: a guest capsule can hold real media before any user
+    // row exists to attribute it to — the exact same reasoning that already
+    // makes `capsules.owner_id` nullable for a guest-owned capsule. Left
+    // null for guest-enclosed media even after the capsule is later claimed;
+    // nothing reads this column to decide ownership (that's `capsuleId`'s
+    // job via the capsule row), so there's nothing to backfill.
+    uploaderId: uuid('uploader_id').references(() => users.id),
     kind: mediaKindEnum('kind').notNull(),
     storageKey: text('storage_key'),
     originalName: text('original_name'),

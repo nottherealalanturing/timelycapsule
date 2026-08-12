@@ -521,6 +521,44 @@ export const guestApi = {
 
   getCapsule: (guestToken: string, capsuleId: string) =>
     request(`/guest/capsules/${capsuleId}`, GuestCapsuleResponseSchema, { bearer: guestToken }),
+
+  /**
+   * M5 — the same request/response shapes `mediaApi` uses (guest media is
+   * the identical pipeline, just scoped to a guest session instead of an
+   * account), each carrying the guest bearer token as its first argument to
+   * match every other function in this object.
+   */
+  media: {
+    list: (guestToken: string, capsuleId: string) =>
+      request(`/guest/capsules/${capsuleId}/media`, MediaListResponseSchema, { bearer: guestToken }),
+
+    createTicket: (guestToken: string, capsuleId: string, input: CreateMediaTicketRequest) =>
+      request(`/guest/capsules/${capsuleId}/media/tickets`, CreateMediaTicketResponseSchema, {
+        method: 'POST',
+        bearer: guestToken,
+        body: CreateMediaTicketRequestSchema.parse(input),
+      }),
+
+    complete: (guestToken: string, mediaId: string, input: CompleteMediaRequest) =>
+      request(`/guest/media/${mediaId}/complete`, MediaResponseSchema, {
+        method: 'POST',
+        bearer: guestToken,
+        body: CompleteMediaRequestSchema.parse(input),
+      }),
+
+    patch: (guestToken: string, mediaId: string, input: PatchMediaRequest) =>
+      request(`/guest/media/${mediaId}`, MediaResponseSchema, {
+        method: 'PATCH',
+        bearer: guestToken,
+        body: PatchMediaRequestSchema.parse(input),
+      }),
+
+    delete: (guestToken: string, mediaId: string) =>
+      request(`/guest/media/${mediaId}`, z.void(), { method: 'DELETE', bearer: guestToken }),
+
+    view: (guestToken: string, mediaId: string) =>
+      request(`/guest/media/${mediaId}/view`, MediaViewResponseSchema, { bearer: guestToken }),
+  },
 };
 
 export const receivedApi = {

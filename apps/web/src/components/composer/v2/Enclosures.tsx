@@ -9,6 +9,16 @@ import type { ComposerCapabilities } from './capabilities';
 import { stageReading, type PendingEnclosure } from './enclosure-lifecycle';
 import { VoiceRecorder } from './VoiceRecorder';
 
+/** The first-visit hint, built from what this entry point can actually offer rather than assumed. */
+function enclosureKindsHint(capabilities: ComposerCapabilities): string {
+  const kinds: string[] = [];
+  if (capabilities.enclosures) kinds.push('a photo', 'a voice note');
+  if (capabilities.placeMemory) kinds.push('where you wrote this');
+  if (kinds.length === 0) return '';
+  if (kinds.length === 1) return kinds[0]!;
+  return `${kinds.slice(0, -1).join(', ')}, or ${kinds[kinds.length - 1]}`;
+}
+
 export interface EnclosuresProps {
   items: MediaItem[];
   pending: PendingEnclosure[];
@@ -23,6 +33,14 @@ export interface EnclosuresProps {
   onRemovePlace: () => void;
   onCaption: (item: MediaItem, caption: string) => void;
   onReorder: (item: MediaItem, direction: -1 | 1) => void;
+  /**
+   * Stated remaining-allowance text (M5) — undefined for every entry point
+   * that has no allowance to state, which is every one of them except
+   * Guest. Passed as a single ready-made string rather than raw numbers so
+   * this component makes no assumptions about whose limit it is or how
+   * close is "near" — that policy lives entirely at the call site.
+   */
+  allowanceHint?: string | null;
   className?: string;
 }
 
@@ -63,6 +81,7 @@ export function Enclosures({
   onRemovePlace,
   onCaption,
   onReorder,
+  allowanceHint,
   className,
 }: EnclosuresProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -231,11 +250,25 @@ export function Enclosures({
             would be the duplicated-decision noise this composer pass keeps
             cutting elsewhere. Stated, not implied by a bare "+", per the
             brief: optional, and there's more than one kind.
+
+            Built from capabilities rather than a fixed sentence (M5) — every
+            entry point before Guest had `enclosures` and `placeMemory`
+            either both on or both off, so one hardcoded string ("a photo, a
+            voice note, or where you wrote this") was always accurate.
+            Guest is the first to have one without the other, and the old
+            string would have promised a place-memory control that isn't
+            there — found by actually looking at the guest composer, not
+            just by reasoning about the capability flags.
           */}
           {isEmpty ? (
-            <p className="text-[length:var(--text-caption)] text-secondary">
-              Optional — a photo, a voice note, or where you wrote this.
-            </p>
+            <p className="text-[length:var(--text-caption)] text-secondary">Optional — {enclosureKindsHint(capabilities)}.</p>
+          ) : null}
+          {/* Stated plainly rather than only surfacing once the limit is
+              actually hit — Guest's whole design is "you can do this now,
+              an account gives you more room," not a wall that appears
+              without warning. */}
+          {allowanceHint ? (
+            <p className="text-[length:var(--text-caption)] text-secondary">{allowanceHint}</p>
           ) : null}
           <div ref={menuRef} className="relative self-start">
             <Button

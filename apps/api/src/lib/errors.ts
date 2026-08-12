@@ -139,6 +139,17 @@ export class ApiError extends Error {
     return new ApiError('guest_capsule_locked', message, 409);
   }
 
+  /**
+   * A distinct code from `quota_exceeded` on purpose — that one's mapped
+   * copy (`seal-errors.ts`) talks about how many sealed capsules a plan
+   * keeps at once, which is the wrong story entirely for a guest hitting
+   * their 5 MB storage allowance. Carries used/limit so the client can say
+   * a real number rather than a bare refusal.
+   */
+  static guestQuotaExceeded(usedBytes: number, limitBytes: number): ApiError {
+    return new ApiError('guest_quota_exceeded', 'This would go over the 5 MB guest allowance', 403, { usedBytes, limitBytes });
+  }
+
   static ownerKeyWrapAlreadySet(): ApiError {
     return new ApiError('owner_key_wrap_already_set', 'This capsule already has an owner key wrap', 409);
   }
