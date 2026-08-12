@@ -438,6 +438,18 @@ export const mediaApi = {
   delete: (mediaId: string) => request(`/media/${mediaId}`, z.void(), { method: 'DELETE', auth: true }),
 
   view: (mediaId: string) => request(`/media/${mediaId}/view`, MediaViewResponseSchema, { auth: true }),
+
+  /**
+   * Releases every enclosure this capsule still holds in storage (M4).
+   * Capsule-level and irreversible: the letter, the record and the replies
+   * survive, the files do not.
+   */
+  release: (capsuleId: string) =>
+    request(
+      `/capsules/${capsuleId}/media/release`,
+      z.object({ released: z.number(), alreadyReleased: z.number(), bytesReclaimed: z.number() }),
+      { method: 'POST', auth: true },
+    ),
 };
 
 export const revealApi = {

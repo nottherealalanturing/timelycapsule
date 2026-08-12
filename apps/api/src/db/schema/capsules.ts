@@ -83,6 +83,31 @@ export const capsules = pgTable(
     replyPrompt: text('reply_prompt'),
     location: jsonb('location'), // {lat, lng, name}
     sealedDaySnapshot: jsonb('sealed_day_snapshot'),
+    /**
+     * **M4 — the promise this capsule was sealed with.**
+     *
+     * Written once, at seal, and never again. Everything about this
+     * capsule's future storage behaviour reads from here, never from the
+     * owner's current subscription: cancelling, downgrading, going over
+     * quota or never renewing cannot reach a capsule that is already
+     * sealed. See `modules/capsules/sealed-entitlement.ts` for the schema
+     * and the readers.
+     *
+     * NULL means the capsule was sealed before this system existed. That is
+     * read as **forever** — at the moment it was sealed no retention
+     * promise had been made, so the promise it keeps is perpetual custody.
+     * Legacy rows are never backfilled with a fabricated snapshot.
+     */
+    sealedEntitlementSnapshot: jsonb('sealed_entitlement_snapshot'),
+    /**
+     * Denormalised from `sealedEntitlementSnapshot.mediaRetention.until` so
+     * the scheduler and the storage reading can query it without unpacking
+     * jsonb. **The snapshot is authoritative; this is an index of it.**
+     * Written in the same UPDATE. NULL means forever, or that the capsule
+     * holds no media and therefore carries no retention obligation at all.
+     */
+    mediaRetentionUntil: timestamp('media_retention_until', { withTimezone: true }),
+    /** The owner's shelf (§5.10) — reversible, unrelated to media retention. Not to be confused with media *release*, which reclaims bytes. */
     archivedAt: timestamp('archived_at', { withTimezone: true }),
     trashedAt: timestamp('trashed_at', { withTimezone: true }),
     purgeAfter: timestamp('purge_after', { withTimezone: true }),
@@ -189,6 +214,19 @@ export const mediaItems = pgTable(
     status: mediaStatusEnum('status').default('uploading'),
     scanResult: jsonb('scan_result'),
     exifCapturedAt: timestamp('exif_captured_at', { withTimezone: true }),
+    /**
+     * **M4.** When the encrypted bytes were reclaimed from object storage.
+     *
+     * Everything else on this row deliberately survives — `originalName`,
+     * `sizeBytes`, `caption`, `kind`, `position`, `createdAt`. That is the
+     * point: the enclosure remains a fact of the capsule's history, and the
+     * record can still say honestly what was here and how big it was. Only
+     * the storage keys are nulled, because the objects behind them are gone
+     * and a dangling key invites a read that can only 404.
+     */
+    releasedAt: timestamp('released_at', { withTimezone: true }),
+    /** 'retention' (the sealed snapshot's date came due) or 'owner' (released early, deliberately). */
+    releaseReason: text('release_reason'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [index('media_items_capsule_id_idx').on(t.capsuleId)],

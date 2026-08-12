@@ -4,7 +4,8 @@ import type { capsules } from '../../db/schema/index.js';
 type CapsuleRow = typeof capsules.$inferSelect;
 
 const MIN_UNLOCK_LEAD_MS = 5 * 60 * 1000;
-const MAX_UNLOCK_HORIZON_MS = 50 * 365.25 * 24 * 60 * 60 * 1000; // 50 years
+/** Exported since M4: the sealed entitlement snapshot records the horizon a capsule was sealed under. */
+export const MAX_UNLOCK_HORIZON_MS = 50 * 365.25 * 24 * 60 * 60 * 1000; // 50 years
 const MAX_EXTEND_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
 /**
@@ -38,6 +39,44 @@ export function assertCanPatch(capsule: CapsuleRow): void {
 export function assertCanSeal(capsule: CapsuleRow): void {
   if (capsule.state !== 'draft') {
     throw ApiError.capsuleSealed('Only a draft can be sealed');
+  }
+}
+
+// --- M4: releasing media is not patching a capsule ---
+
+/**
+ * **The deliberate, narrow exception to `assertCanPatch` — not a relaxation of it.**
+ *
+ * `assertCanPatch` above is draft-only, because sealed content is immutable
+ * (hard rule 2). That is correct and stays exactly as it is. But it also
+ * gates `deleteMedia`, which is why encrypted blobs are currently immortal
+ * once a capsule seals: there has been no legitimate way to reclaim the
+ * bytes of a capsule from 2026 that has already been read.
+ *
+ * The resolution is a second, separate guard rather than a softer first
+ * one. Releasing media is not an edit: it changes nothing a reader was
+ * promised about *content* — the letter, the metadata, the history, the
+ * replies and the enclosure record all survive verbatim — it only reclaims
+ * storage the capsule is no longer entitled to hold. Two different
+ * operations, two different rules, and the ordinary user-mutation path
+ * keeps the strict one.
+ *
+ * Allowed on `sealed`, `unlocked` and `expired`. Not on:
+ *   - `draft` — nothing has been promised yet, so the right verb is delete,
+ *     which already works and also removes the row.
+ *   - `withdrawn` / trashed — both are already bound for `purgeCapsuleNow`,
+ *     which deletes the objects *and* the rows. Releasing first would leave
+ *     a half-erased record on its way to being erased entirely.
+ */
+export function assertCanReleaseMedia(capsule: CapsuleRow): void {
+  if (capsule.trashedAt) {
+    throw ApiError.forbidden('A trashed capsule is already scheduled for permanent deletion');
+  }
+  if (capsule.state === 'draft') {
+    throw ApiError.forbidden('This capsule is still a draft — remove the enclosure instead of releasing it');
+  }
+  if (capsule.state !== 'sealed' && capsule.state !== 'unlocked' && capsule.state !== 'expired') {
+    throw ApiError.forbidden('Media can only be released from a sealed, opened or expired capsule');
   }
 }
 

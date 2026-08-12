@@ -178,6 +178,14 @@ export const CapsuleSchema = z.object({
   expiryStrict: z.boolean(),
   expiredAt: z.string().nullable(),
   archivedAt: z.string().nullable(),
+  /**
+   * M4 — when this capsule's enclosures are due to be released from
+   * storage, as promised by its sealed entitlement snapshot. Null means
+   * forever, or that the capsule holds no media. Distinct from
+   * `archivedAt`, which is the owner's reversible shelf and has nothing to
+   * do with storage.
+   */
+  mediaRetentionUntil: z.string().nullable(),
   trashedAt: z.string().nullable(),
   purgeAfter: z.string().nullable(),
   withdrawnAt: z.string().nullable(),

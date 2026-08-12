@@ -11,6 +11,7 @@ import { NewDeviceAlert } from './templates/NewDeviceAlert.js';
 import { OpenedNotice } from './templates/OpenedNotice.js';
 import { PasswordReset } from './templates/PasswordReset.js';
 import { PreUnlockReminder, type PreUnlockReminderProps } from './templates/PreUnlockReminder.js';
+import { MediaReleaseWarning, type MediaReleaseWarningProps } from './templates/MediaReleaseWarning.js';
 import { ReplyReceived } from './templates/ReplyReceived.js';
 import { SomethingWaiting } from './templates/SomethingWaiting.js';
 import { VerifyEmail } from './templates/VerifyEmail.js';
@@ -121,6 +122,29 @@ export async function sendPreUnlockReminder(db: Database, to: string, input: Pre
     template: 'pre-unlock-reminder',
     subject: input.audience === 'owner' ? 'Your words arrive soon' : 'Almost time',
     node: PreUnlockReminder(input),
+    payload: input,
+  });
+}
+
+/**
+ * The 30d/7d notice before a capsule's enclosures are released (M4).
+ *
+ * `payload` is persisted to the `outbound_messages` ledger by
+ * `sendTemplatedOrThrow`, which is exactly why this template's props carry
+ * no capsule content: anything passed here is written to the database a
+ * second time. M3 fixed this same class of leak for replies; the rule holds
+ * for every template added after it.
+ */
+export async function sendMediaReleaseWarning(
+  db: Database,
+  to: string,
+  input: MediaReleaseWarningProps,
+): Promise<void> {
+  await sendTemplatedOrThrow(db, {
+    to,
+    template: 'media-release-warning',
+    subject: input.daysUntilRelease <= 7 ? 'Enclosures released next week' : 'Enclosures released next month',
+    node: MediaReleaseWarning(input),
     payload: input,
   });
 }

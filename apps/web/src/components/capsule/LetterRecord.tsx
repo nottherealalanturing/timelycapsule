@@ -176,7 +176,13 @@ function OpenLetter({ capsule }: { capsule: Capsule }) {
             {media.map((item) => (
               <EnclosureViewer
                 key={item.id}
-                enclosure={item}
+                // A released enclosure keeps its place in the record and
+                // says what happened to it (M4). Before this, the row was
+                // still listed but its Open button called a view endpoint
+                // that answered "still uploading or processing" — a false
+                // explanation for a capsule whose bytes were deliberately
+                // reclaimed years earlier.
+                enclosure={{ ...item, released: item.status === 'released', releasedAt: item.releasedAt }}
                 allowDownload={capsule.allowDownload}
                 load={async () => {
                   if (!masterKey || !capsule.ownerKeyWrap) throw new Error('Capsule is locked');

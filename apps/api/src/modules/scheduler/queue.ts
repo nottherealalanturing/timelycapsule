@@ -19,6 +19,9 @@ export const QUEUE_NAMES = [
   'trash_purge',
   'data_export',
   'account_purge',
+  // M4 storage lifecycle.
+  'media_release_warning',
+  'media_release',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];

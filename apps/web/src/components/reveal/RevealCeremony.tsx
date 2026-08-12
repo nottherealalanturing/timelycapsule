@@ -91,8 +91,26 @@ function RecordAtRest({
     setDownloading(true);
     try {
       const files: Record<string, Uint8Array> = { 'letter.txt': new TextEncoder().encode(letterText) };
+      const released: string[] = [];
       for (const item of media) {
+        if (!item.viewUrl) {
+          // Named in the zip rather than dropped from it. A recipient
+          // taking their copy away deserves to know a photograph was here
+          // and when it went, not to find a shorter set of files than the
+          // letter they just read described.
+          released.push(
+            `${item.originalName ?? 'An enclosure'} — released from storage${
+              item.releasedAt ? ` on ${new Date(item.releasedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}` : ''
+            }.`,
+          );
+          continue;
+        }
         files[item.originalName ?? `${item.id}.${item.kind}`] = await decryptEnclosure(item.viewUrl, capsuleKey);
+      }
+      if (released.length > 0) {
+        files['released.txt'] = new TextEncoder().encode(
+          ['These were enclosed with the letter, and are no longer kept:', '', ...released, ''].join('\n'),
+        );
       }
       const blob = new Blob([zipSync(files) as unknown as BlobPart], { type: 'application/zip' });
       const url = URL.createObjectURL(blob);
@@ -138,7 +156,14 @@ function RecordAtRest({
               key={item.id}
               enclosure={item}
               allowDownload={allowDownload}
-              load={() => decryptEnclosure(item.viewUrl, capsuleKey)}
+              load={() => {
+                // Unreachable while `released` is true — the viewer offers
+                // no way to open one — but `viewUrl` is genuinely nullable
+                // now, and a thrown error is a better answer than passing
+                // `null` down into the decrypt path.
+                if (!item.viewUrl) throw new Error('This enclosure was released from storage');
+                return decryptEnclosure(item.viewUrl, capsuleKey);
+              }}
             />
           ))}
         </section>

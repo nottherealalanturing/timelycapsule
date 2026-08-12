@@ -6,7 +6,7 @@ import type {
   RevealResponse,
   SealStatus,
 } from '@tc/contracts';
-import { and, desc, eq, gt, isNull } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
@@ -155,12 +155,23 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
     throw ApiError.sealNotSatisfied(unmet.type);
   }
 
-  const mediaRows = await db.select().from(mediaItems).where(and(eq(mediaItems.capsuleId, capsule.id), eq(mediaItems.status, 'ready')));
+  // `ready` *and* `released` (M4). Filtering to `ready` alone — which is
+  // what this did — meant a released enclosure vanished from the letter
+  // with nothing in its place, so a recipient in 2041 would see a shorter
+  // letter than the one that was sent them and never know a photograph had
+  // been there. Absence has to be visible; the record says what was
+  // enclosed even when the bytes are gone. Genuinely unfinished uploads
+  // stay filtered out: they were never part of the sealed capsule.
+  const mediaRows = await db
+    .select()
+    .from(mediaItems)
+    .where(and(eq(mediaItems.capsuleId, capsule.id), inArray(mediaItems.status, ['ready', 'released'])))
+    .orderBy(mediaItems.position);
   const adapter = getStorageAdapter();
   const media = await Promise.all(
-    mediaRows
-      .filter((m) => m.storageKey)
-      .map(async (m) => ({
+    mediaRows.map(async (m) => {
+      const released = m.status === 'released' || !m.storageKey;
+      return {
         id: m.id,
         kind: m.kind,
         caption: m.caption,
@@ -168,8 +179,13 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
         encMeta: m.encMeta as Record<string, unknown> | null,
         mime: m.mime,
         originalName: m.originalName,
-        viewUrl: await adapter.getSignedGetUrl(m.storageKey!, { expiresInSeconds: VIEW_URL_TTL_SECONDS, asAttachment: false }),
-      })),
+        released,
+        releasedAt: m.releasedAt ? m.releasedAt.toISOString() : null,
+        viewUrl: released
+          ? null
+          : await adapter.getSignedGetUrl(m.storageKey!, { expiresInSeconds: VIEW_URL_TTL_SECONDS, asAttachment: false }),
+      };
+    }),
   );
 
   const alreadyOpened = recipient.status === 'opened';

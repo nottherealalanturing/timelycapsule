@@ -6,6 +6,7 @@ export {
   sendExportReady,
   sendCapsuleUnlocked,
   sendPreUnlockReminder,
+  sendMediaReleaseWarning,
   sendOpenedNotice,
   sendReplyReceived,
   sendBounceAlert,

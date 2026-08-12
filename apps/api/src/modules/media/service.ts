@@ -5,8 +5,16 @@ import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
 import { capsules, mediaItems } from '../../db/schema/index.js';
-import { assertCanPatch, assertFileWithinSizeLimit, assertWithinStorageQuota, findOwnedCapsuleOrThrow } from '../capsules/index.js';
+import {
+  assertCanPatch,
+  assertCanReleaseMedia,
+  assertFileWithinSizeLimit,
+  assertWithinStorageQuota,
+  cancelPendingMediaRelease,
+  findOwnedCapsuleOrThrow,
+} from '../capsules/index.js';
 import { getStorageAdapter } from './get-adapter.js';
+import { releaseCapsuleMedia, type ReleaseResult } from './release.js';
 import { toMediaItem } from './mappers.js';
 import { mimeToKind } from './mime.js';
 
@@ -225,8 +233,48 @@ export async function deleteMedia(db: Database, ownerId: string, mediaId: string
   });
 }
 
+/**
+ * Owner-initiated early release of everything this capsule still holds in
+ * storage (M4). Capsule-level by design: retention is a property of the
+ * capsule, and per-enclosure release is deliberately not offered yet.
+ *
+ * Guarded by `assertCanReleaseMedia`, **not** `assertCanPatch`. The latter
+ * is draft-only and stays that way — see the long note on the guard itself
+ * for why releasing bytes is not the same operation as editing a sealed
+ * capsule.
+ */
+export async function releaseCapsuleMediaAsOwner(db: Database, ownerId: string, capsuleId: string): Promise<ReleaseResult> {
+  const capsule = await findOwnedCapsuleOrThrow(db, ownerId, capsuleId);
+  assertCanReleaseMedia(capsule);
+
+  const result = await releaseCapsuleMedia(db, capsuleId, { reason: 'owner', actorId: ownerId });
+
+  // The owner has just done by hand what the schedule existed to do later.
+  await cancelPendingMediaRelease(db, capsuleId);
+
+  if (result.failedMediaIds.length > 0) {
+    // Reported rather than swallowed: some bytes are still there, and the
+    // owner asked for them to be gone. Whatever did release stays released
+    // (the rows are already updated), so a retry picks up only the rest.
+    throw new ApiError(
+      'internal_error',
+      `Could not release ${result.failedMediaIds.length} enclosure(s) — please try again`,
+      500,
+    );
+  }
+
+  return result;
+}
+
 export async function getMediaViewUrl(db: Database, ownerId: string, mediaId: string): Promise<MediaViewResponse> {
   const { media: row } = await findOwnedMediaByIdOrThrow(db, ownerId, mediaId);
+  if (row.status === 'released') {
+    // A distinct, true statement. Saying "still uploading or processing"
+    // here — which is what the old single branch did — would be a plain
+    // lie about a capsule whose bytes were deliberately reclaimed years
+    // earlier, and would send the owner looking for a fault that isn't one.
+    throw ApiError.mediaReleased();
+  }
   if (row.status !== 'ready' || !row.storageKey) {
     throw ApiError.uploadIncomplete('Media is still uploading or processing');
   }

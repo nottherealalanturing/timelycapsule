@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { use, useState } from 'react';
 import { useCorrectedNow } from '../../../../lib/use-corrected-now';
 import { formatAbsoluteDate, horizonPhrase, resolveUnlockDate } from '../../../../lib/waiting';
-import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
+import { ApiClientError, capsulesApi, collectionsApi, favoritesApi, mediaApi, recipientsApi, tagsApi } from '../../../../lib/api-client';
 import { CustodyTerms } from '../../../../components/capsule/CustodyTerms';
 import { LetterRecord } from '../../../../components/capsule/LetterRecord';
 import { appFrame } from '../../../../components/page-frame';
@@ -61,6 +61,7 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
   const { show } = useToast();
   const [extendOpen, setExtendOpen] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [releaseOpen, setReleaseOpen] = useState(false);
   const [newUnlockAt, setNewUnlockAt] = useState('');
   const [tagsOpen, setTagsOpen] = useState(false);
   const [collectionsOpen, setCollectionsOpen] = useState(false);
@@ -390,6 +391,13 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
           {capsule.state === 'sealed' ? (
             <GraveAction onClick={() => setWithdrawOpen(true)}>Withdraw it</GraveAction>
           ) : null}
+          {/* Only offered when there is something to reclaim. A sealed or
+              opened capsule holding bytes can have them released early; a
+              draft cannot, because the right verb there is to remove the
+              enclosure outright. */}
+          {capsule.sizeBytes > 0 && (capsule.state === 'sealed' || capsule.state === 'unlocked' || capsule.state === 'expired') ? (
+            <GraveAction onClick={() => setReleaseOpen(true)}>Release enclosures</GraveAction>
+          ) : null}
           {capsule.trashedAt ? (
             <GraveAction onClick={() => setPurgeOpen(true)}>Delete forever</GraveAction>
           ) : (
@@ -437,6 +445,26 @@ export default function CapsuleDetailPage({ params }: { params: Promise<{ id: st
             onClick={() => void runAction(() => capsulesApi.withdraw(id), 'Withdrawn').then(() => setWithdrawOpen(false))}
           >
             Withdraw
+          </Button>
+        </div>
+      </Dialog>
+
+      <Dialog open={releaseOpen} onOpenChange={setReleaseOpen} title="Release the enclosures?" width="sm">
+        <div className="flex flex-col gap-4">
+          <p className="text-[length:var(--text-body-s)] text-secondary">
+            The photographs, recordings and files enclosed with this capsule are removed from storage and the
+            space is returned to you. This cannot be undone — we hold no copy and no key.
+          </p>
+          <p className="text-[length:var(--text-body-s)] text-secondary">
+            The letter is kept. So are the dates, who it went to, any replies, and the record of what was
+            enclosed — its name, its size, and your note about it.
+          </p>
+          <Button
+            variant="destructive"
+            fullWidth
+            onClick={() => void runAction(() => mediaApi.release(id), 'Enclosures released').then(() => setReleaseOpen(false))}
+          >
+            Release
           </Button>
         </div>
       </Dialog>

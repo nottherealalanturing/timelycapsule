@@ -85,6 +85,16 @@ export class ApiError extends Error {
     return new ApiError('plan_required', `This feature requires a paid plan: ${feature}`, 403, { feature });
   }
 
+  /**
+   * The enclosure exists and is described honestly, but its bytes were
+   * released from storage. Distinct from `upload_incomplete`, which means
+   * something went wrong — this one means the system did exactly what the
+   * capsule was sealed promising.
+   */
+  static mediaReleased(message = 'This enclosure was released from storage'): ApiError {
+    return new ApiError('media_released', message, 410);
+  }
+
   static uploadIncomplete(message = 'Media is still uploading or processing'): ApiError {
     return new ApiError('upload_incomplete', message, 409);
   }

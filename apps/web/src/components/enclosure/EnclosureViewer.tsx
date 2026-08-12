@@ -11,6 +11,14 @@ export interface ViewableEnclosure {
   caption: string | null;
   originalName: string | null;
   sizeBytes?: number | null;
+  /**
+   * The bytes were reclaimed at the end of this capsule's storage term
+   * (M4). The enclosure stays in the record — it was really here, it really
+   * had this name and this size — and says so, because a letter that
+   * quietly loses a photograph is a letter nobody can trust the rest of.
+   */
+  released?: boolean;
+  releasedAt?: string | null;
 }
 
 /**
@@ -19,6 +27,11 @@ export interface ViewableEnclosure {
  * way — a named step, never a spinner (`07 §XVI`).
  */
 type ViewerStage = 'closed' | 'opening' | 'open' | 'failed';
+
+/** `07 §VIII` rule 4 — a date stated in the record is always literal and absolute. */
+function formatReleaseDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
 
 export interface EnclosureViewerProps {
   enclosure: ViewableEnclosure;
@@ -119,7 +132,20 @@ export function EnclosureViewer({ enclosure, load, allowDownload = true, classNa
         ) : null}
       </div>
 
-      {stage === 'open' && objectUrl ? (
+      {enclosure.released ? (
+        /* No "Open", because there is nothing to open, and offering one
+           would be a button that can only ever fail. The label stays — the
+           name, the size, the sender's note — and the absence is stated
+           where the artifact used to be rather than left as a gap. */
+        <div className="flex flex-col gap-1.5">
+          <span className="text-[length:var(--text-body-s)] text-[var(--color-text-primary)]">{label}</span>
+          <p className="text-[length:var(--text-body-s)] text-[var(--color-text-secondary)]">
+            {enclosure.releasedAt
+              ? `Released from storage on ${formatReleaseDate(enclosure.releasedAt)}.`
+              : 'Released from storage.'}
+          </p>
+        </div>
+      ) : stage === 'open' && objectUrl ? (
         <Rendered enclosure={enclosure} url={objectUrl} label={label} />
       ) : (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
