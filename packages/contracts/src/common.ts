@@ -50,6 +50,8 @@ export const ERROR_CODES = [
   'guest_capsule_limit',
   'guest_capsule_locked',
   'owner_key_wrap_already_set',
+  // M5 — guest media
+  'guest_quota_exceeded',
   // T-17 organization
   'tag_already_exists',
   // T-20 (production bug fix) OAuth-only accounts setting a first password

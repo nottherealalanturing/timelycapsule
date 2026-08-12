@@ -3,8 +3,9 @@ import { eq } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
-import { capsuleRecipients, capsules, guestSessions, scheduledActions } from '../../db/schema/index.js';
-import { generateUniquePublicId } from '../capsules/index.js';
+import { GUEST_MEDIA_RETENTION_AFTER_UNLOCK_MS, GUEST_STORAGE_ALLOWANCE_BYTES } from '../../lib/guest-limits.js';
+import { capsuleRecipients, capsules, guestSessions, mediaItems, scheduledActions } from '../../db/schema/index.js';
+import { buildSealedEntitlementSnapshot, generateUniquePublicId, scheduleMediaRelease, type PlanLimits } from '../capsules/index.js';
 import { generateAccessToken, hashAccessToken } from '../recipients/index.js';
 import { generateGuestToken, hashGuestToken } from './token.js';
 
@@ -13,6 +14,24 @@ type CapsuleRow = typeof capsules.$inferSelect;
 
 const MIN_UNLOCK_MS = 5 * 60 * 1000;
 const MAX_UNLOCK_MS = 365 * 24 * 60 * 60 * 1000; // +1 year (01 §4.1b) — the guest ceiling, well under the owner +50yr bound
+
+/**
+ * The `PlanLimits` shape `buildSealedEntitlementSnapshot` expects, filled in
+ * with Guest's actual terms (`lib/guest-limits.ts`) plus honest values for
+ * the fields a snapshot doesn't read — Guest genuinely has one capsule, one
+ * recipient (the anonymous link-holder row `createGuestCapsule` creates),
+ * and no seals (`capabilities.conditions` is already `false` for Guest in
+ * the composer, so these can never actually be set). Not `PLAN_LIMITS` and
+ * never merged into it — Guest is not a plan.
+ */
+const GUEST_PLAN_LIMITS: PlanLimits = {
+  activeSealedCapsules: 1,
+  storageBytes: GUEST_STORAGE_ALLOWANCE_BYTES,
+  placeOrPassphraseSealsPerCapsule: 0,
+  recipientsPerCapsule: 1,
+  maxFileSizeBytes: GUEST_STORAGE_ALLOWANCE_BYTES,
+  mediaRetentionAfterUnlockMs: GUEST_MEDIA_RETENTION_AFTER_UNLOCK_MS,
+};
 
 export async function createGuestSession(db: Database, ip: string | undefined): Promise<{ guestToken: string }> {
   const guestToken = generateGuestToken();
@@ -127,10 +146,51 @@ export async function sealGuestCapsule(db: Database, sessionId: string, capsuleI
     throw ApiError.unlockInPast('Guest capsules must unlock between 5 minutes and 1 year from now');
   }
 
+  // M5 — the same media-readiness gate `capsules/lifecycle.ts`'s owner
+  // `sealCapsule` has always had. Guest media didn't exist when this
+  // function was first written, so nothing here ever checked it; without
+  // this a guest could seal a capsule with a photo still mid-transfer.
+  const media = await db.select({ status: mediaItems.status }).from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+  if (media.some((m) => m.status !== 'ready')) {
+    throw ApiError.uploadIncomplete();
+  }
+
   const now = new Date();
+
+  // --- M5: the promise this guest capsule is being sealed with -----------
+  //
+  // Guest gets an entitlement snapshot too, and for exactly the reason M4's
+  // own doc comment on a *missing* snapshot gives: absent reads as
+  // *forever*. Without writing one here, every guest-sealed capsule with
+  // media would silently get the most generous retention in the entire
+  // product — the opposite of "Guest is intentionally constrained" — purely
+  // as an accident of which code path sealed it. `hasMedia` gates the same
+  // way the owner path does: nothing to release, nothing to promise.
+  const hasMedia = media.length > 0;
+  const retentionUntil = hasMedia ? new Date(row.unlockAt.getTime() + GUEST_MEDIA_RETENTION_AFTER_UNLOCK_MS) : null;
+
+  if (retentionUntil && retentionUntil.getTime() < row.unlockAt.getTime()) {
+    throw ApiError.validationFailed({ retentionUntil: 'Media retention cannot end before the capsule opens' });
+  }
+
+  const snapshot = buildSealedEntitlementSnapshot({
+    plan: 'guest',
+    limits: GUEST_PLAN_LIMITS,
+    sealedAt: now,
+    retentionUntil,
+    hasMedia,
+    maxHorizonMs: MAX_UNLOCK_MS,
+  });
+
   const [sealed] = (await db
     .update(capsules)
-    .set({ state: 'sealed', sealedAt: now, updatedAt: now })
+    .set({
+      state: 'sealed',
+      sealedAt: now,
+      updatedAt: now,
+      sealedEntitlementSnapshot: snapshot,
+      mediaRetentionUntil: retentionUntil,
+    })
     .where(eq(capsules.id, capsuleId))
     .returning()) as [CapsuleRow];
 
@@ -143,6 +203,11 @@ export async function sealGuestCapsule(db: Database, sessionId: string, capsuleI
     runAt: row.unlockAt,
     idempotencyKey: `capsule_unlock:${capsuleId}`,
   });
+
+  // Same warning/release schedule M4 gives an authenticated seal — this
+  // guest capsule now carries exactly the same retention machinery, not a
+  // second implementation of it.
+  await scheduleMediaRelease(db, capsuleId, retentionUntil, now);
 
   await audit(db, { actorType: 'guest', actorId: sessionId, action: 'capsule.sealed', subjectType: 'capsule', subjectId: capsuleId });
   return toGuestCapsuleResponse(sealed);

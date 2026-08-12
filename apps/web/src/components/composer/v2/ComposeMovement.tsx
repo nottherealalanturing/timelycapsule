@@ -21,6 +21,8 @@ export interface ComposeMovementProps {
   opensAt: Date | null;
   tz: string;
   recipientLocal?: boolean;
+  /** Passed straight through to `Enclosures` — see its own doc comment. */
+  allowanceHint?: string | null;
   /** Rendered at the end of the document — the way out of this movement. */
   footer?: ReactNode;
   className?: string;
@@ -55,6 +57,7 @@ export function ComposeMovement({
   opensAt,
   tz,
   recipientLocal = false,
+  allowanceHint,
   footer,
   className,
 }: ComposeMovementProps) {
@@ -126,6 +129,7 @@ export function ComposeMovement({
         onRemovePlace={() => writeEnvelope({ writtenAt: null })}
         onCaption={enclosures.onCaption}
         onReorder={enclosures.onReorder}
+        allowanceHint={allowanceHint}
       />
 
       {footer}

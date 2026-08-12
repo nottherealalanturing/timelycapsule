@@ -276,12 +276,31 @@ Each module: **Purpose · Features · States · Validation/Business rules · Per
 
 ### 4.1b Guest Mode (web + mobile — "try before you sign up")
 - **Purpose:** let a visitor experience the core loop (write → seal → deliver) with zero signup friction, then convert. Guests are the bottom rung of the ability ladder: **Guest → Free (signup) → Premium/Family/Business (subscription)** — every step up unlocks more, nothing sealed is ever lost on the way up.
-- **What a guest CAN do:** open/receive capsules via link (unchanged — recipients never needed accounts); create **one** guest capsule: text-only Time-locked note (≤ 5,000 chars, no media), unlock between +5 min and **+1 year**, delivered **by shareable link only** (guest copies the `/c/:token#k=…` link and sends it themselves — could be to their own future self); see a minimal status page for that one capsule (countdown + link recovery from the same device).
-- **What requires signup (Free):** email/SMS delivery + announce/reminder notifications (we have no verified sender identity for a guest), media, more than 1 capsule, dashboard/timeline, recipients management, withdraw/extend, recovery kit, everything else.
+- **What a guest CAN do:** open/receive capsules via link (unchanged — recipients never needed accounts); create **one** guest capsule: a Time-locked note (≤ 5,000 chars) with **basic media (M5): a photograph, video, file or voice recording, up to a 5 MB total storage allowance**, unlock between +5 min and **+1 year**, delivered **by shareable link only** (guest copies the `/c/:token#k=…` link and sends it themselves — could be to their own future self); see a minimal status page for that one capsule (countdown, its enclosures, and link recovery from the same device).
+- **What requires signup (Free):** email/SMS delivery + announce/reminder notifications (we have no verified sender identity for a guest), more than 1 capsule and 100 MB of storage, **Place Memory entirely** (M5 — not partially: no *where this was written* control at all for Guest, not even a coordinates-only version, since the reverse-geocoding lookup that makes the feature legible has no anonymous equivalent and none is planned), dashboard/timeline, recipients management, withdraw/extend, recovery kit, everything else.
 - **Identity:** server issues an anonymous **guest session** (opaque token, stored hashed; persisted device-locally). Zero-access E2E applies identically — capsule key is generated client-side and travels only in the link fragment; the server holds ciphertext + envelope. No password → no recovery: lose the link, lose the capsule (stated plainly at seal time).
-- **Conversion & claim:** signup (any method) with the guest token present **claims** the guest capsule into the new account (same spirit as recipient ghost-claim). Conversion prompts are contextual, never blocking: after the seal ceremony ("Create a free account to keep track of this capsule + get email delivery"), on the status page, and on any limit hit (guest paywall = signup sheet, not payment sheet).
-- **Abuse guardrails:** 1 active sealed + 1 draft per guest session; per-IP velocity limits on guest session + seal creation; guest capsules excluded from any public surface; standard report/withdraw handling applies.
+- **Conversion & claim:** signup (any method) with the guest token present **claims** the guest capsule into the new account (same spirit as recipient ghost-claim). Conversion prompts are contextual, never blocking: after the seal ceremony ("Create a free account to keep track of this capsule + get email delivery"), on the status page, and on any limit hit — **including the 5 MB guest storage limit** — where the message is always framed as capability gained ("Create a free account to increase storage to 100 MB"), never as a wall (guest paywall = signup sheet, not payment sheet). **Claim transfers ownership only** (M5): a capsule already sealed under the 5 MB guest allowance keeps exactly that entitlement afterward — it is never upgraded to the claiming account's Free terms just because an account now exists behind it. The account's own Free entitlement governs its own future capsules, never one already sealed. Matches the same rule M4 already enforces for a plan downgrade after sealing.
+- **Abuse guardrails:** 1 active sealed + 1 draft per guest session; **5 MB storage allowance per guest session (M5)**; per-IP velocity limits on guest session + seal creation; guest capsules excluded from any public surface; standard report/withdraw handling applies.
 - **Delivery promise unchanged:** once sealed, a guest capsule delivers on schedule regardless of whether the guest ever signs up (hard rule 5 applies to guests too).
+
+**Capability matrix (M5), stated explicitly rather than left to infer from prose:**
+
+| Capability | Guest | Free | Premium+ |
+|---|---|---|---|
+| Capsules | 1 | 5 active sealed | Unlimited |
+| Storage | 5 MB | 100 MB | Storage packs (sizes TBD) |
+| Basic media (photo/video/file/voice) | ✓ | ✓ | ✓ |
+| Media retention after unlock | 1 yr | 1 yr | Forever |
+| Place Memory (attach where written) | — | ✓ | ✓ |
+| Reverse-geocoding / place-name lookup | — | ✓ | ✓ |
+| Named recipients / email delivery | — | ✓ | ✓ |
+| Conditions (Place/Passphrase/Identity seals, expiry) | — | ✓ | ✓ |
+| Dashboard / history / collections | — | ✓ | ✓ |
+| Export | — | ✓ | ✓ |
+| Recovery kit | — | ✓ | ✓ |
+| Max horizon | 1 yr | 50 yr | 50 yr |
+
+Every "—" is a capability gained by signing up, never a control shown disabled in the guest composer — `02 §16`/`07`'s standing rule that an unavailable capability is *omitted*, not advertised as locked.
 
 ### 4.2 Profiles
 - **Purpose:** Light identity presentation (this is not a social network).
@@ -316,8 +335,8 @@ All types are the same entity with a `type` preset that pre-configures schedulin
 ### 4.6 Media & Files
 - **Purpose:** Ingest, store, process, and serve rich content durably for decades.
 - **Features:** Images (JPEG/PNG/HEIC/WebP), video (MP4/MOV → H.264/HEVC ladder), audio/voice (AAC/M4A/MP3, in-app recorder with waveform), documents (PDF, docx/xlsx/pptx with preview render, ZIP as opaque attachment), links (unfurled preview card), location pin (lat/lng + name, rendered map snapshot), text/markdown blocks. Per-item captions. Ordering. Client-side compression choices, background/resumable uploads (tus-style via S3 multipart), thumbnail + preview generation, EXIF stripping (privacy default; capture-date preserved into metadata field).
-- **Limits:** Free: 100 MB/account, 25 MB/file, 1 min video. Premium: 100 GB/account, 5 GB/file, 30 min 4K video. Business: 1 TB pooled.
-- **Media retention (M4):** enclosed files are kept for **1 year after the capsule opens** on Free, and **forever** on paid tiers. When the term ends the encrypted media is *released* — the bytes are reclaimed from storage while the capsule, letter, metadata, history, replies and the enclosure record (name, size, caption) are kept permanently. Releasing is never silent: the record says what was enclosed and when it went. The term is captured in the capsule's **sealed entitlement snapshot** at seal time and is a property of that capsule thereafter — changing, downgrading or cancelling a plan later cannot shorten it, and a capsule sealed before this system existed is kept forever. Distinct from **Archive**, which is the owner's reversible shelf and touches no storage.
+- **Limits:** Guest: 5 MB/session (M5). Free: 100 MB/account, 25 MB/file, 1 min video. Premium: 100 GB/account, 5 GB/file, 30 min 4K video. Business: 1 TB pooled.
+- **Media retention (M4):** enclosed files are kept for **1 year after the capsule opens** on Free, and **forever** on paid tiers. When the term ends the encrypted media is *released* — the bytes are reclaimed from storage while the capsule, letter, metadata, history, replies and the enclosure record (name, size, caption) are kept permanently. Releasing is never silent: the record says what was enclosed and when it went. The term is captured in the capsule's **sealed entitlement snapshot** at seal time and is a property of that capsule thereafter — changing, downgrading or cancelling a plan later cannot shorten it, and a capsule sealed before this system existed is kept forever. Distinct from **Archive**, which is the owner's reversible shelf and touches no storage. **Guest media retention is 1 year after the capsule opens (M5)** — the same term as Free, and an explicit `sealedEntitlementSnapshot` written at guest-seal time specifically so a guest capsule is never accidentally treated as *forever* (M4's rule for a genuinely absent snapshot), which would have made Guest the most generous tier rather than the most constrained.
 - **Validation (E2E-adjusted, 06 §A):** size/duration caps enforced at presign by plan; content-level checks (type validation, decompression-bomb guard, EXIF strip) run client-side pre-encryption; server serves user files attachment-only from an isolated origin in lieu of server-side AV.
 - **States (media item):** `uploading → processing → ready | failed`, and `ready → released` once the retention term ends (M4). A capsule cannot seal until all media `ready`. A released item keeps its row and its metadata; only the stored bytes are gone.
 
@@ -371,7 +390,7 @@ Full design in `03-ARCHITECTURE.md §Notification System`. Product surface: per-
 
 ### Plans
 
-> Below Free sits **Guest** (no account, §4.1b): 1 text-only capsule, link-only delivery, +1 yr max horizon, no storage/media, no dashboard. Signup is the first "upgrade"; subscription is the second. The ladder is Guest → Free → Premium/Family/Business, and moving up never loses or re-locks anything already sealed.
+> Below Free sits **Guest** (no account, §4.1b): 1 capsule, **5 MB storage/media (M5)**, link-only delivery, +1 yr max horizon, no dashboard. Signup is the first "upgrade"; subscription is the second. The ladder is Guest → Free → Premium/Family/Business, and moving up never loses or re-locks anything already sealed. Guest storage is a real capability, not a monetization tier of its own — no payment collection exists at this rung; **storage and media retention are the intended primary paid lever** from Free upward, detailed in §20 and M4's sealed-entitlement model.
 
 | | **Free** | **Premium** $7.99/mo · $59.99/yr | **Family** $12.99/mo · $99.99/yr (6 seats) | **Business** $10/seat/mo (min 5) | **Enterprise** custom |
 |---|---|---|---|---|---|

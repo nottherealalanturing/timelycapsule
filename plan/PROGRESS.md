@@ -8,13 +8,14 @@
 
 ### Where the work actually is (verified against git, 2026-08-12)
 
-- **Merged to `origin/main`:** everything through `15de991` ("Add places lookup and UX polish", 2026-08-10), via PRs #28–#40. That includes the full Meridian V2 rebuild, T-21/T-22, **Capsule Creation V2**, **Dashboard V2 (M0–M4)**, the cold-walkthrough fixes, and the Product Quality Pass.
-- **On the working branch `guest-composer-orientation` only — not pushed, not merged, no PR:** the five commits of the Enclosures/Media/Replies initiative (`ae524bb`, `9b68a71`, `787656e`, `9e68221`, `4cc648c`), covering M0–M3, **plus uncommitted M4 working-tree changes** (storage lifecycle — complete and fully verified, not yet committed).
-- **⚠️ Local `main` is stale** at `4e502cf` (PR #27) — it has never been pulled. `origin/main` is the real trunk. A `git log main..HEAD` run without fetching will wildly overstate what is unmerged; measure against `origin/main`.
+- **Merged to `origin/main`:** everything through PR #41 (`3aa664c`, merge of `m4-storage-lifecycle`). That includes the full Meridian V2 rebuild, T-21/T-22, **Capsule Creation V2**, **Dashboard V2 (M0–M4)**, the cold-walkthrough fixes, the Product Quality Pass, and the **entire Enclosures/Media/Replies initiative M0–M4** (Seal expiry validation, Unified enclosure lifecycle, Unified media viewer, Encrypted replies, Storage lifecycle). Nothing from this initiative is unmerged as of this line.
+- Local `main` is current with `origin/main` (pulled after the M4 merge).
 
 ### What is next
 
-**M5 — Guest capability**, of the Enclosures/Media/Replies initiative documented in its own section below. **M4 (Storage lifecycle) is complete** as of 2026-08-12 — see its section for what shipped and what was verified against real R2 rather than mocks. M5 remains blocked on the `01-PRODUCT.md` guest-media contradiction recorded there.
+**M5 — Guest capability is implemented** (2026-08-12) — the last milestone of the Enclosures/Media/Replies initiative, documented in full in its own section below. All three decisions the spec pass flagged (guest→account claim preserves the sealed promise unchanged; guest media retention is 1 year after unlock, using M4's own snapshot/release machinery rather than a second system; Place Memory stays account-only, no anonymous geocoding) were approved and built exactly as specified, plus the real architecture gap (guest capsule + key now created lazily on first enclosure, not only at seal). **Not yet committed** — sitting as local changes pending the founder's review, same as M4 was at this point in its own pass.
+
+Next after M5 lands: **Stage E — Mobile app (T-23 → T-29)**, still gated on the human-setup checklist further down, and the Premium storage-packs-vs-single-100GB-tier documentation drift flagged (not resolved) during M4's own doc pass.
 
 **T-23 (Mobile shell) is no longer the live "next ticket."** It was the correct pointer when written, before Dashboard V2 and this initiative existed; it has been superseded *for the current workstream*, not cancelled. Stage E (T-23 → T-29) remains real, unstarted, and its human-setup checklist still applies whenever web work pauses. The old pointer is preserved in the line further down rather than deleted.
 
@@ -70,7 +71,7 @@
 
 **Standing process for this initiative:** one milestone at a time; stop after each for review; report what changed, what was reused, backend changes, architectural implications, and verification performed. Do not start the next milestone without approval.
 
-**Status of the branch carrying M0–M3:** `guest-composer-orientation`, five commits, **unpushed and unmerged**. See "Where the work actually is" above.
+**Status.** M0–M4 merged to `origin/main` (PRs through #41). M5 is implemented and locally verified, not yet committed — see "Where the work actually is" above and M5's own section below for the full account. **The initiative is complete, M0–M5, pending M5's commit.**
 
 ---
 
@@ -178,28 +179,50 @@ Pre-existing drift left alone as already recorded: Premium's flat 100 GB vs. fut
 
 **Open items.** None blocking. Two notes for later: no reconciliation sweep exists for an object orphaned by a DB-write failure after a successful delete (the bucket's existing lifecycle rule is the backstop, and the R2-first ordering makes it very unlikely); and `processing` remains a dead `media_status` member, deprecated in place rather than removed — dropping a PG enum member means recreating the type for no functional gain.
 
-### M5 — Guest capability · 🔜 later
+### M5 — Guest capability · ✅ complete (2026-08-12)
 
-**Purpose.** Give guests real capability — media and place memories — without turning the free tier into a hostage situation.
+**Purpose.** Give guests real capability — media, deliberately narrower than Free — without turning Guest into a miniature account.
 
-#### Agreed requirements
+**The founder's approved decisions, locked before implementation:**
 
-- Storage allowances: **Guest 5 MB, Free 100 MB, Premium per purchased pack**.
-- **Guests should support media** (the founder's words: *"guests SHOULD support media"*).
-- **Place memories enabled** for guests.
-- Upgrade copy stays natural — *"Create a free account to increase storage to 100 MB."* **No aggressive upsell.**
+1. **Claim preserves the sealed promise, unchanged.** A guest capsule already sealed under Guest's 5 MB/1-year terms keeps exactly those terms after claim — never upgraded to Free's 100 MB/1yr just because an account now exists behind it. The account's Free entitlement governs only its own future activity.
+2. **Guest media retention is 1 year after unlock**, using M4's existing snapshot/release architecture verbatim — no second retention system.
+3. **Place Memory is account-only.** No anonymous geocoding, ever — the capability system (not a scattered `isGuest` check) is what keeps it off Guest.
 
-#### 🧑 CONTRADICTION TO RECONCILE BEFORE M5
+#### What was built
 
-`plan/01-PRODUCT.md:373` currently states that Guest has **"no storage/media"**, and `§20`'s plans table reflects the same. The later product direction says guests **should** have media with a 5 MB allowance. These are in direct conflict.
+- **The real architecture gap diagnosed in the spec pass — fixed.** The guest capsule row used to exist only from the instant "Seal capsule" was pressed (`createCapsule → patchCapsule → sealCapsule`, one synchronous burst), so there was no `capsuleId` and no capsule key to enclose anything against during Compose. `use-guest-draft.ts` now creates both lazily, on whichever comes first — the first enclosure or the final seal — via `ensureMediaCapsule()`, cached in the same session-storage draft blob so a reload never mints a second capsule (guest sessions are capped at one) and `seal()` reuses the same id/key rather than generating a fresh pair.
+- **`media_items.uploader_id` made nullable** (migration, additive) — a guest has no user row to attribute an upload to; mirrors `capsules.owner_id`'s existing guest-nullable pattern exactly.
+- **`GUEST_STORAGE_ALLOWANCE_BYTES` (5 MB) lives in `@tc/contracts`**, imported by both the API's enforcement (`lib/guest-limits.ts`) and the web app's "5 MB guest allowance" display text — one number, not two that could drift. Deliberately *not* folded into `PLAN_LIMITS`/`entitlements` — Guest has no `entitlements` row and is not a billing plan.
+- **`modules/media/guest-service.ts`** — the full ticket/complete/patch/delete/list/view pipeline, scoped to `guestSessionId` instead of `ownerId`, living inside the `media` module so it can reuse `mimeToKind`/`buildStorageKey`/`adjustCapsuleSizeBytes`/`getStorageAdapter` directly (same-module imports, `buildStorageKey`/`adjustCapsuleSizeBytes` newly exported from `service.ts` for exactly this reuse) rather than a second implementation. `assertCanPatch` needed no change — it was already ownership-agnostic. New guest routes mirror the authenticated ones one-for-one (`/guest/capsules/:id/media/tickets`, `/guest/media/:id/complete`, etc.), all behind `requireGuestSession`.
+- **`sealGuestCapsule`** gained the three things it was missing: a media-readiness check (blocks on any non-`ready` row, same as the owner path), a written `sealedEntitlementSnapshot` (`planAtSeal: 'guest'`, closing the accidental-forever loophole a missing snapshot would otherwise open — M4's own rule for *absent* reads as *forever*, which is backwards for the tier meant to be most constrained), and the same 30d/7d-warning-plus-release scheduling M4 gives an authenticated seal (`scheduleMediaRelease`, exported from the capsules module for this).
+- **`claimGuestSession` needed zero changes** — it already only reassigns `ownerId`, which is exactly decision #1. A new test (`guest-media.test.ts`) makes that a guarantee rather than an accident: seals a guest capsule with real media, captures the snapshot and retention date, claims it via a real signup, and asserts both are byte-for-byte/ISO-identical afterward, plus that `planAtSeal`/`storageAllowanceBytes` still read `'guest'`/5 MB, not Free's.
+- **`Enclosures.tsx`** gained one optional prop, `allowanceHint`, rendered only when passed — `undefined` for the authenticated composer (zero visual change there), a live "5 MB guest allowance" / "X.X MB of 5 MB used" / "You're near your 5 MB guest allowance. A free account gives you 100 MB." for Guest, computed in `try/page.tsx` from real enclosure sizes. No `isGuest` branch inside the shared component.
+- **The guest status page (`try/capsule/[id]`)** gained a real `EnclosureViewer` list (same museum-label component the owner and recipient surfaces use, decrypting via the cached capsule key) and a copy fix — "get five capsules, media, and email delivery" was stale the moment Guest got media; now "…100 MB of storage, and email delivery."
+- **Place Memory required no code change at all**, confirmed by reading rather than assumed: `GUEST_CAPABILITIES.placeMemory` was already `false`, and `ComposeMovement.tsx`/`Enclosures.tsx` already omit the "Where this was written" control entirely whenever it is — no dead button ever existed to remove. Left `false`, with a comment explaining why, so a future session doesn't "helpfully" flip it.
 
-**Not resolved here, and not silently interpreted either way.** `01-PRODUCT.md` is the older written spec; the guest-media direction is the newer verbal one. Which governs is a founder call, and whichever wins, `01-PRODUCT.md` needs editing so the written record stops contradicting the build.
+#### Verification
 
-**Status.** Not started. No code written.
+**API (fake adapter):** real ticket→complete→ready flow; quota rejection at exactly 5 MB with proof no ticket row is left behind; cross-guest-session isolation (view/patch/delete/list all 404 across sessions); a guest bearer token rejected by `/places/reverse-geocode` with the same 401 a no-token request gets; seal blocked while an enclosure is mid-transfer; snapshot + 1-year retention + 2 scheduled warnings + 1 scheduled release, all asserted directly against the DB; release exercised through the unmodified M4 `releaseCapsuleMedia` service; an unclaimed guest capsule still unlocking on schedule with media attached; and the claim-preservation test. **271/271 API tests** (37 files, +10 new).
+
+**Real browser, real R2 — not simulated.** The local dev API runs with real R2 credentials (`NODE_ENV=development`, not `test`), so the full walkthrough below exercised the genuine `R2StorageAdapter` throughout, not the fake one: fresh guest session → chose a moment → wrote a letter → enclosed a real PNG (client-side AES-GCM encrypt → real presigned multipart PUT → real complete) → the file appeared correctly, immediately, with no reload → sealed → DB confirmed `planAtSeal:'guest'`, `storageAllowanceBytes:5242880`, `mediaRetentionUntil` exactly one year past `unlockAt`, and the 2 warnings + 1 release scheduled at the right instants → guest status page rendered the enclosure and **decrypted and displayed it correctly** via the real signed-GET path → a follow-up script called the unmodified M4 `releaseCapsuleMedia` directly against that real object and confirmed via `headObject` that it existed before and was **genuinely gone from R2** after. 390px: zero horizontal overflow across Address/Compose/Seal/handoff/status pages. Authenticated composer re-checked afterward and confirmed unaffected (identical hint text, byte-for-byte).
+
+**Three real bugs found by actually using it, not by reasoning about the code — all fixed before this milestone was called done:**
+1. **The first enclosure a guest ever attaches would silently vanish.** `useGuestEnclosures`'s `refresh()` closed over the hook's `queryKey` at the time `enclose()` was *defined* — for a first-ever enclosure that's before `ensureMediaCapsule()` has created anything, so the closure was permanently bound to `['guest-media', null]`. The upload genuinely succeeded (confirmed in the network log), but invalidating that stale key never refetched the query now keyed on the real capsule id, so the item never appeared until something else happened to trigger a fresh fetch (e.g. a reload). Fixed by having `refresh()` take the resolved capsule id explicitly rather than trusting its own closure.
+2. **The "Optional — a photo, a voice note, or where you wrote this" hint was hardcoded** — safe for every entry point before M5, since `enclosures` and `placeMemory` had always been either both on or both off together. Guest is the first to have one without the other, and the fixed string would have promised a place-memory control that was never there. Now built from `capabilities` at render time.
+3. **"0.0 MB of 5 MB used"** — a hand-rolled MB-only formatter on a 717-byte test file. Replaced with the same `formatBytes` (B/KB/MB) every enclosure row already uses.
+
+Typecheck clean on both apps, lint clean across all 8 packages (re-run with the turbo cache forced off), production build succeeds from a clean `.next`, full 271/271 API suite re-run clean after the fixes above.
+
+#### Open items
+
+None blocking. Two non-decisions carried forward from the spec pass, unchanged and still correctly out of scope for M5: Premium's storage-pack sizing (still undecided, not invented), and the reverse-geocode-for-guests question (left authenticated-only per decision #3 — not a partial implementation, a deliberate "no").
 
 ### Pricing architecture (context for M4/M5 — no billing implementation in either)
 
-Recorded because M4's snapshot and M5's allowances both depend on it: Guest = 5 MB / 1 capsule / 1 recipient / 1 yr horizon. Free = 100 MB / 5 capsules / 3 recipients / 10 yr / replies / exports. Premium = **storage packs** (10/50/100/500 GB) rather than one fixed tier, plus unlimited recipients and capsules, 50 yr horizon, media never archived, trustees/legacy. Note this **differs from `plan/01-PRODUCT.md §20`'s single-tier Premium (100 GB)** — same class of written-vs-verbal drift as the guest-media contradiction, and worth reconciling in the same pass.
+Recorded because M4's snapshot and M5's allowances both depend on it: Guest = 5 MB / 1 capsule / 1 recipient / 1 yr horizon. Free = 100 MB / 5 capsules / 3 recipients / 10 yr / replies / exports. Premium = **storage packs** (10/50/100/500 GB) rather than one fixed tier, plus unlimited recipients and capsules, 50 yr horizon, media never archived, trustees/legacy. Note this **differs from `plan/01-PRODUCT.md §20`'s single-tier Premium (100 GB)** — same class of written-vs-verbal drift as the guest-media contradiction was.
+
+**Guest half reconciled 2026-08-12** (`01-PRODUCT.md §4.1b`/`§20` now state the 5 MB guest allowance — see the M5 section above). **The Premium storage-packs-vs-single-100GB-tier drift is explicitly left open** — this session was scoped to the guest contradiction only, and the founder's instruction was not to invent final storage-pack sizes or premium prices. Still needs its own reconciliation pass before Premium-tier work.
 
 ### Cross-cutting instructions for the whole initiative
 

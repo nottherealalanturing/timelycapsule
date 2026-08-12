@@ -12,6 +12,17 @@ import { CoverSchema } from './capsules';
 export const GuestSessionResponseSchema = z.object({ guestToken: z.string() });
 export type GuestSessionResponse = z.infer<typeof GuestSessionResponseSchema>;
 
+/**
+ * M5 — the total storage one guest session may use. Lives here, not in
+ * `apps/api`'s own `lib/guest-limits.ts` or duplicated as a client-side
+ * magic number, because both the server (enforcement) and the web app
+ * (the "5 MB guest allowance" display text) need the identical figure and
+ * this is the one package both already depend on. `apps/api`'s
+ * `GUEST_MEDIA_RETENTION_AFTER_UNLOCK_MS` stays API-only — nothing on the
+ * client needs to display the retention term itself.
+ */
+export const GUEST_STORAGE_ALLOWANCE_BYTES = 5 * 1024 * 1024;
+
 export const CreateGuestCapsuleRequestSchema = z.object({
   title: z.string().max(120).optional(),
   cover: CoverSchema.optional(),

@@ -1,16 +1,19 @@
 'use client';
 
 import { Button, DualClock, Hallmark, MeridianApproach, useToast } from '@tc/ui-web';
-import type { GuestCapsuleResponse, ReplyThread } from '@tc/contracts';
+import type { GuestCapsuleResponse, MediaItem, ReplyThread } from '@tc/contracts';
 import { fromBase64Url } from '@tc/crypto';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { guestApi } from '../../../../lib/api-client';
+import { decryptEnclosure } from '../../../../lib/enclosure-media';
 import { useCorrectedNow } from '../../../../lib/use-corrected-now';
 import { formatAbsoluteDate, horizonPhrase } from '../../../../lib/waiting';
 import { getGuestCapsule, getGuestToken } from '../../../../lib/guest-store';
 import { Correspondence } from '../../../../components/reply/Correspondence';
+import { EnclosureViewer } from '../../../../components/enclosure/EnclosureViewer';
 
 /** The guest's view of their own wait — the same reading the owner gets, minus the account. */
 function GuestWait({
@@ -71,6 +74,15 @@ export default function GuestCapsuleStatusPage() {
   // section that needed the key.
   const capsuleKey = cache && cache.capsuleId === params.id ? fromBase64Url(cache.capsuleKeyB64) : null;
   const shareUrl = cache && cache.capsuleId === params.id ? `${typeof window !== 'undefined' ? window.location.origin : ''}/c/${cache.recipientToken}#k=${cache.capsuleKeyB64}` : null;
+
+  // M5 — whatever was enclosed, read the same way the owner's own capsule
+  // page reads it: nothing decrypts until asked, via the same
+  // `EnclosureViewer` both surfaces already share.
+  const { data: media = [] } = useQuery({
+    queryKey: ['guest-media', params.id],
+    queryFn: async () => (await guestApi.media.list(guestToken!, params.id)).data,
+    enabled: Boolean(guestToken),
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -149,6 +161,33 @@ export default function GuestCapsuleStatusPage() {
       )}
 
       {/*
+        Whatever was enclosed (M5) — the same viewer the owner's capsule
+        page and the recipient's reveal both use. Nothing opens itself;
+        a released enclosure states its own absence, same as everywhere
+        else this component appears.
+      */}
+      {media.length > 0 && capsuleKey ? (
+        <div className="flex w-full flex-col gap-3 text-left">
+          {media.map((item: MediaItem) => (
+            <EnclosureViewer
+              key={item.id}
+              enclosure={{ ...item, released: item.status === 'released', releasedAt: item.releasedAt }}
+              // Guest capsules are always created with `allowDownload: true`
+              // (`createGuestCapsule`) — there's no guest-facing toggle for
+              // it, so this mirrors the one value it can ever actually be
+              // rather than reading a field the guest contract doesn't have.
+              allowDownload
+              load={async () => {
+                if (!guestToken) throw new Error('Guest session is not ready yet');
+                const { url } = await guestApi.media.view(guestToken, item.id);
+                return decryptEnclosure(url, capsuleKey);
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
+
+      {/*
         Anything written back, readable here.
 
         A guest can send a capsule, so a guest can be replied to — and without
@@ -172,7 +211,10 @@ export default function GuestCapsuleStatusPage() {
       ) : null}
 
       <div className="w-full border-t border-[var(--color-rule)] pt-6">
-        <p className="mb-3 text-sm text-secondary">Keep it safe with a free account — get five capsules, media, and email delivery.</p>
+        {/* "…and media" was stale the moment M5 gave Guest media too — the
+            real difference an account adds is room and reach, not a
+            capability Guest already has. */}
+        <p className="mb-3 text-sm text-secondary">Keep it safe with a free account — get five capsules, 100 MB of storage, and email delivery.</p>
         <Link href={`/signup?guestToken=${encodeURIComponent(guestToken ?? '')}`}>
           <Button size="lg">Sign up free</Button>
         </Link>

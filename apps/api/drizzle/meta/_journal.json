@@ -99,6 +99,13 @@
       "when": 1786514537524,
       "tag": "0013_quiet_bug",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1786543657487,
+      "tag": "0014_curly_scarlet_witch",
+      "breakpoints": true
     }
   ]
 }

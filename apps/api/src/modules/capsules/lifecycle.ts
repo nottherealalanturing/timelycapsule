@@ -116,7 +116,7 @@ async function scheduleReminders(db: Database, capsuleId: string, unlockAt: Date
  * A warning whose moment has already passed is simply not scheduled, rather
  * than firing immediately and telling someone their media goes in −3 days.
  */
-async function scheduleMediaRelease(db: Database, capsuleId: string, retentionUntil: Date | null, now: Date): Promise<void> {
+export async function scheduleMediaRelease(db: Database, capsuleId: string, retentionUntil: Date | null, now: Date): Promise<void> {
   if (!retentionUntil) return;
   const at = retentionUntil.getTime();
 
