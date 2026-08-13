@@ -324,10 +324,16 @@ export default function RevealPage() {
   useEffect(() => {
     if (state !== 'unlocked' || data?.status !== 'unlocked' || !data.contentDocEnc) return;
     if (data.requireIdentityVerification && !data.identityVerified) return;
+    // The completed-reading signal for `expiry_strict` capsules — fired the
+    // instant decryption actually succeeds, not on page load and not on the
+    // transit ceremony finishing (`07 §V.7`: the document is never gated by
+    // the animation). A no-op server-side for every other capsule.
+    function onDecrypted(doc: unknown) {
+      setDecryptedDoc(doc);
+      void revealApi.confirmRead(token);
+    }
     if (capsuleKey) {
-      void decryptContentDoc(data.contentDocEnc, capsuleKey)
-        .then(setDecryptedDoc)
-        .catch(() => setDecryptFailed(true));
+      void decryptContentDoc(data.contentDocEnc, capsuleKey).then(onDecrypted).catch(() => setDecryptFailed(true));
       return;
     }
     if (data.passphraseSeal) return; // waiting on PassphraseGate to unwrap
@@ -335,12 +341,10 @@ export default function RevealPage() {
     if (!fragmentKey) return;
     const timer = setTimeout(() => {
       setCapsuleKey(fragmentKey);
-      void decryptContentDoc(data.contentDocEnc!, fragmentKey)
-        .then(setDecryptedDoc)
-        .catch(() => setDecryptFailed(true));
+      void decryptContentDoc(data.contentDocEnc!, fragmentKey).then(onDecrypted).catch(() => setDecryptFailed(true));
     }, 0);
     return () => clearTimeout(timer);
-  }, [state, data, capsuleKey]);
+  }, [state, data, capsuleKey, token]);
 
   if (state === 'loading') {
     return (

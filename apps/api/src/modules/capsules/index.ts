@@ -1,6 +1,13 @@
 export { capsulesRouter } from './routes.js';
 export { findOwnedCapsuleOrThrow } from './service.js';
-export { purgeCapsuleNow, withdrawCapsule, cancelPendingMediaRelease, scheduleMediaRelease } from './lifecycle.js';
+export {
+  purgeCapsuleNow,
+  withdrawCapsule,
+  cancelPendingMediaRelease,
+  scheduleMediaRelease,
+  expireCapsule,
+  scheduleCapsuleExpiry,
+} from './lifecycle.js';
 export { generateUniquePublicId } from './public-id.js';
 export { assertCanPatch, assertCanReleaseMedia } from './state-machine.js';
 export {

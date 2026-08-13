@@ -479,6 +479,15 @@ export const revealApi = {
   remind: (token: string, enabled: boolean) =>
     request(`/r/${token}/remind`, z.void(), { method: 'POST', body: RemindRequestSchema.parse({ enabled }) }),
 
+  /**
+   * The completed-reading signal for `expiry_strict` capsules — call once,
+   * right after the letter has actually been decrypted client-side (not on
+   * page load, not on ceremony completion). A no-op server-side for every
+   * non-strict capsule, so calling it unconditionally on every successful
+   * decrypt is safe and correct.
+   */
+  confirmRead: (token: string) => request(`/r/${token}/confirm-read`, z.void(), { method: 'POST', body: {} }),
+
   listReplies: (token: string) => request(`/r/${token}/replies`, ReplyListResponseSchema),
 
   reply: (token: string, bodyEnc: string) =>

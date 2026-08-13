@@ -12,6 +12,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
 import {
+  confirmRead,
   getReveal,
   inferTimezone,
   placeCheck,
@@ -78,6 +79,20 @@ export function revealRouter(db: Database): Router {
       next(err);
     }
   });
+
+  router.post(
+    '/r/:token/confirm-read',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 20, keyFn: (r) => String(r.params.token) }),
+    validate({ params: TokenParamsSchema }),
+    async (req, res, next) => {
+      try {
+        await confirmRead(db, req.params.token as string);
+        res.status(204).end();
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   router.post('/r/:token/remind', validate({ params: TokenParamsSchema, body: RemindRequestSchema }), async (req, res, next) => {
     try {

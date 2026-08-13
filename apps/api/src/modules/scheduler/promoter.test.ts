@@ -70,7 +70,10 @@ describe('promoter (T-13)', () => {
     const clock = new VirtualClock(new Date('2026-01-01T00:00:00Z'));
     const queue = new FakeQueue();
     const subjectId = randomUUID();
-    const action = await track(await insertScheduledAction(db, { kind: 'capsule_expire', subjectId, runAt: clock.now() }));
+    // `trigger_release` — still genuinely unbuilt (unlike `capsule_expire`,
+    // which this test used until the "one reading only" milestone gave it
+    // a real queue/handler).
+    const action = await track(await insertScheduledAction(db, { kind: 'trigger_release', subjectId, runAt: clock.now() }));
 
     await promoteDueActions(db, asQueue(queue), clock);
 
