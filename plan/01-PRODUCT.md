@@ -311,7 +311,8 @@ Every "—" is a capability gained by signing up, never a control shown disabled
 
 ### 4.3 Capsules (core)
 Fully specified in `03-ARCHITECTURE.md §Capsule System`. Summary of features: create, draft autosave, co-authoring, seal, cover customization, scheduling, recipient management, cancel/withdraw, early-open (self only, opt-in, cooled), duplicate, archive, trash/restore, transfer ownership, export, version history (drafts only), audit log, chained capsules (Phase 2), conditional/legacy release.
-- **Capsule lifecycle states:** `draft → sealed → unlocked → opened` (+ `withdrawn`, `trashed`, `archived` side-states). Sealed content is immutable — this is the trust cornerstone.
+- **Capsule lifecycle states:** `draft → sealed → unlocked → opened` (+ `withdrawn`, `trashed`, `archived` side-states, and terminal `expired`). Sealed content is immutable — this is the trust cornerstone.
+- **`expired`** — the destructive outcome of a capsule sealed **"one reading only"** (Conditions → After it is opened). The instant the recipient's device confirms it has actually decrypted the letter (not merely that the reveal link was opened — a forwarded or truncated link must never destroy a capsule nobody read), the letter, its enclosures and its replies are irreversibly deleted; the capsule row survives only as a tombstone (title/cover/dates, `expiredAt`) so the recipient's own link keeps resolving to an honest "this capsule has expired" page rather than a masked 404. Neither the recipient nor the owner can recover the content afterward — there is no grace window, unlike `trashed`'s 30-day undo. Distinct from M4 media release, which reclaims bytes while keeping the record, metadata and replies intact.
 - **Key rule (per 06 §A):** *Sealed means sealed — not even we can open it.* ALL capsule contents are zero-access E2E encrypted client-side by default; servers hold ciphertext plus the plaintext "envelope" (title, cover, dates). Tradeoffs owned openly: recovery kit is mandatory-nagged (lose password + kit = unrecoverable by anyone), previews/search/exports are client-side. One uncompromising promise beats two tiers.
 
 ### 4.4 Capsule Types (product-level presets, one engine underneath)
@@ -402,13 +403,15 @@ Full design in `03-ARCHITECTURE.md §Notification System`. Product surface: per-
 | Legacy & trustees | — | ✓ | ✓ | — | — |
 | Zero-access E2E encryption | ✓ (all plans — trust is never paywalled) | ✓ | ✓ | ✓ | ✓ |
 | Seals: Place / Passphrase | 1 per capsule | Unlimited stacking | Unlimited | ✓ | ✓ |
-| Expiry / ephemeral capsules | — | ✓ | ✓ | ✓ | ✓ |
+| Expiry / ephemeral capsules | ✓ (shipped to all — see note) | ✓ | ✓ | ✓ | ✓ |
 | Family Vault | — | — | ✓ | — | — |
 | Recurring series | 1 | Unlimited | Unlimited | ✓ | ✓ |
 | Themes/covers | Basic | All + seasonal | All | Branded | Branded |
 | Campaigns/CSV/analytics | — | — | — | ✓ | ✓ |
 | SSO / API / SLA | — | — | — | — | ✓ |
 | PDF/ZIP keepsake export | ✓ (watermarked PDF) | ✓ | ✓ | ✓ | ✓ |
+
+> **Expiry tiering — genuinely open, not decided.** This table's "Free: —" was never implemented: `ComposerCapabilities.conditions` (which gates the whole Conditions panel — seals *and* expiry) has always been one uniform flag for every authenticated account, with no Free/Premium distinction anywhere in the composer. The "one reading only" destructive-expiry milestone (post-M5) shipped strict expiry exactly as uniformly available as the seals beside it in this same row, rather than inventing a plan gate with no existing entitlement mechanism to hang it on. Resolving whether expiry should be Premium-exclusive is future monetization-workstream scope (same bucket as the Premium storage-packs-vs-100GB drift already flagged below) — not decided here, not silently guessed.
 
 ### One-time purchases (no subscription required)
 - **Gift Capsule Pass** ($4.99): one premium-sized capsule (2 GB, 30-min video). Perfect for the wedding-guest use case; major top-of-funnel.

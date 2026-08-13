@@ -49,6 +49,25 @@ export function LetterRecord({ capsule }: { capsule: Capsule }) {
 
   // `07 §V.6` — a capsule to yourself keeps its own secret until it opens.
   const withheld = capsule.type === 'self' && capsule.state === 'sealed';
+  // "One reading only" — the record genuinely no longer exists server-side
+  // (`contentDocEnc` is null, enclosures and replies deleted) once this is
+  // true. Checked ahead of the master-key gate below: there is nothing left
+  // to unlock, so asking for a password here would promise a letter this
+  // page can no longer produce.
+  const destroyed = capsule.expiryStrict && capsule.state === 'expired';
+
+  if (destroyed) {
+    return (
+      <RecordBed>
+        <Record as="article">
+          <p className="text-[var(--color-text-secondary)]">
+            Destroyed. This was sealed as one reading only — it was destroyed the moment it was read, and there is
+            no copy anywhere, including here.
+          </p>
+        </Record>
+      </RecordBed>
+    );
+  }
 
   if (withheld) {
     return (

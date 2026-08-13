@@ -53,7 +53,13 @@ export function CustodyTerms({ capsule, addressee }: { capsule: Capsule; address
     terms.push(`${who} must prove who they are.`);
   }
 
-  if (capsule.expiryStrict) {
+  if (capsule.expiryStrict && capsule.state === 'expired') {
+    // The promise below is forward-looking ("is destroyed") and stops being
+    // true the instant it's kept — stated as a past-tense fact instead,
+    // matching this file's own rule, rather than continuing to describe a
+    // future event that has already happened.
+    terms.push('One reading only — the record was destroyed after it was read.');
+  } else if (capsule.expiryStrict) {
     terms.push('One reading only — the record is destroyed once it has been read.');
   } else if (capsule.expiresAfter) {
     terms.push('Kept for a while after opening, then gone.');

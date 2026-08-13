@@ -22,6 +22,8 @@ export const QUEUE_NAMES = [
   // M4 storage lifecycle.
   'media_release_warning',
   'media_release',
+  // Post-M5 correctness — "one reading only" (expiry_strict).
+  'capsule_expire',
 ] as const;
 
 export type QueueName = (typeof QUEUE_NAMES)[number];

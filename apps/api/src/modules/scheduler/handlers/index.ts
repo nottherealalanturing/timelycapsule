@@ -1,6 +1,7 @@
 import type { QueueName } from '../queue.js';
 import { accountPurgeHandler } from './account-purge.js';
 import { breakglassOpenHandler } from './breakglass-open.js';
+import { capsuleExpireHandler } from './capsule-expire.js';
 import { capsuleUnlockHandler } from './capsule-unlock.js';
 import { dataExportHandler } from './data-export.js';
 import { mediaReleaseHandler } from './media-release.js';
@@ -20,6 +21,7 @@ export const HANDLERS: Record<QueueName, ActionHandler> = {
   account_purge: accountPurgeHandler,
   media_release_warning: mediaReleaseWarningHandler,
   media_release: mediaReleaseHandler,
+  capsule_expire: capsuleExpireHandler,
 };
 
 export { runAction } from './dispatch.js';

@@ -22,6 +22,7 @@ import { hashAccessToken } from '../recipients/index.js';
 import { sendOpenedNotice, sendVerifyEmailCode } from '../email/index.js';
 import { writeNotification } from '../notifications/index.js';
 import { getStorageAdapter } from '../media/index.js';
+import { scheduleCapsuleExpiry } from '../capsules/index.js';
 import { issueGateToken, verifyGateToken, type GateSealType } from './gate-token.js';
 
 type CapsuleRow = typeof capsules.$inferSelect;
@@ -243,6 +244,35 @@ export async function getReveal(db: Database, rawToken: string, gates: GateToken
     identityVerified: Boolean(gates.identity && verifyGateToken(gates.identity, recipient.id, 'identity')),
     alreadyOpened,
   };
+}
+
+/**
+ * **The actual "completed reading" signal for `expiry_strict` — deliberately
+ * not `getReveal`'s own `status → 'opened'` flip.**
+ *
+ * That flip fires the instant the API hands back ciphertext-eligible
+ * content, before the client has attempted to decrypt anything — a
+ * forwarded link missing its `#k=` fragment, or a corrupted link, already
+ * reaches that exact branch today (the reveal page's own "Key missing" /
+ * "Key mismatch" states prove it). Wiring destruction to that point would
+ * let a recipient who never read a single word destroy their own capsule by
+ * opening a broken link.
+ *
+ * The client calls this once, right after it has successfully decrypted the
+ * letter — the earliest moment it can truthfully claim the reading happened
+ * — not after the transit ceremony's animation finishes; `07 §V.7`'s own
+ * rule is that the document is never gated by the animation, and neither
+ * should the one thing more consequential than the animation.
+ *
+ * A no-op for every capsule that isn't `expiry_strict`, which is the
+ * overwhelming majority — nothing about this changes for a normal capsule.
+ * Idempotent for one that is: `scheduleCapsuleExpiry`'s insert collides on
+ * its idempotency key, so a retried or duplicated call schedules nothing
+ * further.
+ */
+export async function confirmRead(db: Database, rawToken: string): Promise<void> {
+  const { capsule } = await findRecipientOrThrow(db, rawToken);
+  await scheduleCapsuleExpiry(db, capsule);
 }
 
 export async function requestIdentityCode(db: Database, rawToken: string): Promise<void> {

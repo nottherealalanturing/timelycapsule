@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, ne } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
-import { auditEvents, capsuleRecipients, capsules, entitlements, mediaItems, scheduledActions } from '../../db/schema/index.js';
+import { auditEvents, capsuleRecipients, capsuleReplies, capsules, entitlements, mediaItems, scheduledActions } from '../../db/schema/index.js';
 import { assertWithinActiveCapsuleLimit } from './entitlements.js';
 import { validateSeals } from './seals.js';
 import { getPlanLimits } from './entitlements.js';
@@ -423,6 +423,97 @@ export async function purgeCapsule(db: Database, ownerId: string, capsuleId: str
   assertCanPurge(row);
   await purgeCapsuleNow(db, capsuleId);
   await audit(db, { actorType: 'user', actorId: ownerId, action: 'capsule.purged', subjectType: 'capsule', subjectId: capsuleId });
+}
+
+/**
+ * **"One reading only" — the destructive fulfilment of `expiry_strict`.**
+ *
+ * Deliberately not `releaseCapsuleMedia`/M4's release: that machinery keeps
+ * the record, metadata, history and replies and only reclaims bytes — the
+ * opposite of what "the record is destroyed once they have read it" is
+ * promised to mean. This is closer to `purgeCapsuleNow`, except the capsule
+ * row survives as a tombstone (`state: 'expired'`) rather than being
+ * hard-deleted: `capsule_recipients` rows are left alone on purpose, so a
+ * recipient's own link keeps resolving to the honest "this capsule has
+ * expired" page (`reveal/service.ts` already handles `state === 'expired'`
+ * — see `03-ARCHITECTURE.md`'s "envelope kept for expired page") instead of
+ * a masked 404 that can't tell "never existed" from "was destroyed."
+ *
+ * R2 objects deleted first (M4 discipline) — only once every delete has
+ * succeeded does the DB transaction run, so a crash mid-way never lets the
+ * database claim destruction while ciphertext still sits in the bucket.
+ * The reverse gap (objects gone, DB not yet updated) is the same accepted,
+ * self-healing transient window `purgeCapsuleNow`/`releaseCapsuleMedia`
+ * already have — the scheduled action simply retries, and every step here
+ * is naturally idempotent (an already-gone R2 key deletes as a no-op; the
+ * DB writes converge to the same end state on a repeat run).
+ *
+ * Re-derives its own authority from the row rather than trusting that it
+ * was scheduled for a good reason — mirrors `capsuleUnlockHandler`. Only
+ * ever proceeds from `unlocked`; anything else (already `expired`, or
+ * withdrawn/trashed on its way to `purgeCapsuleNow`) is a no-op.
+ */
+export async function expireCapsule(db: Database, capsuleId: string): Promise<void> {
+  const [row] = (await db.select().from(capsules).where(eq(capsules.id, capsuleId)).limit(1)) as [CapsuleRow?];
+  if (!row) return; // purged since scheduling — nothing to expire.
+  if (row.state !== 'unlocked') return; // already expired, or withdrawn/trashed — idempotent no-op.
+
+  const media = await db.select({ storageKey: mediaItems.storageKey }).from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+  const { getStorageAdapter } = await import('../media/index.js');
+  const adapter = getStorageAdapter();
+  const failed: string[] = [];
+  for (const item of media) {
+    if (!item.storageKey) continue;
+    try {
+      await adapter.deleteObject(item.storageKey);
+    } catch {
+      failed.push(item.storageKey);
+    }
+  }
+  if (failed.length > 0) {
+    // Nothing in the DB has been touched yet — thrown so `runAction` hands
+    // the row back to the promoter for a full, safe retry.
+    throw new Error(`Capsule expiry incomplete for ${capsuleId}: ${failed.length} of ${media.length} object(s) could not be deleted`);
+  }
+
+  const now = new Date();
+  await db.transaction(async (tx) => {
+    await tx.delete(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+    await tx.delete(capsuleReplies).where(eq(capsuleReplies.capsuleId, capsuleId));
+    await tx
+      .update(capsules)
+      .set({ state: 'expired', expiredAt: now, contentDocEnc: null, sizeBytes: 0, updatedAt: now })
+      .where(eq(capsules.id, capsuleId));
+  });
+
+  // No media survives to release, and nothing further should remind anyone
+  // about a capsule that no longer has anything to open.
+  await cancelPendingMediaRelease(db, capsuleId);
+  await cancelPendingReminders(db, capsuleId);
+
+  await audit(db, { actorType: 'system', action: 'capsule.expired', subjectType: 'capsule', subjectId: capsuleId });
+}
+
+/**
+ * The read-triggered entry point (`reveal/service.ts`'s confirm-read call)
+ * — schedules the destructive work above through the ordinary
+ * promoter/dispatch pipeline rather than doing it inline in the recipient's
+ * own request. A no-op for every non-strict capsule (the overwhelming
+ * majority), and idempotent for a strict one: a second confirm-read call
+ * (retry, double-render) collides on the idempotency key and inserts
+ * nothing further.
+ */
+export async function scheduleCapsuleExpiry(db: Database, capsule: CapsuleRow): Promise<void> {
+  if (!capsule.expiryStrict || capsule.state !== 'unlocked') return;
+  await db
+    .insert(scheduledActions)
+    .values({
+      kind: 'capsule_expire',
+      subjectId: capsule.id,
+      runAt: new Date(),
+      idempotencyKey: `capsule_expire:${capsule.id}`,
+    })
+    .onConflictDoNothing({ target: scheduledActions.idempotencyKey });
 }
 
 export async function getCapsuleActivity(db: Database, ownerId: string, capsuleId: string): Promise<CapsuleActivityResponse> {
