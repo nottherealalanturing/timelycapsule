@@ -1,4 +1,4 @@
-import { and, count, eq, inArray, sql } from 'drizzle-orm';
+import { and, count, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
 import { capsuleRecipients, capsules, entitlements } from '../../db/schema/index.js';
 import { ApiError } from '../../lib/errors.js';
@@ -186,4 +186,62 @@ export async function assertWithinStorageQuota(db: Database, userId: string, add
     // only blocked action is adding something new.
     throw ApiError.quotaExceeded(`storage_bytes:${limits.storageBytes}:used:${used}`);
   }
+}
+
+/**
+ * **The one authoritative "actual bytes" quota gate — audit fix, post-M5.**
+ *
+ * `assertWithinStorageQuota` above (and Guest's own equivalent ticket-time
+ * check) is a cheap *pre*-upload UX check against the size the client
+ * *declares*. Nothing previously re-checked the limit against what actually
+ * lands in storage, so a client that under-declared at ticket time could
+ * complete with more real bytes than it claimed and still get counted and
+ * marked ready. This closes that gap for both trust boundaries with one
+ * algorithm, not two: `scope` is a plain capsule-row predicate (every
+ * capsule that counts toward this quota — `owner_id = X` for an account,
+ * `guest_session_id = X` for a guest), so the arithmetic itself never knows
+ * or cares which kind of caller it's serving.
+ *
+ * Locks every row `scope` matches with `FOR UPDATE` (blocking, not
+ * `skipLocked` — we want a concurrent completion for the same owner/guest
+ * to wait, not skip past the row it needs to recheck), sums their real
+ * `size_bytes`, and only if `used + actualBytes` still fits does
+ * `onAccepted` run — in the same transaction as the capsule's own size
+ * increment, so "counted" and "marked ready" move together or not at all.
+ * Rejection just means `onAccepted` never runs: nothing was written, which
+ * is as good as a rollback because nothing happened. This is the same
+ * lock-then-act idiom `scheduler/promoter.ts` already uses for its own
+ * claim race (`FOR UPDATE`, inside `db.transaction`) — reused, not
+ * reinvented.
+ *
+ * `limitBytes` is an already-resolved number — an owner's
+ * `PlanLimits.storageBytes` or Guest's fixed constant from
+ * `lib/guest-limits.ts` — never a plan name; this function has no notion of
+ * what a "plan" is, on purpose (01-INDEX.md's own rule against branching
+ * sealed/live behaviour on a plan label applies here too).
+ */
+export async function commitActualStorageUsage<T>(
+  db: Database,
+  scope: SQL,
+  capsuleId: string,
+  actualBytes: number,
+  limitBytes: number | null,
+  onAccepted: (tx: Database) => Promise<T>,
+): Promise<{ accepted: true; result: T } | { accepted: false; usedBytes: number }> {
+  return db.transaction(async (tx) => {
+    const rows = await tx.select({ sizeBytes: capsules.sizeBytes }).from(capsules).where(scope).for('update');
+    const used = rows.reduce((sum, row) => sum + row.sizeBytes, 0);
+
+    if (limitBytes !== null && used + actualBytes > limitBytes) {
+      return { accepted: false as const, usedBytes: used };
+    }
+
+    await tx
+      .update(capsules)
+      .set({ sizeBytes: sql`greatest(${capsules.sizeBytes} + ${actualBytes}, 0)` })
+      .where(eq(capsules.id, capsuleId));
+
+    const result = await onAccepted(tx as unknown as Database);
+    return { accepted: true as const, result };
+  });
 }

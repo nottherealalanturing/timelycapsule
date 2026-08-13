@@ -17,13 +17,13 @@ const trackedCapsuleIds: string[] = [];
 const trackedSessionIds: string[] = [];
 const trackedUserIds: string[] = [];
 
-async function createGuestSession(): Promise<string> {
-  const res = await request(app).post('/v1/guest/sessions').expect(201);
+async function createGuestSession(appInstance: ReturnType<typeof createApp> = app): Promise<string> {
+  const res = await request(appInstance).post('/v1/guest/sessions').expect(201);
   return res.body.guestToken as string;
 }
 
-async function createDraftCapsule(guestToken: string): Promise<string> {
-  const res = await request(app)
+async function createDraftCapsule(guestToken: string, appInstance: ReturnType<typeof createApp> = app): Promise<string> {
+  const res = await request(appInstance)
     .post('/v1/guest/capsules')
     .set('Authorization', `Bearer ${guestToken}`)
     .send({ title: 'A note to the future' })
@@ -34,24 +34,53 @@ async function createDraftCapsule(guestToken: string): Promise<string> {
 
 /** Real ticket → real (fake-adapter) bytes → real complete, exactly the sequence the browser performs. */
 async function encloseRealFile(guestToken: string, capsuleId: string, sizeBytes: number, name = 'photo.jpg') {
-  const ticket = await request(app)
+  const { mediaId, complete } = await ticketThenComplete(guestToken, capsuleId, { declaredBytes: sizeBytes, actualBytes: sizeBytes, name });
+  expect(complete.status).toBe(200);
+  return { mediaId, media: complete.body.media };
+}
+
+/**
+ * Storage-integrity fix — lets a test declare one size at ticket time and
+ * land a *different* real size in the (fake) bucket before completing, the
+ * exact shape of the under-declare-then-overupload bypass this fix closes.
+ * Returns the raw (un-asserted) `complete` response so a test can check
+ * either outcome, plus the media row's storage key for cleanup checks.
+ *
+ * Takes its own `app` instance (a fresh `createApp(db)` per test in the
+ * storage-integrity describe block below) rather than the module's shared
+ * one — the `/guest/capsules` create route is rate-limited to 10/hour per
+ * IP, and this fix's tests alone create more capsules than that shared
+ * budget allows; a fresh app gets a fresh in-memory rate-limit bucket
+ * (`rateLimit()` closes over a new `Map` each time `guestRouter(db)` is
+ * constructed), the same pattern `media.test.ts`'s `createUser()` already
+ * uses for the same reason.
+ */
+async function ticketThenComplete(
+  guestToken: string,
+  capsuleId: string,
+  opts: { declaredBytes: number; actualBytes: number; name?: string },
+  appInstance: ReturnType<typeof createApp> = app,
+) {
+  const ticket = await request(appInstance)
     .post(`/v1/guest/capsules/${capsuleId}/media/tickets`)
     .set('Authorization', `Bearer ${guestToken}`)
-    .send({ name, mime: 'image/jpeg', sizeBytes })
+    .send({ name: opts.name ?? 'photo.jpg', mime: 'image/jpeg', sizeBytes: opts.declaredBytes })
     .expect(201);
+
+  const mediaId = ticket.body.mediaId as string;
+  const [row] = await db.select({ storageKey: mediaItems.storageKey }).from(mediaItems).where(eq(mediaItems.id, mediaId));
 
   const adapter = getStorageAdapter() as ReturnType<typeof getStorageAdapter> & {
     setFakePartSize: (uploadId: string, partNumber: number, sizeBytes: number) => void;
   };
-  adapter.setFakePartSize(ticket.body.uploadId, 1, sizeBytes);
+  adapter.setFakePartSize(ticket.body.uploadId, 1, opts.actualBytes);
 
-  const completed = await request(app)
-    .post(`/v1/guest/media/${ticket.body.mediaId}/complete`)
+  const complete = await request(appInstance)
+    .post(`/v1/guest/media/${mediaId}/complete`)
     .set('Authorization', `Bearer ${guestToken}`)
-    .send({ parts: [{ partNumber: 1, eTag: 'etag-1' }] })
-    .expect(200);
+    .send({ parts: [{ partNumber: 1, eTag: 'etag-1' }] });
 
-  return { mediaId: ticket.body.mediaId as string, media: completed.body.media };
+  return { mediaId, storageKey: row!.storageKey as string, complete };
 }
 
 describe('guest media (M5)', () => {
@@ -100,6 +129,138 @@ describe('guest media (M5)', () => {
     // clean up and nothing that could confuse a later readiness check.
     const rows = await db.select().from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
     expect(rows).toHaveLength(0);
+  });
+
+  describe('storage-integrity fix — the actual object size, not the declared one, is authoritative', () => {
+    it('rejects at completion when the declared size fits but the real uploaded size does not (1 MB declared, 6 MB actual)', async () => {
+      const testApp = createApp(db);
+      const guestToken = await createGuestSession(testApp);
+      const capsuleId = await createDraftCapsule(guestToken, testApp);
+
+      const { mediaId, storageKey, complete } = await ticketThenComplete(
+        guestToken,
+        capsuleId,
+        { declaredBytes: 1 * 1024 * 1024, actualBytes: 6 * 1024 * 1024 },
+        testApp,
+      );
+
+      expect(complete.status).toBe(403);
+      expect(complete.body.error.code).toBe('guest_quota_exceeded');
+
+      // No usable ready row left behind.
+      const rows = await db.select().from(mediaItems).where(eq(mediaItems.id, mediaId));
+      expect(rows).toHaveLength(0);
+
+      // The capsule's recorded usage never moved.
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      expect(capsule!.sizeBytes).toBe(0);
+
+      // The object itself is gone from storage, not left dangling.
+      const adapter = getStorageAdapter();
+      expect(await adapter.headObject(storageKey)).toBeNull();
+    });
+
+    it('accepts when the declared size overstates the real upload (6 MB declared, 1 MB actual)', async () => {
+      const testApp = createApp(db);
+      const guestToken = await createGuestSession(testApp);
+      const capsuleId = await createDraftCapsule(guestToken, testApp);
+
+      // 6 MB alone would fail the *ticket-time* check against a 5 MB
+      // allowance, so this proves the declared figure is only ever a
+      // ceiling for that pre-check — never used to compute what actually
+      // gets recorded.
+      const { complete } = await ticketThenComplete(
+        guestToken,
+        capsuleId,
+        { declaredBytes: 4 * 1024 * 1024, actualBytes: 1 * 1024 * 1024 },
+        testApp,
+      );
+
+      expect(complete.status).toBe(200);
+      expect(complete.body.media.status).toBe('ready');
+      expect(complete.body.media.sizeBytes).toBe(1 * 1024 * 1024);
+
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      expect(capsule!.sizeBytes).toBe(1 * 1024 * 1024);
+    });
+
+    it('cannot bypass the 5 MB allowance through a series of individually under-declared tickets', async () => {
+      const testApp = createApp(db);
+      const guestToken = await createGuestSession(testApp);
+      const capsuleId = await createDraftCapsule(guestToken, testApp);
+
+      // Each ticket declares a negligible size (so the ticket-time check,
+      // which only ever looks at bytes already committed, never objects),
+      // but each real upload is a genuine 2 MB. Two land; the third's real
+      // bytes would push the session to 6 MB.
+      const first = await ticketThenComplete(guestToken, capsuleId, { declaredBytes: 1024, actualBytes: 2 * 1024 * 1024, name: 'a.jpg' }, testApp);
+      expect(first.complete.status).toBe(200);
+      const second = await ticketThenComplete(guestToken, capsuleId, { declaredBytes: 1024, actualBytes: 2 * 1024 * 1024, name: 'b.jpg' }, testApp);
+      expect(second.complete.status).toBe(200);
+      const third = await ticketThenComplete(guestToken, capsuleId, { declaredBytes: 1024, actualBytes: 2 * 1024 * 1024, name: 'c.jpg' }, testApp);
+
+      expect(third.complete.status).toBe(403);
+      expect(third.complete.body.error.code).toBe('guest_quota_exceeded');
+
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      // Exactly the two accepted uploads — the third's bytes never counted.
+      expect(capsule!.sizeBytes).toBe(4 * 1024 * 1024);
+
+      const rows = await db.select().from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+      expect(rows).toHaveLength(2);
+      expect(rows.every((r) => r.status === 'ready')).toBe(true);
+    });
+
+    it('two concurrent completions that individually fit but together exceed the allowance: exactly one is accepted', async () => {
+      const testApp = createApp(db);
+      const guestToken = await createGuestSession(testApp);
+      const capsuleId = await createDraftCapsule(guestToken, testApp);
+
+      // Both tickets are created (and both individually fit — 0 used at
+      // ticket time for each) before either completes, then raced.
+      const ticketA = await request(testApp)
+        .post(`/v1/guest/capsules/${capsuleId}/media/tickets`)
+        .set('Authorization', `Bearer ${guestToken}`)
+        .send({ name: 'race-a.jpg', mime: 'image/jpeg', sizeBytes: 1024 })
+        .expect(201);
+      const ticketB = await request(testApp)
+        .post(`/v1/guest/capsules/${capsuleId}/media/tickets`)
+        .set('Authorization', `Bearer ${guestToken}`)
+        .send({ name: 'race-b.jpg', mime: 'image/jpeg', sizeBytes: 1024 })
+        .expect(201);
+
+      const adapter = getStorageAdapter() as ReturnType<typeof getStorageAdapter> & {
+        setFakePartSize: (uploadId: string, partNumber: number, sizeBytes: number) => void;
+      };
+      const eachBytes = 3 * 1024 * 1024; // 3 MB + 3 MB = 6 MB, over the 5 MB allowance together.
+      adapter.setFakePartSize(ticketA.body.uploadId, 1, eachBytes);
+      adapter.setFakePartSize(ticketB.body.uploadId, 1, eachBytes);
+
+      const [resA, resB] = await Promise.all([
+        request(testApp)
+          .post(`/v1/guest/media/${ticketA.body.mediaId}/complete`)
+          .set('Authorization', `Bearer ${guestToken}`)
+          .send({ parts: [{ partNumber: 1, eTag: 'etag-a' }] }),
+        request(testApp)
+          .post(`/v1/guest/media/${ticketB.body.mediaId}/complete`)
+          .set('Authorization', `Bearer ${guestToken}`)
+          .send({ parts: [{ partNumber: 1, eTag: 'etag-b' }] }),
+      ]);
+
+      const statuses = [resA.status, resB.status].sort();
+      // Exactly one accepted, one rejected — not both accepted (the race
+      // this fix closes) and not both rejected (over-cautious locking).
+      expect(statuses).toEqual([200, 403]);
+
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      // Whichever one won, the recorded usage is exactly one upload's worth
+      // — never the sum of both, and never zero.
+      expect(capsule!.sizeBytes).toBe(eachBytes);
+
+      const rows = await db.select().from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.status).toBe('ready');
+    });
   });
 
   it('one guest session cannot read, patch, or delete another session\'s media', async () => {

@@ -6,7 +6,7 @@ import { audit } from '../../db/audit.js';
 import { ApiError } from '../../lib/errors.js';
 import { GUEST_STORAGE_ALLOWANCE_BYTES } from '../../lib/guest-limits.js';
 import { capsules, mediaItems } from '../../db/schema/index.js';
-import { assertCanPatch } from '../capsules/index.js';
+import { assertCanPatch, commitActualStorageUsage } from '../capsules/index.js';
 import { getStorageAdapter } from './get-adapter.js';
 import { adjustCapsuleSizeBytes, buildStorageKey } from './service.js';
 import { toMediaItem } from './mappers.js';
@@ -162,21 +162,37 @@ export async function completeGuestMedia(
     throw ApiError.uploadIncomplete('Uploaded object was not found in storage');
   }
 
-  const [updated] = (await db
-    .update(mediaItems)
-    .set({
-      status: 'ready',
-      sizeBytes: head.sizeBytes,
-      encMeta: input.encMeta ?? null,
-      durationMs: input.durationMs ?? null,
-      width: input.width ?? null,
-      height: input.height ?? null,
-      blurhash: input.blurhash ?? null,
-    })
-    .where(eq(mediaItems.id, mediaId))
-    .returning()) as [MediaRow];
+  // Same authoritative re-check the owner path now does — see the doc
+  // comment on `commitActualStorageUsage`. `assertGuestWithinQuota` above
+  // only ever guarded the client's *declared* size at ticket time.
+  const guard = await commitActualStorageUsage(
+    db,
+    eq(capsules.guestSessionId, guestSessionId),
+    capsuleId,
+    head.sizeBytes,
+    GUEST_STORAGE_ALLOWANCE_BYTES,
+    (tx) =>
+      tx
+        .update(mediaItems)
+        .set({
+          status: 'ready',
+          sizeBytes: head.sizeBytes,
+          encMeta: input.encMeta ?? null,
+          durationMs: input.durationMs ?? null,
+          width: input.width ?? null,
+          height: input.height ?? null,
+          blurhash: input.blurhash ?? null,
+        })
+        .where(eq(mediaItems.id, mediaId))
+        .returning()
+        .then((rows) => rows[0] as MediaRow),
+  );
 
-  await adjustCapsuleSizeBytes(db, capsuleId, head.sizeBytes);
+  if (!guard.accepted) {
+    await adapter.deleteObject(row.storageKey);
+    await db.delete(mediaItems).where(eq(mediaItems.id, mediaId));
+    throw ApiError.guestQuotaExceeded(guard.usedBytes, GUEST_STORAGE_ALLOWANCE_BYTES);
+  }
 
   await audit(db, {
     actorType: 'guest',
@@ -187,7 +203,7 @@ export async function completeGuestMedia(
     metadata: { mediaId, sizeBytes: head.sizeBytes },
   });
 
-  return toMediaItem(updated);
+  return toMediaItem(guard.result);
 }
 
 export async function patchGuestMedia(

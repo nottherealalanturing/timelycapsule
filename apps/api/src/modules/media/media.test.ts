@@ -75,6 +75,38 @@ async function uploadReadyMedia(
   return { mediaId: ticket.body.mediaId as string };
 }
 
+/**
+ * Storage-integrity fix — like `uploadReadyMedia` but lets a test declare
+ * one size at ticket time and land a genuinely different real size in the
+ * (fake) bucket before completing. Returns the raw, un-asserted `complete`
+ * response so a test can check either outcome.
+ */
+async function ticketThenComplete(
+  app: ReturnType<typeof createApp>,
+  token: string,
+  capsuleId: string,
+  opts: { declaredBytes: number; actualBytes: number; name?: string },
+) {
+  const ticket = await authed(app, token)
+    .post(`/v1/capsules/${capsuleId}/media/tickets`)
+    .send({ name: opts.name ?? 'photo.jpg', mime: 'image/jpeg', sizeBytes: opts.declaredBytes });
+  expect(ticket.status).toBe(201);
+
+  const mediaId = ticket.body.mediaId as string;
+  const [row] = await db.select({ storageKey: mediaItems.storageKey }).from(mediaItems).where(eq(mediaItems.id, mediaId));
+
+  const adapter = getStorageAdapter() as FakeStorageAdapter;
+  (ticket.body.parts as { partNumber: number }[]).forEach((part, i) => {
+    adapter.setFakePartSize(ticket.body.uploadId, part.partNumber, i === 0 ? opts.actualBytes : 0);
+  });
+
+  const complete = await authed(app, token)
+    .post(`/v1/media/${mediaId}/complete`)
+    .send({ parts: (ticket.body.parts as { partNumber: number }[]).map((p) => ({ partNumber: p.partNumber, eTag: 'etag' })) });
+
+  return { mediaId, storageKey: row!.storageKey as string, complete };
+}
+
 describe('media module (T-10)', () => {
   afterEach(() => {
     resetStorageAdapterForTests();
@@ -159,6 +191,108 @@ describe('media module (T-10)', () => {
       .send({ name: 'b.jpg', mime: 'image/jpeg', sizeBytes: 10 * 1024 * 1024 });
     expect(res.status).toBe(403);
     expect(res.body.error.code).toBe('quota_exceeded');
+  });
+
+  describe('storage-integrity fix — the actual object size, not the declared one, is authoritative', () => {
+    it('cannot bypass the 100 MB free-plan quota by under-declaring a single ticket (1 MB declared, 101 MB actual)', async () => {
+      const { app, accessToken } = await createUser();
+      const capsuleId = await createDraftCapsule(app, accessToken);
+
+      const { mediaId, storageKey, complete } = await ticketThenComplete(app, accessToken, capsuleId, {
+        declaredBytes: 1024,
+        actualBytes: 101 * 1024 * 1024,
+      });
+
+      expect(complete.status).toBe(403);
+      expect(complete.body.error.code).toBe('quota_exceeded');
+
+      // No usable ready row left behind, and the capsule's recorded usage
+      // never moved.
+      const rows = await db.select().from(mediaItems).where(eq(mediaItems.id, mediaId));
+      expect(rows).toHaveLength(0);
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      expect(capsule!.sizeBytes).toBe(0);
+
+      // The object itself is gone from storage, not left dangling.
+      const adapter = getStorageAdapter();
+      expect(await adapter.headObject(storageKey)).toBeNull();
+    });
+
+    it('cannot bypass the 100 MB quota through a series of individually under-declared tickets', async () => {
+      const { app, accessToken } = await createUser();
+      const capsuleId = await createDraftCapsule(app, accessToken);
+
+      // Each ticket declares a negligible size (so the ticket-time check —
+      // which only ever sees bytes already committed — never objects), but
+      // each real upload is a genuine 60 MB. The first two land (120 MB
+      // would already be over on its own, so actually only the first fits
+      // cleanly within 100 MB; the second pushes past it).
+      const first = await ticketThenComplete(app, accessToken, capsuleId, { declaredBytes: 1024, actualBytes: 60 * 1024 * 1024, name: 'a.jpg' });
+      expect(first.complete.status).toBe(200);
+      const second = await ticketThenComplete(app, accessToken, capsuleId, { declaredBytes: 1024, actualBytes: 60 * 1024 * 1024, name: 'b.jpg' });
+
+      expect(second.complete.status).toBe(403);
+      expect(second.complete.body.error.code).toBe('quota_exceeded');
+
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      // Exactly the one accepted upload — the second's bytes never counted.
+      expect(capsule!.sizeBytes).toBe(60 * 1024 * 1024);
+
+      const rows = await db.select().from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.status).toBe('ready');
+    });
+
+    it('accepts when the declared size overstates the real upload (20 MB declared, 1 MB actual)', async () => {
+      const { app, accessToken } = await createUser();
+      const capsuleId = await createDraftCapsule(app, accessToken);
+
+      const { complete } = await ticketThenComplete(app, accessToken, capsuleId, {
+        declaredBytes: 20 * 1024 * 1024,
+        actualBytes: 1 * 1024 * 1024,
+      });
+
+      expect(complete.status).toBe(200);
+      expect(complete.body.media.status).toBe('ready');
+      expect(complete.body.media.sizeBytes).toBe(1 * 1024 * 1024);
+
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      expect(capsule!.sizeBytes).toBe(1 * 1024 * 1024);
+    });
+
+    it('two concurrent completions that individually fit but together exceed the quota: exactly one is accepted', async () => {
+      const { app, accessToken } = await createUser();
+      const capsuleId = await createDraftCapsule(app, accessToken);
+
+      const ticketA = await authed(app, accessToken)
+        .post(`/v1/capsules/${capsuleId}/media/tickets`)
+        .send({ name: 'race-a.jpg', mime: 'image/jpeg', sizeBytes: 1024 });
+      expect(ticketA.status).toBe(201);
+      const ticketB = await authed(app, accessToken)
+        .post(`/v1/capsules/${capsuleId}/media/tickets`)
+        .send({ name: 'race-b.jpg', mime: 'image/jpeg', sizeBytes: 1024 });
+      expect(ticketB.status).toBe(201);
+
+      const adapter = getStorageAdapter() as FakeStorageAdapter;
+      const eachBytes = 60 * 1024 * 1024; // 60 MB + 60 MB = 120 MB, over the 100 MB quota together.
+      adapter.setFakePartSize(ticketA.body.uploadId, 1, eachBytes);
+      adapter.setFakePartSize(ticketB.body.uploadId, 1, eachBytes);
+
+      const [resA, resB] = await Promise.all([
+        authed(app, accessToken).post(`/v1/media/${ticketA.body.mediaId}/complete`).send({ parts: [{ partNumber: 1, eTag: 'etag-a' }] }),
+        authed(app, accessToken).post(`/v1/media/${ticketB.body.mediaId}/complete`).send({ parts: [{ partNumber: 1, eTag: 'etag-b' }] }),
+      ]);
+
+      const statuses = [resA.status, resB.status].sort();
+      expect(statuses).toEqual([200, 403]);
+
+      const [capsule] = await db.select().from(capsules).where(eq(capsules.id, capsuleId));
+      expect(capsule!.sizeBytes).toBe(eachBytes);
+
+      const rows = await db.select().from(mediaItems).where(eq(mediaItems.capsuleId, capsuleId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]!.status).toBe('ready');
+    });
   });
 
   it('blocks sealing while media is not ready, then allows it once ready (DoD)', async () => {
