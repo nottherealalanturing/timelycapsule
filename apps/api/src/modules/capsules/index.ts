@@ -16,6 +16,7 @@ export {
   assertWithinRecipientLimit,
   assertFileWithinSizeLimit,
   assertWithinStorageQuota,
+  commitActualStorageUsage,
   type PlanLimits,
   type EntitlementPlan,
 } from './entitlements.js';

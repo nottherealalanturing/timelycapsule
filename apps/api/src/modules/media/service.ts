@@ -11,7 +11,9 @@ import {
   assertFileWithinSizeLimit,
   assertWithinStorageQuota,
   cancelPendingMediaRelease,
+  commitActualStorageUsage,
   findOwnedCapsuleOrThrow,
+  getPlanLimits,
 } from '../capsules/index.js';
 import { getStorageAdapter } from './get-adapter.js';
 import { releaseCapsuleMedia, type ReleaseResult } from './release.js';
@@ -153,21 +155,38 @@ export async function completeMedia(
     throw ApiError.uploadIncomplete('Uploaded object was not found in storage');
   }
 
-  const [updated] = (await db
-    .update(mediaItems)
-    .set({
-      status: 'ready',
-      sizeBytes: head.sizeBytes,
-      encMeta: input.encMeta ?? null,
-      durationMs: input.durationMs ?? null,
-      width: input.width ?? null,
-      height: input.height ?? null,
-      blurhash: input.blurhash ?? null,
-    })
-    .where(eq(mediaItems.id, mediaId))
-    .returning()) as [MediaRow];
+  // The authoritative check — audit fix. `assertWithinStorageQuota` above
+  // was only ever a pre-upload UX gate against the client's *declared*
+  // size; this re-checks against the *real* object size R2 just confirmed,
+  // and commits the capsule's size increment atomically with marking the
+  // media ready, so a rejection here can never leave one written without
+  // the other.
+  const limits = await getPlanLimits(db, ownerId);
+  const guard = await commitActualStorageUsage(db, eq(capsules.ownerId, ownerId), capsuleId, head.sizeBytes, limits.storageBytes, (tx) =>
+    tx
+      .update(mediaItems)
+      .set({
+        status: 'ready',
+        sizeBytes: head.sizeBytes,
+        encMeta: input.encMeta ?? null,
+        durationMs: input.durationMs ?? null,
+        width: input.width ?? null,
+        height: input.height ?? null,
+        blurhash: input.blurhash ?? null,
+      })
+      .where(eq(mediaItems.id, mediaId))
+      .returning()
+      .then((rows) => rows[0] as MediaRow),
+  );
 
-  await adjustCapsuleSizeBytes(db, capsuleId, head.sizeBytes);
+  if (!guard.accepted) {
+    // The real upload turned out too big for what's left of the quota —
+    // clean up the object and the ticket row rather than leaving either
+    // pretending the upload succeeded.
+    await adapter.deleteObject(row.storageKey);
+    await db.delete(mediaItems).where(eq(mediaItems.id, mediaId));
+    throw ApiError.quotaExceeded(`storage_bytes:${limits.storageBytes}:used:${guard.usedBytes}`);
+  }
 
   await audit(db, {
     actorType: 'user',
@@ -178,7 +197,7 @@ export async function completeMedia(
     metadata: { mediaId, sizeBytes: head.sizeBytes },
   });
 
-  return toMediaItem(updated);
+  return toMediaItem(guard.result);
 }
 
 export async function patchMedia(db: Database, ownerId: string, mediaId: string, input: PatchMediaRequest): Promise<MediaItem> {
