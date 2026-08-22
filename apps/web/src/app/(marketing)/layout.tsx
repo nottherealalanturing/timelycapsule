@@ -28,7 +28,11 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <header className="sticky top-0 z-20 border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]">
         <div className="mx-auto flex h-14 w-full max-w-[1200px] items-center justify-between px-4 sm:px-6">
           <Link href="/" aria-label="TimelyCapsule home" className="motion-instant">
-            <Lockup size={22} />
+            {/* Icon only below `sm` — at 375/390px the wordmark competing
+                with Pricing/Help/Log in wrapped the nav to two lines. The
+                footer, auth and app-shell Lockups are untouched (see the
+                prop's own doc comment). */}
+            <Lockup size={22} wordmarkClassName="hidden sm:inline" />
           </Link>
           <nav aria-label="Site" className="flex items-center gap-5 text-[length:var(--text-body-s)]">
             <Link href="/pricing" className="motion-instant text-secondary hover:text-foreground">

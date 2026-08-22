@@ -63,6 +63,15 @@ export interface LockupProps {
   size?: number;
   orientation?: 'horizontal' | 'vertical';
   className?: string;
+  /**
+   * Extra classes on the wordmark `<span>` only — opt-in, so every existing
+   * call site (footer, auth, app header, sidebar drawer) keeps showing the
+   * full wordmark at every width unless it explicitly asks otherwise. Added
+   * for the marketing header alone, which was the one place the wordmark
+   * competing with the nav caused a real overflow at 375px — not a change
+   * to `Lockup`'s own default behaviour.
+   */
+  wordmarkClassName?: string;
 }
 
 /**
@@ -71,7 +80,7 @@ export interface LockupProps {
  * punctuation attached to the word rather than as a mark (found in applied
  * testing, `design/17`).
  */
-export function Lockup({ size = 28, orientation = 'horizontal', className }: LockupProps) {
+export function Lockup({ size = 28, orientation = 'horizontal', className, wordmarkClassName }: LockupProps) {
   const vertical = orientation === 'vertical';
   return (
     <span
@@ -84,7 +93,7 @@ export function Lockup({ size = 28, orientation = 'horizontal', className }: Loc
     >
       <Mark size={size} title="TimelyCapsule" />
       <span
-        className="font-semibold leading-none tracking-[-0.005em]"
+        className={cn('font-semibold leading-none tracking-[-0.005em]', wordmarkClassName)}
         style={{ fontSize: size * 0.72 }}
       >
         Timely<span className="font-normal opacity-[0.62]">Capsule</span>
