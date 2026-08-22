@@ -249,9 +249,19 @@ export default function GuestComposerPage() {
           nav below it. A fixed three-column track keeps the nav centred
           whether or not the side labels have room to show themselves. */}
       <header className="sticky top-0 z-10 grid grid-cols-[1fr_auto_1fr] items-center gap-2 border-b border-[var(--color-rule)] bg-[var(--color-bg-primary)]/95 px-4 py-3 backdrop-blur sm:gap-4 sm:px-6">
-        <p className="hidden truncate font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary sm:block">
-          No account needed
-        </p>
+        <div className="flex min-w-0 items-center gap-3">
+          {/* The way out, same control and same restraint as the
+              authenticated composer's own "Close" — this entry point never
+              had one at any width. Nothing to flush first: the guest draft
+              is already persisted to session storage as it's typed, so
+              leaving is just a navigation, not a save action. */}
+          <Button variant="ghost" size="sm" onClick={() => router.push('/')}>
+            Close
+          </Button>
+          <p className="hidden truncate font-[var(--font-mono)] text-[length:var(--text-caption)] uppercase tracking-[0.1em] text-secondary sm:block">
+            No account needed
+          </p>
+        </div>
         <MovementNav current={movement} available={reachable} onGo={setMovement} className="col-start-2 justify-self-center" />
         <div className="justify-self-end">
           <ThemeToggle />
