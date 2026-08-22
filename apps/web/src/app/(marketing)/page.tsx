@@ -6,7 +6,6 @@ import { OrbitScrub } from '../../components/marketing/OrbitScrub';
 import { HeroClock } from '../../components/marketing/HeroClock';
 import { HeroMeridianSpine } from '../../components/marketing/HeroMeridianSpine';
 import { WriteAndSeal } from '../../components/marketing/WriteAndSeal';
-import { YearsBetween } from '../../components/marketing/YearsBetween';
 
 export const metadata: Metadata = {
   title: 'TimelyCapsule — sealed until the date you choose',
@@ -21,9 +20,24 @@ export const metadata: Metadata = {
  * clock, the compressed wait, survival evidence, one paper artifact, and no
  * testimonials. The sections `02 §5.1` lists that survive the rebuild
  * (how-it-works, use cases, pricing teaser, FAQ, footer) follow after,
- * restated in the `07 §VIII` voice. The hero CTA still routes into guest
- * mode — "no signup wall between the landing page and writing" (`02 §5.1`),
- * unchanged business logic.
+ * restated in the `07 §VIII` voice. The hero CTA now routes straight into
+ * `/try` rather than the on-page demo — guest mode itself is unchanged
+ * ("no signup wall between the landing page and writing", `02 §5.1`), only
+ * the number of hops to reach it. `/try` is the real Capsule Creation V2
+ * composer now, not a lighter stand-in for it, so the on-page demo
+ * (`WriteAndSeal`, §"Write one" below) is positioned as a bridge into that
+ * real thing rather than a second, competing composer.
+ *
+ * Post-M0–M5 product-quality pass (Landing Page V2): "The years between" —
+ * a third `DualClock`-in-a-card reading, visually repeating the hero and
+ * the Orbit Scrub, and the one section with a real horizontal-overflow bug
+ * at 375px (a `size="lg"` clock inside padded card constraints) — was
+ * removed rather than patched. Its ideas aren't lost: the instrument-carries
+ * -the-wait feeling it existed to demonstrate is already carried twice
+ * (hero, Orbit Scrub); its reachability/export facts already duplicated
+ * existing "How it is kept" answers; its one genuinely new idea (nothing to
+ * maintain while it waits) didn't need restating — no engagement mechanic
+ * exists anywhere in the product for it to be a promise about.
  *
  * Tempo: `07 §X`'s unusual rule — slower than the app, in tempo not
  * performance. That is carried by spacing and by how little happens, not by
@@ -48,6 +62,14 @@ const SURVIVAL: { q: string; a: string }[] = [
   {
     q: 'What if TimelyCapsule disappears?',
     a: 'The honest answer is the export: everything you own — letters, files, metadata — downloads as ordinary files, today, from Settings. It is not a promise about a rainy day; it already works.',
+  },
+  {
+    q: 'Does a capsule have to be kept forever?',
+    a: 'Not if you seal it that way. Some things aren’t meant to be kept — choose "one reading only" and it disappears the moment it has been read. No copy remains, not even ours.',
+  },
+  {
+    q: 'What happens to photos and files after a while?',
+    a: 'On a free account, enclosed photos and files are kept for a year after the capsule opens, then reclaimed. The letter and everything it says are kept regardless — only the bytes are ever reclaimed.',
   },
 ];
 
@@ -138,7 +160,7 @@ export default function MarketingHome() {
               before it leaves.
             </p>
             <div className="flex flex-wrap gap-3 pt-1">
-              <Link href="#write">
+              <Link href="/try">
                 <Button size="lg">Write one now</Button>
               </Link>
               <a href="#kept">
@@ -198,22 +220,7 @@ export default function MarketingHome() {
         </div>
       </section>
 
-      {/* 5 · The years between — what owning it actually feels like.
-          `03 §VII`: does a sealed capsule sitting untouched for three years
-          look like something valuable is happening? */}
-      <section aria-label="The years between" className="border-t border-[var(--color-rule)]">
-        <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-8 px-4 py-24 sm:px-6">
-          <div className="flex flex-col gap-2">
-            <Hallmark>The years between</Hallmark>
-            <h2 className="max-w-[32rem] text-[length:var(--text-title)] leading-[var(--lh-heading)]">
-              Most of a capsule&rsquo;s life is spent waiting. That should look like custody, not storage.
-            </h2>
-          </div>
-          <YearsBetween />
-        </div>
-      </section>
-
-      {/* 6 · What arrives — Gate 1's register change, played on demand.
+      {/* What arrives — Gate 1's register change, played on demand.
           Replaces a static Record, which described the payoff instead of
           delivering it. */}
       <section aria-label="What arrives" className="border-t border-[var(--color-rule)]">
@@ -222,11 +229,19 @@ export default function MarketingHome() {
             sits beside it rather than above, giving the section a right-hand
             edge without narrowing the artifact. */}
         <div className="mx-auto grid w-full max-w-[1200px] items-start gap-12 px-4 py-24 sm:px-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:gap-16">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <Hallmark>What arrives</Hallmark>
             <h2 className="text-[length:var(--text-title)] leading-[var(--lh-heading)]">
               On the day, the instrument gives way to the letter.
             </h2>
+            {/* Post-M0–M5: the product no longer ends at delivery — a
+                recipient can write back, encrypted the same way the letter
+                was. One sentence extends the section's existing arc rather
+                than adding a "Replies" feature card; `07 §X` still governs
+                (show the record, don't enumerate capabilities). */}
+            <p className="text-[length:var(--text-body)] leading-[var(--lh-body)] text-secondary">
+              And if they write back, you will hear it too — the letter does not have to be the last word.
+            </p>
           </div>
           <ArrivalDemo />
         </div>
@@ -318,6 +333,7 @@ export default function MarketingHome() {
             <Hallmark className="pb-1">Free plan</Hallmark>
             {[
               { term: 'Sealed capsules', figure: 'Five' },
+              { term: 'Storage', figure: '100 MB' },
               // The scheduling engine's real ceiling is 50 years (`01 §Scheduling`),
               // not unlimited — "No limit" overstated a plan's actual capability,
               // which is exactly the wrong kind of claim on a page whose central
