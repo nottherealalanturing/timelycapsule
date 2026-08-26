@@ -43,6 +43,8 @@ export interface SealMovementProps {
    */
   scheduleProblem?: ScheduleProblem | null;
   className?: string;
+  /** Dev/marketing-capture aid only — every real caller leaves this unset. */
+  defaultConditionsOpen?: boolean;
 }
 
 /** Paragraphs of the letter, as they will be read. */
@@ -94,12 +96,13 @@ export function SealMovement({
   problem = null,
   scheduleProblem = null,
   className,
+  defaultConditionsOpen = false,
 }: SealMovementProps) {
   const capsule = draft.capsule!;
   const envelope = readEnvelope(draft.contentDoc);
   const lines = paragraphs(envelope.doc);
 
-  const [conditionsOpen, setConditionsOpen] = useState(false);
+  const [conditionsOpen, setConditionsOpen] = useState(defaultConditionsOpen);
   const [naming, setNaming] = useState(false);
 
   const sealCount = capsule.seals.length;

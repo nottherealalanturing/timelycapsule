@@ -1,3 +1,3 @@
-Frozen 2026-08-04T09:14:33.580Z from design/launch/{x,instagram,artwork,og,screenshots}.
-39 files. Re-run `node design/.build-launch.mjs --freeze` after any
+Frozen 2026-08-25T15:02:45.817Z from design/launch/{x,instagram,artwork,og,screenshots}.
+51 files. Re-run `node design/.build-launch.mjs --freeze` after any
 reviewed change to update this copy — nothing else writes here.

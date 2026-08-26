@@ -53,6 +53,123 @@ requirement.
 throwaway RN app lived entirely outside the repo and was deleted. Full gate green
 (`pnpm typecheck`/`pnpm lint`/`pnpm test` in `packages/crypto`, 35/35 tests).
 
+### Marketing package refresh (2026-08-25, same day as the theme fix) — not a numbered ticket, not yet committed
+
+Full writeup: **`design/launch/REFRESH-2026-08-25-NOTES.md`**. Ran after
+the theme fix above (approved first), against the running app post-fix.
+Discarded the same day's earlier, uncommitted 2026-08-24 pass entirely
+(dark-mode-oriented, per the theme-fix entry below) and rebuilt from a
+fresh audit rather than editing it forward.
+
+**The headline finding: every "real UI" screenshot in every prior version
+of this pack was never real UI.** `design/.build-launch.mjs` only ever
+navigates to the public marketing homepage (`http://localhost:3001/`) and
+crops regions out of it — the "composer," "waiting," and "reveal"
+screenshots were crops of that page's own `WriteAndSeal`/`ArrivalDemo`
+illustration components, not the authenticated app or the real recipient
+reveal page. Not dishonest (those components are careful, real-token
+reproductions, labelled as demos in-product) but not what the captions
+claimed either. Traced by reading the capture pipeline in full, not
+assumed from the file names.
+
+**Fixed by actually capturing the real thing, hands-on, this session:**
+signed up a real test account, walked a real capsule through the full
+composer (Address → Compose → Seal, real "Dear Amara" specimen letter,
+real enclosures), sealed it for real (`POST /capsules/:id/seal` → 200),
+backdated its `sealed_at` in the dev DB for a realistic multi-year
+"mid-custody" dashboard shot, sealed a second capsule to a real recipient
+address with a near-future unlock time, started the `dev:scheduler` +
+`dev:worker` processes (neither runs by default in local dev — their
+absence is why the capsule sat at `state=sealed` looking "stuck" for
+several minutes before this was diagnosed) to promote and unlock it for
+real, then screenshotted the real public `/c/[token]` reveal page —
+including a real reply sent through the real "write back" flow. New
+one-off capture script: `design/.capture-marketing-raw.mjs` (its own
+Chrome profile dir, kept separate from `.build-launch.mjs`'s, so a
+dev-only auth-token seed never leaks into that script's own homepage
+capture). Two small, additive, dev-only product changes enabled the
+headless captures: `apps/web/src/app/layout.tsx` gained a
+`DEV_SESSION_SEED_SCRIPT` (`NODE_ENV==='development'`-gated, reads
+`__seed_at`/`__seed_rt` query params into `localStorage` pre-paint — a
+one-shot Chrome `--screenshot` run has no click/type capability, so this
+is what let it land on an authenticated page in a single navigation), and
+`apps/web/src/app/dev/schedule/page.tsx` (the pre-existing composer
+harness) gained a `?movement=`/`?conditions=1` query-param-driven initial
+state, with a matching optional `defaultConditionsOpen` prop threaded onto
+`SealMovement` (every real caller leaves it unset).
+
+**Also found and fixed in passing:** the actual, currently-installed
+production Open Graph image (`apps/web/src/app/(marketing)/opengraph-
+image.png`) still read "Sealed on your device · opening 2026" — the same
+bug the discarded 2026-08-24 pass had already found and fixed once, which
+came back when that pass was rolled back. Fixed again at the source
+(`design/.build-launch.mjs`'s `og()` call for `og-home`) and reinstalled,
+verified byte-identical between the design source and the installed file.
+
+**Copy rewritten in full, not polished** — `design/launch/COPY.md`. Moved
+away from the previous "institution / notice board of a standards body"
+register while keeping every underlying constitution rule intact (no
+exclamation marks, no emoji, no "we"/"our"/"us" for the institution, no
+"just," no manufactured urgency, no testimonials — verified
+programmatically against every bio/pinned/post via a small checked-in
+script, `design/launch/.raw/copy-check.py`; zero violations). Eleven posts
+(down from the previous thirteen-slot calendar, a deliberately smaller and
+stronger set), six of them now demonstrating the actual product journey
+(composer → before-sealing → waiting → reveal → replies → one-reading-
+only) with real screenshots instead of only carrying the visual identity.
+Every X post and both bios re-verified under real platform character
+limits (X bio ≤160, IG bio ≤150, every X post ≤280) — all comfortably
+under, not just barely fitting.
+
+**Verified against the real capability set, not assumed:** replies,
+one-reading-only (real destroy-on-read behavior, matches the earlier M5
+verification elsewhere in this file), guest media/composer (`/try`, "5 MB
+guest allowance," confirmed live), and the composer's enclosure flow
+(photo/voice-note/place) are all real and were each checked hands-on this
+session, not carried over from an older pass's notes.
+
+**Two soft gaps flagged, not papered over, same as the discarded pass
+already found once:** no voice-notes asset (the recorder UI is real and
+confirmed working, but a synthetic mic capture would be exactly the "fake
+UI" the constitution rules out — needs a live human recording, once) and
+no write→seal→wait→reveal video stitched end-to-end (every individual
+piece exists as a screenshot now; nobody has recorded the whole arc back
+to back). The decade-scrubber capture harness from the discarded pass
+wasn't rebuilt this session either — flagged as a Reel candidate, not
+produced.
+
+Test artifacts cleaned up: the `marketing-demo-20260825@…` account and its
+two capsules deleted from the dev DB; the `dev:scheduler`/`dev:worker`
+processes started to promote one of them stopped afterward; browser
+`localStorage` reset. Full gate green throughout today's changes
+(`pnpm typecheck`/`pnpm lint` clean across all 8 packages, `apps/web`
+production `next build` succeeds, `/dev/schedule` still prerenders static
+despite the new `useSearchParams` usage — wrapped in `Suspense`).
+
+**Not yet committed** — local changes pending review, same posture every
+other pass in this file uses at this point.
+
+### Theme default fix — light restored, plus a real hydration bug found underneath it (2026-08-25) — not a numbered ticket, not yet committed
+
+Founder-requested, ahead of a marketing-package refresh (that second half is paused pending review of this part — see below). Re-verified everything hands-on against the running dev app rather than trusting this file's own prior "done" claims, per instruction for the session, and found those claims were stale.
+
+**A previous, uncommitted marketing-refresh pass (dated 2026-08-24 in an earlier local session) was discarded, not built on.** It had regenerated screenshots/social assets and rewritten `design/launch/REFRESH-2026-08.md` — but its own §9a explicitly mounted every asset in **dark** theme, on the reasoning that dark was the app's real default at the time. That directly conflicted with this session's brief (light/paper as the unconditional default), so continuing to build on those assets would have meant redoing them anyway. Discarded via `git checkout` (tracked files) + `rm` (untracked) before any new work started; nothing from that pass survived. Its own §9a is, in hindsight, the first real evidence of the bug below — it recorded captures "sometimes rendering in light mode" with a fresh browser profile and worked around it by forcing the capture harness to dark, rather than treating the inconsistency itself as the bug.
+
+**Root cause #1 — the actual default regressed.** `plan/PROGRESS.md`'s older ticket-log (below) claims "Theme default → light, done" from a session before 2026-08-04. That was true once, but a later, later-dated entry in this same file — the 2026-08-10 "Product Quality Pass" (§ "Marketing/auth/theme polish," below) — reintroduced `matchMedia('(prefers-color-scheme: dark)')` as the pre-paint fallback in `apps/web/src/app/layout.tsx`'s `THEME_INIT_SCRIPT`, undoing the earlier fix without flagging it as a reversal (commit `15de991`). Reproduced live: fresh `localStorage`, OS set to dark → app rendered dark. Fixed by removing the OS fallback again — no stored preference now always resolves to light, full stop; an explicit stored choice (light or dark) still always wins. Also removed `ThemeToggle.tsx`'s live `matchMedia` listener (same reasoning — light is a deliberate default, not a stand-in for "whatever the OS says right now").
+
+**Root cause #2, found only by testing across surfaces, and the more serious one — a hydration-mismatch bug in `apps/web/src/lib/auth-context.tsx` was silently wiping the theme choice for any logged-in visitor to a marketing route.** `AuthProvider` read `localStorage` synchronously in a `useState(() => Boolean(getTokens()))` initializer — `false` during SSR (no `localStorage` server-side) but `true` on the client's very first hydration pass for anyone already logged in, a guaranteed structural mismatch wherever that value gates what renders (`MarketingNavAuth`'s Log in/Home/null branch). Confirmed directly via Next's own dev diagnostic (`Recoverable Error` panel, pinpointing `ThemeToggle.tsx (54:5)` inside `MarketingNavAuth`) — React's recovery from a hydration failure is to discard and re-render the **entire document** client-side, and a client-rendered `<script>` tag never executes (confirmed via React's own console warning: "Scripts inside React components are never executed when rendering on the client"). That script is exactly `layout.tsx`'s pre-paint `THEME_INIT_SCRIPT` — so every time this fired, `data-theme` silently stayed unset for the rest of that page's life, falling back to the CSS default (light) even when a user had explicitly stored `dark`. Reproduced and confirmed the exact mechanism: stored `tc-theme=dark`, logged in, hit `/` → `data-theme` came back `null`, page rendered light, toggle showed the wrong action.
+
+Fixed at the root: `hasTokens` now starts `false` unconditionally (matching what SSR always produces) and is set to its real value in a mount effect instead of during render — the standard fix for this exact class of bug. That surfaced a second-order issue from the fix itself: `useQuery`'s `initialData: hasTokens ? undefined : null` was seeding the query cache with a "fresh" `null` (per `staleTime: 60_000`) before `hasTokens` ever flipped true, so React Query never refetched once it did — a real logged-in visitor got stuck reading as logged-out. Removed `initialData` entirely (redundant — `loading`'s `hasTokens &&` guard and the `data: user = null` destructure default already covered what it was for). The `setState`-in-effect calls in both fixes are deferred via `setTimeout(fn, 0)`, matching the existing `useCorrectedNow`/`SealCeremony` convention for the same lint rule (`react-hooks/set-state-in-effect`).
+
+**A second real regression surfaced from the `hasTokens` fix itself, caught during the marketing-asset capture pass that followed (2026-08-25, same day):** `apps/web/src/app/(app)/layout.tsx:38`'s route guard reads `if (!loading && !user) router.push('/login')`. With `hasTokens` starting `false` (the fix above), `loading` (`hasTokens && isLoading`) was also `false` on the very first render — so the guard concluded "not loading, no user, redirect" immediately, before the deferred mount-effect token check ever ran. Net effect: **every hard reload of an authenticated page bounced a genuinely logged-in visitor straight to `/login`**, reproduced live (sealed a real capsule, hard-reloaded `/home`, landed on the login screen despite valid tokens in `localStorage`). Fixed by giving `hasTokens` a third state: `useState<boolean | null>(null)` (not `false`) — `null` means "haven't checked yet" and now reads as `loading` (`hasTokens === null || (hasTokens && isLoading)`), so downstream consumers wait for the real answer instead of assuming "logged out" by default. `null` starts identically on server and client, so this doesn't reopen the original hydration-mismatch bug — confirmed both still hold together live: a hard reload of `/` with `tc-theme=dark` stored while logged in stays dark, and a hard reload of `/home` while logged in stays on the dashboard. Full gate re-confirmed green after this change too.
+
+**Also fixed while cross-checking toggle behaviour across simultaneously-mounted surfaces (sidebar + Settings → Appearance, both persistent under the authenticated layout):** each `ThemeToggle` instance held its own local React state with no shared source of truth, so switching theme from one visibly-mounted toggle left any other mounted toggle showing a stale action label — and clicking the stale one could be a silent no-op (its `toggle()` computed `next` from its own stale state, which could coincidentally already match the real current theme). Fixed by having `toggle()` read `data-theme` directly off the DOM rather than trusting local state, and adding a `MutationObserver` on `document.documentElement`'s `data-theme` attribute so every mounted instance's label stays live-synced to whichever one was actually clicked.
+
+**Verified, live, both desktop and mobile (375×812):** landing (logged out), signup, email-verify, recovery-code screen, login, authenticated dashboard, composer (Address + Compose movements), Settings → Appearance, and the mobile sidebar drawer — each checked with (a) no stored preference + OS dark → light, (b) stored `dark` → dark, (c) stored `light` → light, (d) toggling from one surface reflected immediately on every other mounted surface. Investigated (via a full read of `packages/ui-web/src/tokens.css`, every composer/dashboard/marketing-demo component, and a grep for hardcoded colors/`prefers-color-scheme`/`data-theme` across `apps/web/src` and `packages/ui-web/src`) and confirmed clean: no component hardcodes light or dark, no second theme-toggle implementation exists, `WriteAndSeal`/`OrbitScrub` (the landing-page demo) have no theme logic of their own and correctly inherit the global attribute, and `.tc-record` (the record/paper register) is correctly theme-independent by design. Full gate green: `pnpm typecheck`/`pnpm lint` clean across all 8 packages, `apps/web` production `next build` succeeds.
+
+Test artifacts cleaned up: the throwaway `theme-qa-…@timelycapsule.com` account created to test the authenticated dashboard/composer was deleted from the dev DB after verification; browser `localStorage` reset to empty afterward.
+
+**Not yet committed** — local changes pending review, same posture every other pass in this file uses at this point. **Reviewed and approved same session** — the marketing-package refresh that was the second half of this session's brief followed immediately after, using this fix as its foundation; see the entry above.
 
 ### Where the work actually is (verified against git, 2026-08-13)
 

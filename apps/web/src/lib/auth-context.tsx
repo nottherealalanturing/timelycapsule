@@ -9,7 +9,7 @@ import {
   wrapMasterKeyWithRecoveryCode,
 } from '@tc/crypto';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { track } from './analytics';
 import { authApi } from './api-client';
 import { useMasterKey } from './master-key-context';
@@ -44,7 +44,35 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [hasTokens] = useState(() => Boolean(getTokens()));
+  // Three states, not two — `null` means "haven't checked localStorage yet."
+  // Starts `null` unconditionally (matching what SSR always renders, since
+  // there's no localStorage server-side) and only reads the real value
+  // after mount. Reading it synchronously here (the original approach) was
+  // true-or-false on the client's very first hydration pass for any already
+  // -logged-in visitor but was always false during SSR — a guaranteed
+  // hydration mismatch on every auth-aware component (MarketingNavAuth,
+  // notably). React's recovery from that discards and re-renders the
+  // entire document purely client-side, and a client-rendered <script> tag
+  // never executes (React only runs inline scripts from real SSR HTML) —
+  // so it was silently wiping whatever data-theme the pre-paint script in
+  // layout.tsx had just set, on every authenticated marketing-page visit.
+  //
+  // `null` (not `false`) matters: an earlier version of this fix collapsed
+  // straight to `false`, which made `loading` (below) resolve `false` too
+  // before the deferred check below had even run — (app)/layout.tsx's route
+  // guard reads `!loading && !user` to redirect to /login, so every
+  // authenticated hard-reload bounced a genuinely logged-in visitor. `null`
+  // keeps `loading` `true` until the real answer is known, same as it was
+  // before this whole fix, while still starting identically on server and
+  // client so hydration itself stays clean.
+  const [hasTokens, setHasTokens] = useState<boolean | null>(null);
+  useEffect(() => {
+    // Deferred — an effect body must not call setState synchronously
+    // (react-hooks/set-state-in-effect), the same pattern useCorrectedNow
+    // and SealCeremony use for their own first tick/reset.
+    const timer = setTimeout(() => setHasTokens(Boolean(getTokens())), 0);
+    return () => clearTimeout(timer);
+  }, []);
   const { setMasterKey, clearMasterKey, unlockWithPassword } = useMasterKey();
 
   const { data: user = null, isLoading } = useQuery({
@@ -58,8 +86,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return null;
       }
     },
-    enabled: hasTokens,
-    initialData: hasTokens ? undefined : null,
+    enabled: hasTokens === true,
+    // No initialData: `hasTokens` now always starts false (see above) and
+    // flips true post-mount, so seeding `null` here as "initial" data would
+    // mark the query fresh (staleTime below) before `hasTokens` ever flips —
+    // React Query would then never actually fetch once enabled turned true,
+    // leaving a real logged-in visitor stuck looking logged-out. `data`
+    // already defaults to `null` at the destructure above until a real
+    // fetch resolves, so this was doing nothing `hasTokens &&` (loading,
+    // below) didn't already cover.
     staleTime: 60_000,
     retry: false,
   });
@@ -141,7 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading: hasTokens && isLoading, signup, login, googleOAuth, logout, refreshUser, setUser }}
+      value={{ user, loading: hasTokens === null || (hasTokens && isLoading), signup, login, googleOAuth, logout, refreshUser, setUser }}
     >
       {children}
     </AuthContext.Provider>
