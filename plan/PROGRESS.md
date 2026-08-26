@@ -6,6 +6,54 @@
 
 > **Read this block first.** Everything below the horizontal rule is the older, ticket-numbered history and is preserved as written. Where the two disagree, this block wins.
 
+### Stage E, Spike 1 — Native Argon2id compatibility (2026-08-26) — PASS, not committed
+
+Full spike report: this session's transcript (not written to a separate file). Answers
+`plan/STAGE-E-MOBILE-V1-PHASE-0-SPIKES.md`'s Spike 1. **Verdict: PASS.**
+`react-native-libsodium` (vendored, official, minisign-verified libsodium 1.0.21) exposes
+native `crypto_pwhash(..., crypto_pwhash_ALG_ARGON2ID13)` on iOS/Android via JSI — real
+native code, not WASM. Its high-level API hardcodes parallelism to 1 lane, which happens
+to exactly match `constants.ts`'s `ARGON2ID_PARAMS` (parallelism: 1) — no param
+compromise needed. `memLimit` is bytes (not KiB) on the libsodium side; convert
+`memorySize * 1024` when wiring this up for real.
+
+Generated 5 fixed vectors from the *production* `deriveKeyFromPassword` (hash-wasm) path
+— short/long/non-ASCII/single-char/whitespace passwords — checked in at
+`packages/crypto/test-vectors/argon2id-v1.json` (regenerate via
+`scripts/generate-argon2-test-vectors.mjs`), with a matching self-consistency test added
+to `test-vectors.test.ts`. Built a throwaway Expo dev-client app (outside the repo, not
+committed, deleted after) with `react-native-libsodium`, ran the same 5 vectors against
+native `crypto_pwhash` on **iPhone 16 iOS 18.6 Simulator** and a **Pixel 7 Android
+API emulator** (both real ARM64 native code, not WASM/interpreted) — **all 5 matched
+byte-for-byte on both platforms.** No physical-device testing done this session (none
+available) — flagged, not assumed equivalent; Argon2id output shouldn't vary by silicon,
+but latency will, so a physical-device latency check is still warranted before E2.5.
+
+Hit and worked around one unrelated build blocker: Xcode 26.2 + Swift 6 rejects
+`expo-modules-jsi@57.0.5`'s `RuntimeScheduler.h` (`SWIFT_RETURNS_RETAINED` misapplied to
+a non-`SWIFT_SHARED_REFERENCE` constructor) — a confirmed-open upstream Expo bug
+(expo/expo#49214), unrelated to Argon2id/libsodium. Patched in the throwaway app's
+`node_modules` only (2-line removal, per the issue's own confirmed fix) to unblock the
+spike; this patch does not exist anywhere in this repo and will need to be applied again
+(or Expo/Xcode will need to have shipped a fix by then) whenever `apps/mobile` actually
+gets prebuilt on this toolchain.
+
+**Next step for E2.5 (not done this session — spike scope only):** add
+`react-native-libsodium` to `apps/mobile`, replace `kdf.ts`'s `hash-wasm` call with a
+platform branch (web keeps hash-wasm; RN calls `sodium.crypto_pwhash` with
+`memLimit = ARGON2ID_PARAMS.memorySize * 1024`), and run this same vector file against it
+in `apps/mobile`'s own test setup. Re-verify on at least one physical mid-tier iOS and
+Android device before considering Phase 2 unblocked, per the spike plan's device
+requirement.
+
+**Files touched (not committed):** `packages/crypto/README.md`,
+`packages/crypto/src/test-vectors.test.ts` (new `describe` block), new
+`packages/crypto/test-vectors/argon2id-v1.json`, new
+`packages/crypto/scripts/generate-argon2-test-vectors.mjs`. `apps/mobile` untouched — the
+throwaway RN app lived entirely outside the repo and was deleted. Full gate green
+(`pnpm typecheck`/`pnpm lint`/`pnpm test` in `packages/crypto`, 35/35 tests).
+
+
 ### Where the work actually is (verified against git, 2026-08-13)
 
 - **Merged to `origin/main`:** everything through PR #43 (`f36dcb4`, merge of `fix/storage-quota-actual-size`). That includes the full Meridian V2 rebuild, T-21/T-22, **Capsule Creation V2**, **Dashboard V2 (M0–M4)**, the cold-walkthrough fixes, the Product Quality Pass, the **entire Enclosures/Media/Replies initiative M0–M5**, and a post-M5 storage-integrity hardening patch (quota enforced on the real uploaded object size, not the client-declared one, for both authenticated and Guest media). Nothing through PR #43 is unmerged as of this line.
