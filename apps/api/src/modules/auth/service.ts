@@ -14,6 +14,7 @@ import {
   issueChangeEmailCode,
   issueEmailVerifyCode,
   issuePasswordResetToken,
+  verifyPasswordResetToken,
 } from './otp.js';
 import { hashPassword, verifyPassword } from './password.js';
 import {
@@ -241,11 +242,49 @@ export async function forgotPassword(db: Database, email: string): Promise<void>
   }
 }
 
-export async function resetPassword(db: Database, token: string, newPassword: string): Promise<void> {
+/**
+ * `masterKeyWrap` is optional (plan/STAGE-E-MOBILE-V1-E0.5-RECOVERY-FLOW-
+ * SPIKE.md §5/§18): present when the client restored the master key via the
+ * recovery-code flow (getRecoveryKeyForResetToken below) and re-wrapped it
+ * under the new password before submitting — absent for a plain "forgot my
+ * password, don't have my recovery code" reset, which still succeeds at the
+ * account-access level but leaves the *old* masterKeyWrap in place,
+ * unreadable under the new password (the explicit, accepted "lose password
+ * + recovery code = historical content unrecoverable" product decision —
+ * not something this function should try to soften).
+ *
+ * When present, it's written in the same single UPDATE statement as
+ * passwordHash — one row, one statement, so Postgres already guarantees the
+ * two can never land inconsistently with each other, exactly like
+ * changePassword's existing pattern below. No transaction needed beyond
+ * that for this specific invariant.
+ */
+export async function resetPassword(db: Database, token: string, newPassword: string, masterKeyWrap?: string): Promise<void> {
   const userId = await consumePasswordResetToken(db, token);
   const passwordHash = await hashPassword(newPassword);
-  await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+  await db
+    .update(users)
+    .set({
+      passwordHash,
+      ...(masterKeyWrap ? { masterKeyWrap: Buffer.from(masterKeyWrap, 'base64') } : {}),
+    })
+    .where(eq(users.id, userId));
   await revokeAllSessions(db, userId);
+}
+
+/**
+ * Step 1 of the recovery-code path (E0.5 §5/§18): given a still-valid,
+ * unconsumed reset token, return only the account's recoveryKeyWrap — never
+ * the wider user row — so the client can attempt local recovery-code
+ * restoration before choosing a new password. Does not consume the token;
+ * `resetPassword` above still needs it. Selects only the one column that's
+ * needed, not `select *`, so this can never accidentally widen into a
+ * second way to read account data.
+ */
+export async function getRecoveryKeyForResetToken(db: Database, token: string): Promise<string | null> {
+  const userId = await verifyPasswordResetToken(db, token);
+  const [row] = await db.select({ recoveryKeyWrap: users.recoveryKeyWrap }).from(users).where(eq(users.id, userId)).limit(1);
+  return row?.recoveryKeyWrap ? row.recoveryKeyWrap.toString('base64') : null;
 }
 
 export async function getMe(db: Database, userId: string): Promise<User> {

@@ -8,6 +8,7 @@ import {
   LoginRequestSchema,
   LogoutRequestSchema,
   PatchMeRequestSchema,
+  RecoveryKeyRequestSchema,
   RefreshRequestSchema,
   ResetPasswordRequestSchema,
   SignupRequestSchema,
@@ -160,8 +161,31 @@ export function authRouter(db: Database): Router {
     validate({ body: ResetPasswordRequestSchema }),
     async (req, res, next) => {
       try {
-        await service.resetPassword(db, req.body.token, req.body.newPassword);
+        await service.resetPassword(db, req.body.token, req.body.newPassword, req.body.masterKeyWrap);
         res.status(200).json({});
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * Step 1 of the recovery-code path (plan/STAGE-E-MOBILE-V1-E0.5-RECOVERY-
+   * FLOW-SPIKE.md §5/§18) — same rate limit as /auth/password/reset itself
+   * (this is the same trust boundary: possession of a valid, unconsumed
+   * reset token, not an authenticated session), and the same generic
+   * "invalid or expired code" error on a bad token, so this endpoint
+   * reveals nothing about an account that POSTing a bad token to the reset
+   * endpoint itself doesn't already reveal.
+   */
+  router.post(
+    '/auth/password/reset/recovery-key',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 10 }),
+    validate({ body: RecoveryKeyRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const recoveryKeyWrap = await service.getRecoveryKeyForResetToken(db, req.body.token);
+        res.status(200).json({ recoveryKeyWrap });
       } catch (err) {
         next(err);
       }
