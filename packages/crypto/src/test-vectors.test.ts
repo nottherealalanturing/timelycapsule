@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { decryptBytes, encryptBytes } from './aes';
 import { fromBase64Url } from './encoding';
+import { deriveKeyFromPassword } from './kdf';
 
 /**
  * Published test vectors (plan/05-BUILD-PLAYBOOK.md T-07b: "consumed by
@@ -37,5 +38,26 @@ describe('test-vectors/v1.json', () => {
 
     const decrypted = await decryptBytes(key, iv, ciphertext, aad);
     expect(new TextDecoder().decode(decrypted)).toBe(v.plaintext);
+  });
+});
+
+/**
+ * Argon2id cross-platform interop fixture (Stage E, E0.1 spike) — same idea
+ * as v1.json above, but for `deriveKeyFromPassword`. A future RN Argon2id
+ * implementation (native module) must reproduce every `expectedKeyB64` here
+ * byte-for-byte. Regenerate via scripts/generate-argon2-test-vectors.mjs,
+ * only on a deliberate ARGON2ID_PARAMS change (see constants.ts/README.md —
+ * changing params breaks every already-wrapped master key).
+ */
+const argon2VectorsPath = fileURLToPath(new URL('../test-vectors/argon2id-v1.json', import.meta.url));
+const { vectors: argon2Vectors } = JSON.parse(readFileSync(argon2VectorsPath, 'utf8')) as {
+  vectors: Array<{ name: string; password: string; saltB64: string; expectedKeyB64: string }>;
+};
+
+describe('test-vectors/argon2id-v1.json', () => {
+  it.each(argon2Vectors)('$name: derives the recorded key', async (v) => {
+    const salt = fromBase64Url(v.saltB64);
+    const key = await deriveKeyFromPassword(v.password, salt);
+    expect(fromBase64Url(v.expectedKeyB64)).toEqual(key);
   });
 });

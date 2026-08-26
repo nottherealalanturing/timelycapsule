@@ -1,0 +1,43 @@
+{
+  "algorithm": "Argon2id",
+  "version": 19,
+  "params": {
+    "parallelism": 1,
+    "iterations": 3,
+    "memorySize": 65536,
+    "hashLength": 32
+  },
+  "note": "expectedKeyB64 generated from the production deriveKeyFromPassword path (hash-wasm). Any RN/native implementation must reproduce these byte-for-byte given the same password/salt/params.",
+  "vectors": [
+    {
+      "name": "short-ascii-password",
+      "password": "correct-horse",
+      "saltB64": "AAECAwQFBgcICQoLDA0ODw",
+      "expectedKeyB64": "PafGBZeaMkNvUv4vnH3SQOGnXco8yqR-uN0uvJmsoO4"
+    },
+    {
+      "name": "long-password",
+      "password": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-the-quick-brown-fox-jumps-over-the-lazy-dog-1234567890",
+      "saltB64": "EBESExQVFhcYGRobHB0eHw",
+      "expectedKeyB64": "94-5jZJyFyWpA378r1IGv_DwKq2vGmUkVUEoqyzeTfY"
+    },
+    {
+      "name": "non-ascii-password",
+      "password": "correct-horse-🔒-Straße-日本語-Ω",
+      "saltB64": "ICEiIyQlJicoKSorLC0uLw",
+      "expectedKeyB64": "sxkVPw2RTyU8Pnji8SddTebE40pesvC0G4H94mcaYnQ"
+    },
+    {
+      "name": "single-char-password",
+      "password": "x",
+      "saltB64": "MDEyMzQ1Njc4OTo7PD0-Pw",
+      "expectedKeyB64": "UhwvecWCJP8Jqbrgp1nvEGmeaNZxFM4CS_ayrOSsgHM"
+    },
+    {
+      "name": "whitespace-and-symbols-password",
+      "password": "  correct horse! @#$%^&*()  \t\n",
+      "saltB64": "QEFCQ0RFRkdISUpLTE1OTw",
+      "expectedKeyB64": "-b3QsK-H2s74DhNW9L4b41DowB8W8rNAV_vQogAnreY"
+    }
+  ]
+}
