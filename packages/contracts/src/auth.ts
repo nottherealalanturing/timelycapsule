@@ -114,8 +114,46 @@ export type ForgotPasswordRequest = z.infer<typeof ForgotPasswordRequestSchema>;
 export const ResetPasswordRequestSchema = z.object({
   token: z.string().min(1),
   newPassword: PasswordSchema,
+  /**
+   * Optional client-computed replacement master-key wrap (base64), exactly
+   * like ChangePasswordRequest's masterKeyWrap — present when the client
+   * restored the master key via the recovery-code flow (see
+   * RecoveryKeyRequestSchema below) before choosing a new password. Omitted
+   * by a plain "I forgot my password" reset that has no recovery code to
+   * restore from — that reset still succeeds (the account remains
+   * reachable), but the *old* masterKeyWrap is left in place, unreadable
+   * under the new password: by design (plan/STAGE-E-MOBILE-V1-E0.5-RECOVERY-
+   * FLOW-SPIKE.md §4/§8), not a bug to silently paper over.
+   */
+  masterKeyWrap: z.string().min(1).optional(),
 });
 export type ResetPasswordRequest = z.infer<typeof ResetPasswordRequestSchema>;
+
+/**
+ * Step 1 of the recovery-code path (E0.5 §5/§18): given a still-valid,
+ * unconsumed password-reset token, fetch the account's recoveryKeyWrap so
+ * the client can attempt local recovery-code restoration *before* choosing
+ * a new password. Does not consume the token — the same token is still
+ * needed for the actual ResetPasswordRequest afterward. Deliberately
+ * separate from ResetPasswordRequestSchema's token field even though both
+ * carry the same value, so each request's intent is self-documenting.
+ */
+export const RecoveryKeyRequestSchema = z.object({
+  token: z.string().min(1),
+});
+export type RecoveryKeyRequest = z.infer<typeof RecoveryKeyRequestSchema>;
+
+/**
+ * Deliberately the only field on this response — never the wider User
+ * shape — so this endpoint cannot become a second way to read account data
+ * (E0.5 §12's "must never expose... arbitrary user endpoints" rule).
+ * `null` for accounts with no recovery kit (pre-dates the column, or an
+ * OAuth-only account that never set a password).
+ */
+export const RecoveryKeyResponseSchema = z.object({
+  recoveryKeyWrap: z.string().nullable(),
+});
+export type RecoveryKeyResponse = z.infer<typeof RecoveryKeyResponseSchema>;
 
 /**
  * Password change while logged in (Settings → Account, T-18) — distinct

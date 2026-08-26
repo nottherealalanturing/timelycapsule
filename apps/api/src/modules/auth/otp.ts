@@ -145,8 +145,8 @@ export async function issuePasswordResetToken(
   return raw;
 }
 
-/** Returns the owning userId, or throws if the token is unknown/used/expired. */
-export async function consumePasswordResetToken(db: Database, token: string): Promise<string> {
+/** Shared lookup for both the non-consuming peek and the consuming finalize below — same validity criteria, one place to keep them in sync. */
+async function lookupPasswordResetToken(db: Database, token: string) {
   const [row] = await db
     .select()
     .from(emailOtpCodes)
@@ -163,7 +163,25 @@ export async function consumePasswordResetToken(db: Database, token: string): Pr
   if (!row) {
     throw ApiError.invalidOrExpiredCode();
   }
+  return row;
+}
 
+/**
+ * Returns the owning userId without consuming the token — used by the
+ * recovery-key lookup step (E0.5 §5/§18), which must not burn the token
+ * since the same token is still needed for the actual
+ * `consumePasswordResetToken` call once the user submits their new
+ * password. Same validity criteria as the consuming version, so a token
+ * that passes this check is guaranteed to still work for the real reset.
+ */
+export async function verifyPasswordResetToken(db: Database, token: string): Promise<string> {
+  const row = await lookupPasswordResetToken(db, token);
+  return row.userId;
+}
+
+/** Returns the owning userId, or throws if the token is unknown/used/expired. */
+export async function consumePasswordResetToken(db: Database, token: string): Promise<string> {
+  const row = await lookupPasswordResetToken(db, token);
   await db.update(emailOtpCodes).set({ usedAt: new Date() }).where(eq(emailOtpCodes.id, row.id));
   return row.userId;
 }

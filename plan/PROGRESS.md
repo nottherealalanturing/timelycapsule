@@ -6,6 +6,330 @@
 
 > **Read this block first.** Everything below the horizontal rule is the older, ticket-numbered history and is preserved as written. Where the two disagree, this block wins.
 
+### Stage E, E1.1 — Backend recovery foundation (2026-08-26) — DONE, not committed
+
+First production implementation task after Phase 0. Fixes exactly the gap E0.5 found:
+`resetPassword` changed only `passwordHash`, silently leaving a recovered account unable
+to decrypt its own historical capsules. No new crypto, no schema change, no UI — a
+mechanical extension of two already-correct patterns (`changePassword`'s re-wrap
+contract; the existing single-use reset-token machinery).
+
+**What changed:** (1) `ResetPasswordRequestSchema` gained an optional `masterKeyWrap`
+field; `resetPassword`'s service function now persists it in the same single `UPDATE`
+statement as `passwordHash` when present, otherwise behaves byte-identically to before.
+(2) New endpoint `POST /auth/password/reset/recovery-key` — given a still-valid,
+unconsumed reset token, returns *only* `{recoveryKeyWrap}` (never the wider user row),
+without consuming the token, so the same token still finalizes the actual reset
+afterward. Backed by a new `otp.ts` function, `verifyPasswordResetToken` (the existing
+`consumePasswordResetToken`'s validity check, factored out and reused, minus the
+token-burning side effect). Same rate limit and same generic `invalid_or_expired_code`
+error as `/auth/password/reset` itself — reveals nothing a bad token there doesn't
+already reveal.
+
+**Why this shape, not a new architecture:** `@tc/crypto`'s `restoreMasterKeyFromRecoveryCode`
+already existed, untouched, unused by any UI — this task only makes it *reachable*.
+`recoveryKeyWrap` was previously exposed by zero endpoints at all (a finding beyond what
+E0.5's report already knew, confirmed again here); the fix scopes it to the existing
+reset-token trust boundary rather than adding it to `/me` or inventing a second
+authorization mechanism.
+
+**Security, explicitly checked (see full report for detail):** no plaintext master key,
+password, or recovery code ever crosses the network at any point in this change; a
+runtime test (real `pino`/`pino-http` instance, not just code-reading) proves the reset
+token, `masterKeyWrap`, and `recoveryKeyWrap` never reach the request log; `toUserResponse`
+still excludes `recoveryKeyWrap` from every normal account response (verified); the new
+endpoint's only output is the single field it's named for.
+
+**Tests:** 7 new focused tests (`apps/api/src/modules/auth/recovery.test.ts`) — legacy
+reset behavior explicitly proven unchanged, recovery-path reset persists atomically,
+recovery-key lookup gated correctly (absent without a valid token, minimal shape with
+one), token-reuse semantics unchanged, no serializer leak, no log leak (runtime-proven).
+Plus 1 new crypto-level test (`packages/crypto/src/master-key.test.ts`) composing only
+existing, already-tested primitives to prove the actual invariant this whole fix depends
+on: a capsule key wrapped under the master key *before* recovery still unwraps correctly
+*after* recovery-code restoration + re-wrap under a new password. Full API suite: 40/40
+files, 300/300 tests pass (no regressions). `packages/crypto`: 7/7 files, 36/36 tests
+pass. Typecheck clean across `@tc/api`, `@tc/crypto`, and `@tc/web` (confirms the
+additive contract change breaks nothing on the existing web client). Lint clean
+(cache bypassed) on `@tc/api`, `@tc/contracts`, `@tc/crypto`. `tsc -p tsconfig.json`
+production build of `@tc/api` succeeds.
+
+**Deliberately not done, and why:** a single test combining real `@tc/crypto` primitives
+with a real HTTP round-trip was considered and rejected — it would require adding
+`@tc/crypto` as a dependency of `apps/api`, directly contradicting that package's own
+README ("the backend never imports this package... it is a regression of the product's
+core security promise — stop and reconsider"). Correctness was instead proven on both
+sides of that boundary separately (real crypto primitives in `packages/crypto`; real
+HTTP + real Postgres in `apps/api`, using opaque ciphertext-shaped test strings, which is
+all the API is ever supposed to see) — the properly-scoped equivalent, not a shortcut.
+No UI was built or touched (`apps/web/src/app/(auth)/reset/page.tsx` still only sends
+`{token, newPassword}` — it doesn't need to change to keep working, and wiring the
+recovery-code UI is separate, future work). `apps/mobile` untouched. No schema migration
+(both columns already existed). The dead `recovery_codes` table was not touched, per
+E0.5's own finding that it most plausibly belongs to the unrelated, deferred TOTP/2FA
+feature.
+
+**Files changed:** `packages/contracts/src/auth.ts`, `apps/api/src/modules/auth/{otp,routes,service}.ts`,
+new `apps/api/src/modules/auth/recovery.test.ts`, `packages/crypto/src/master-key.test.ts`.
+
+**Exact next task:** wire the recovery-code UI itself (web first, per blueprint §25 open
+decision #8's still-unresolved sequencing question) — enter recovery code → call the new
+`/auth/password/reset/recovery-key` endpoint → `restoreMasterKeyFromRecoveryCode` →
+`wrapMasterKeyWithPassword` → submit to `/auth/password/reset` with the new
+`masterKeyWrap`. That work, plus mobile's from-scratch auth build, can now proceed
+against a settled, tested backend contract instead of guessing at one.
+
+### Stage E, Spike 5 (E0.5) — Recovery flow design (2026-08-26) — PASS, not committed
+
+Full spike report: **`plan/STAGE-E-MOBILE-V1-E0.5-RECOVERY-FLOW-SPIKE.md`**. Read-only
+design investigation — no application code, schema, or crypto touched. **Verdict: PASS.**
+This was the last hardware-independent Phase-0 spike; all remaining open items across
+E0.2/E0.3/E0.5 now require a physical iOS device.
+
+**Headline finding, re-confirmed against live code (not just the blueprint's earlier
+claim):** `apps/web`'s forgot-password flow (`(auth)/reset/page.tsx` → API's
+`resetPassword`) updates only `passwordHash`, never touches `masterKeyWrap` — a real,
+reproducible dead end (new password unwraps nothing, "Wrong password. Try again." with no
+way forward). `changePassword` already proves the correct pattern (client re-wraps,
+sends `{newPassword, masterKeyWrap}` together) — the fix is mechanical, not an
+architectural unknown: extend `ResetPasswordRequestSchema` with an optional
+`masterKeyWrap`, mirror `changePassword`'s existing DB write.
+
+**Two findings beyond what the blueprint already knew:** (1) the server currently has
+**no endpoint or response field that returns `recoveryKeyWrap` to any client at all**
+(`UserSchema` excludes it) — even wiring up the existing, unused
+`restoreMasterKeyFromRecoveryCode` client function has nothing to call it with today;
+recommended fix is scoping `recoveryKeyWrap` to the existing reset-token verification
+step, not a new account-wide endpoint. (2) A dead, unused `recovery_codes` table
+(`id, userId, codeHash, usedAt`) exists in the schema, matching `03-ARCHITECTURE.md`'s
+*original* (superseded) recovery design — its shape most plausibly belongs to the
+separate, still-deferred TOTP-2FA backup-codes feature (T-33), not master-key recovery;
+flagged as a naming-collision risk, not something to build on.
+
+**Confirmed, not assumed:** recovery-code crypto (`@tc/crypto`'s HKDF-based
+`restoreMasterKeyFromRecoveryCode`) needs zero changes and zero new primitives — it
+already works, is platform-agnostic, and is simply never called by any UI. One master key
+roots all owned-capsule content uniformly (content docs, replies, media, Place Memory) —
+recovering it recovers everything owned in one step; received capsules and guest-claimed
+recipient rows were already independent of it before this spike (fragment-key delivery,
+metadata-only claim respectively). Mobile device-replacement/recovery needs the identical
+fix, not a separate mechanism — `@tc/crypto` is shared verbatim.
+
+**Recommendation, not a new founder decision:** biometric unlock stays exactly what E0.3
+already concluded (optional convenience, password/recovery always authoritative);
+recovery interacts with it via one small addition — the app needs its own "biometric
+protection enrolled" flag so a `null` SecureStore read reads as "re-enroll," not a
+generic empty state (closes the ambiguity E0.3 §10 found).
+
+**Files touched:** `plan/STAGE-E-MOBILE-V1-E0.5-RECOVERY-FLOW-SPIKE.md` (new, durable
+report) and this entry. No application code, crypto, schema, or `apps/mobile` changed.
+No tests run (nothing executable was touched — this was a read-only investigation).
+
+**Open decisions (none resolved here, all explicit):** whether web gets the reset fix
+alongside mobile or mobile-first (blueprint §25's open decision #8, still unresolved);
+whether recovery codes should ever rotate/become single-use; whether iOS's
+Keychain-survives-reinstall behavior should read as "still logged in" post-reinstall — a
+product call, not a technical necessity.
+
+**Exact next task:** implement the two backend changes (§18/§20 of the report) — the
+shared prerequisite for both web's fix and mobile's from-scratch auth build in E1/E2. All
+hardware-independent Phase-0 spikes are now complete; remaining gates (iOS Universal
+Link, iOS biometric invalidation) need a physical iOS device and block only their
+specific features, not core login/recovery work.
+
+### Stage E, Spike 3 (E0.3) — SecureStore behavior (2026-08-26) — PASS, not committed
+
+Full spike report: **`plan/STAGE-E-MOBILE-V1-E0.3-SECURESTORE-SPIKE.md`**. Answers
+`plan/STAGE-E-MOBILE-V1-PHASE-0-SPIKES.md`'s Spike 3. **Verdict: PASS**, with one
+platform divergence and one Simulator-fidelity limitation, both documented rather than
+glossed over.
+
+**Key findings:** `expo-secure-store ~57.0.1` (resolved against `apps/mobile`'s actual
+Expo `~57.0.7`) round-trips a synthetic 32-byte master-key-shaped payload byte-for-byte
+on both platforms, fast enough (5–48ms) that no loading state is needed for SecureStore
+itself (Argon2id, already measured in E0.1, is what actually needs one). **Real platform
+divergence found:** iOS Keychain **survives uninstall/reinstall** (plain and biometric-
+protected items alike, confirmed via a throwaway app rebuilt from scratch); Android
+SecureStore is **wiped on uninstall**, confirmed the opposite way. **Critical, load-
+bearing error-taxonomy finding:** on both platforms, "secret never written" and "secret
+exists but was invalidated by a credential change" are indistinguishable — both return
+`null`, no error. Android's biometric invalidation was proven for real (cleared the lock
+credential via `adb shell locksettings clear`, which cascaded to remove the enrolled
+fingerprint; the previously-protected item then read back `null`). **iOS's invalidation
+could not be proven** — toggling Face ID enrollment off via the Simulator's Features menu
+did not invalidate the item, but the native code correctly requests `.biometryCurrentSet`
+(the right flag), so this is almost certainly a Simulator fidelity gap, not a real
+finding — flagged explicitly as needing a physical iOS device, not assumed either way.
+
+**Recommendation:** biometric unlock should be the blueprint §5.2 model exactly as
+already specified — an optional convenience layer wrapping the master key a second time
+under a device-bound, biometric-gated key, never a replacement for password/recovery
+unlock (Decisions 5/11/12 already require this; not a new decision). One concrete
+addition for E1/E2: because `null` is ambiguous (see above), the app needs its own
+separate "biometric protection is enrolled" flag so a `null` protected-read when that
+flag is set reads as "re-enroll," not a generic empty state.
+
+**Files touched:** `plan/STAGE-E-MOBILE-V1-E0.3-SECURESTORE-SPIKE.md` (new, durable
+report) and this entry. `apps/mobile` untouched. No production code, crypto, or server
+schema changed. `packages/crypto`'s existing test suite re-run clean (35/35) as a
+sanity check — untouched by this spike, confirmed unaffected.
+
+**Open decision, physical-device-gated:** whether iOS actually invalidates a biometric-
+gated Keychain item on enrollment change (§16/§17 of the report) — blocks shipping the
+*biometric* feature specifically, does not block E1's broader login/session work.
+
+**Exact next task:** no hardware-free Phase 0 item remains except Spike 5 (recovery-flow
+design decision, a design task, not a technical spike). Spikes 2's iOS half and this
+spike's §16/§17 both need a physical iOS device to close out.
+
+### Stage E, Spike 2 (E0.2) — Deep-link fragment survival (2026-08-26) — PARTIAL, not committed
+
+Full spike report: this session's transcript (not written to a separate file). Answers
+`plan/STAGE-E-MOBILE-V1-EXECUTION-BACKLOG.md`'s E0.2. **Verdict: PARTIAL** — Android real
+HTTPS App Link fragment survival is PASS; iOS real HTTPS Universal Link is UNTESTED (hard
+environment blocker, not a negative result); web fallback and leakage audit are both PASS
+with one significant, pre-existing, non-mobile finding surfaced.
+
+**Android — PASS, real evidence.** Built a throwaway Expo app with a real
+`android:autoVerify="true"` intent-filter against a real, trusted-cert HTTPS domain
+(`localtunnel`, serving synthetic AASA/assetlinks.json for a throwaway package/cert
+fingerprint — a real domain, not `timelycapsule.com`, per the task's "smallest isolated
+test domain" instruction). Confirmed via server access logs that the emulator's domain
+verifier reported `STATE_APPROVED` **without ever actually fetching assetlinks.json** —
+a real, notable finding: `pm get-app-links`'s reported state should not be trusted at
+face value as proof of a completed network-based check on this AVD image. Without
+explicit package targeting, the OS routed the link to Chrome, not the app (no automatic,
+verified hand-off demonstrated). **With** explicit targeting (`-p` package, the same
+resolution a user gets after picking "Always" once in the real disambiguation dialog),
+the real `https://` URL delivered `#k=` intact on cold start, warm reopen, and while
+foregrounded — byte-for-byte, matching E0.4's custom-scheme result exactly.
+
+**iOS — UNTESTED, hard blocker, not a workaround-able gap.** Associated Domains
+entitlements require Xcode to resolve a real Apple Developer Team even for a *Simulator*
+build; this machine has zero code-signing identities and no Apple ID signed into Xcode
+(`security find-identity` returns none). Did not attempt to sign into an Apple ID (out of
+scope — that's the user's own credential). Separately, and independent of signing: Apple
+does not expose the *Settings > Developer > Universal Links* toggle needed for
+`?mode=developer` testing anywhere in iOS Simulator — real Universal Link testing has
+always required a physical device for this reason, signing aside. **Physical-device
+verification with a real Apple Developer Team remains the only way to close this.**
+
+**Web fallback — PASS, empirically tested against the running dev server** (not just
+read from source): loaded `/c/TESTTOKEN#k=TESTKEY` and its malformed variants
+(`#foo=bar`, `#k=`, `#k=TESTKEY&extra=value`, no fragment at all) in a real browser tab
+against `apps/web`; in every case the only network request was `GET /v1/r/TESTTOKEN`
+(path only) — confirmed via live network-request inspection, not assumption. No
+fragment ever reached storage (`localStorage`/`sessionStorage` checked directly, empty).
+Confirmed the reveal page's one internal link that reconstructs `window.location.hash`
+(`SystemPage`'s rate-limited retry CTA) is a plain `<a>`, not a Next `<Link>` — so it
+never routes through `onRouterTransitionStart`/PostHog's `capturePageview`, closing a
+plausible leak path traced from `instrumentation-client.ts` before it was tested.
+
+**Leakage audit — one real, pre-existing, non-mobile finding, not introduced by this
+spike, not fixed by this spike (backend/production code, out of scope to touch):**
+`apps/api/src/modules/email/service.ts`'s `sendTemplatedOrThrow` → `recordQueued`
+persists the *entire* email payload — including the recipient link with its `#k=`
+fragment — into `outbound_messages.payload` (a permanent JSONB column, no purge/TTL
+found), for both the original "something waiting" invite and every `resend-invite`. This
+is a legitimate, already-necessary exception (the server must have the link to send the
+email — only the client has the key), but the **durable, unbounded retention** in an
+"audit + retry ledger" table is broader than "transient during send." Flagged as an
+`[OPEN DECISION]` for a founder/security call, not touched. Everything else audited
+clean: `pino`/`pino-http` logging never includes `req.body` (default serializer, no
+custom body logging found); audit-log metadata stores only `{recipientId}`; no
+`console.log` of the link anywhere in `apps/api`; PostHog `capture_pageview: false` (no
+automatic full-URL capture) and the one manual `capturePageview` call is never reached by
+the reveal page's own hash-carrying link (see above); Sentry has no custom
+`beforeBreadcrumb` scrubber — bounded risk since breadcrumbs only leave the browser
+attached to a captured error, not tested by deliberately throwing one this session
+(`[INFERENCE]`, not `[VERIFIED]`).
+
+**Malformed-fragment matrix** — code-traced (`keyFromUrlFragment`/`decodeCapsuleKeyFromLink`
+in the reveal page) and cross-checked against the live network-request evidence above:
+missing fragment and `#k=` (empty) both resolve to "no key" (null, safely, no throw);
+`#k=INVALID` decodes to a wrong-length byte array that would fail AES-256-GCM key import
+downstream (`[INFERENCE]`, not tested against a real existing capsule this session);
+`#k=TESTKEY&extra=value` correctly extracts just the `k=` value, ignoring the rest
+(regex-confirmed, network-confirmed). None of these ever change what reaches the server.
+
+**Files touched in this repo:** none — `apps/mobile`, `apps/web`, `apps/api` all
+untouched (the web dev server was only navigated in a browser tab to observe live
+network/storage behavior, no source edited). `plan/PROGRESS.md` (this entry) is the only
+change. No test/typecheck/lint run — no repository files were touched, so none was owed.
+
+**Exact next spike/task:** physical iOS + Android device verification of real Universal
+Link / App Link delivery (this session could only get Android emulator evidence);
+founder decision on the `outbound_messages.payload` retention finding before Phase 2
+ships resend-invite to mobile too.
+
+### Stage E, Spike 4 (E0.4) — Navigation foundation (2026-08-26) — PASS, not committed
+
+Full spike report: this session's transcript (not written to a separate file). Answers
+`plan/STAGE-E-MOBILE-V1-EXECUTION-BACKLOG.md`'s E0.4 / `plan/STAGE-E-MOBILE-V1-PHASE-0-SPIKES.md`'s
+Spike 4. **Verdict: PASS** — Expo Router (`~57.0.16`, matching `apps/mobile`'s installed
+Expo `~57.0.7`/RN `0.86.0` closely enough to be representative) handles every row of the
+backlog's evaluation table without a structural workaround, proven on a throwaway Expo
+Router app (outside the repo, deleted after) built and run on both an iPhone 16 iOS 18.6
+Simulator and a Pixel 7 Android emulator.
+
+**Proven, both platforms:** unauthenticated → login → authenticated four-tab shell
+(Home/Received/Notifications/Profile per blueprint §9.2, FAB omitted from tabs
+correctly); a tab pushing `capsule/[id]` as a genuine full-screen route that fully covers
+the tab bar (not a `Modal`, satisfying `07 §XVI`'s modal ban) by making `(tabs)` one
+`Stack.Screen` sibling among others inside `(app)/_layout.tsx`'s own `Stack`, not the
+whole layout; an auth-gated `(app)` route group redirecting to login without a hydration-
+race flash (three-state `unknown/authenticated/unauthenticated` model mirroring
+`auth-context.tsx`'s now-fixed pattern — the `unknown` state renders a plain splash and
+never guesses); backgrounding mid-flow (HOME button, reopen) restores to the exact same
+screen on both platforms (in-memory backgrounding, not app-kill restoration — that's a
+separate, harder guarantee this spike didn't attempt).
+
+**Deep-link fragment handoff (the E0.2-relevant half): PASS, with one real caveat found
+and fixed.** A naive per-screen `Linking.useURL()` call in the destination route missed
+the fragment on a **warm** re-open (shows stale, because navigating to a *new* screen
+component necessarily happens after the OS 'url' event already fired, so a freshly-
+mounted screen only ever sees `getInitialURL()`'s original cold-launch value) — this is a
+real, generalizable trap for whoever implements E1's actual router, not a framework
+defect. Fixed by capturing the URL once at the always-mounted root layout instead
+(`Linking.getInitialURL()` + a persistent `'url'` event listener) and reading from that
+shared capture in leaf screens. With that fix: `navspike://c/TOKEN?foo=bar#k=KEY` (custom
+URL scheme, not a real Universal Link — see caveat below) delivered the fragment intact
+to the reveal route on **cold start, warm-reopen, and already-foregrounded** app states,
+both platforms, verified via `xcrun simctl openurl` / `adb shell am start -a
+android.intent.action.VIEW -d ...`. **Caveat, explicit:** this used a custom scheme
+(`navspike://`), not a real `apple-app-site-association`/`assetlinks.json` Universal/App
+Link — E0.2's own job, not re-litigated here (see §13 below). A custom scheme proves
+Expo Router's *internal* fragment handling is sound; it does not prove a Universal Link
+delivers the same intact URL to the OS in the first place — those are two different
+failure points and E0.2 must test the second one specifically.
+
+**Guest composer:** Decision 2 (locked, founder decision) defers all guest code paths
+past Phases 0-8 of Mobile V1 — this directly conflicts with the task's request to
+determine "how the guest composer fits into navigation." **Not silently resolved either
+way:** the throwaway proof includes one stub route reachable from the unauthenticated
+login screen (proving the routing layer *can* host such a screen with no auth-gate
+fight), labeled on-screen as a stub and explicitly *not* a claim that guest composer
+ships in V1. Flagged here for explicit founder/user confirmation rather than assumed.
+
+**Toolchain findings, both real, neither fixed in this repo:** (1) the same
+`expo-modules-jsi@57.0.5` / Xcode 26.2 / Swift 6 `RuntimeScheduler.h` bug from E0.1
+(confirmed-open, expo/expo#49214) reappeared and was patched the same way, in the
+throwaway app's `node_modules` only. (2) **New finding:** `expo-router@57.0.16` pulls in
+`react-native-reanimated@4.6.0` transitively (via `@expo/ui`), which requires
+`react-native-worklets@^0.12` — but `expo-modules-core@57.0.13`'s native `WorkletsAdapter`
+was built against an older worklets API (`executeSync` doesn't exist in 0.12.x),
+producing a real iOS build failure (`no member named 'executeSync'`) the moment
+`expo-router` is installed on this Expo SDK version, with no navigation code involved at
+all. Worked around in the throwaway app via a `package.json` `"overrides"` pin
+(`react-native-worklets: 0.10.4`, forcing npm to drop the incompatible transitive
+version entirely via `--legacy-peer-deps`) — **this will need the same override (or an
+Expo-side fix, if one ships first) in `apps/mobile`'s real `package.json` when E1 adds
+`expo-router` for real.**
+
+**Files touched in this repo:** none — `apps/mobile` untouched, no test/typecheck/lint
+run (no repository files were touched, so none was owed). `plan/PROGRESS.md` (this
+entry) is the only change.
+
 ### Stage E, Spike 1 — Native Argon2id compatibility (2026-08-26) — PASS, not committed
 
 Full spike report: this session's transcript (not written to a separate file). Answers
