@@ -1,7 +1,8 @@
 'use client';
 
 import type { Capsule, Contact, MediaItem, PatchCapsuleRequest, Recipient } from '@tc/contracts';
-import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { Suspense, useState } from 'react';
 import { AddressMovement } from '../../../components/composer/v2/AddressMovement';
 import { ComposeMovement } from '../../../components/composer/v2/ComposeMovement';
 import { MovementNav, type Movement } from '../../../components/composer/v2/MovementNav';
@@ -76,13 +77,30 @@ const MEDIA: MediaItem[] = [
 ];
 
 export default function ComposerHarness() {
+  if (process.env.NODE_ENV !== 'development') return null;
+  return (
+    <Suspense fallback={null}>
+      <ComposerHarnessInner />
+    </Suspense>
+  );
+}
+
+/**
+ * `?movement=address|compose|seal` and `?conditions=1` (seal only, opens the
+ * Conditions panel by default) are capture aids only — for pointing a
+ * headless screenshot straight at a given movement/state without needing to
+ * click through it. No real caller of this harness sets either.
+ */
+function ComposerHarnessInner() {
+  const searchParams = useSearchParams();
+  const initialMovement = (searchParams.get('movement') as Movement | null) ?? 'seal';
+  const conditionsOpen = searchParams.get('conditions') === '1';
+
   const [capsule, setCapsule] = useState(BASE as Capsule);
   const [contentDoc, setContentDoc] = useState<unknown>(LETTER);
-  const [movement, setMovement] = useState<Movement>('seal');
+  const [movement, setMovement] = useState<Movement>(initialMovement);
   const [asGuest, setAsGuest] = useState(false);
   const [withRecipient, setWithRecipient] = useState(true);
-
-  if (process.env.NODE_ENV !== 'development') return null;
 
   const draft: CapsuleDraft = {
     capsule,
@@ -153,6 +171,7 @@ export default function ComposerHarness() {
           hasRecipients={recipients.length > 0}
           sealing={false}
           onSeal={() => {}}
+          defaultConditionsOpen={conditionsOpen}
         />
       ) : null}
 

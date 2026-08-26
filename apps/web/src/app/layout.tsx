@@ -56,25 +56,44 @@ export const metadata: Metadata = {
 // theme while React hydrates (data-theme drives packages/ui-web's
 // tokens.css — see the [data-theme] rules there).
 //
-// Product Quality Pass (2026-08): restores system-preference as the default,
-// superseding the earlier "light always, even with no stored preference"
-// decision recorded lower in this file's history. Precedence, in order:
-// an explicit stored choice (from ThemeToggle, anywhere it's rendered) wins
-// outright; failing that, the OS's own prefers-color-scheme; failing that
-// (matchMedia unavailable), light. ThemeToggle itself keeps following the OS
-// live for as long as nothing has been explicitly chosen — this script only
-// owns the pre-paint instant.
+// Light/paper is the unconditional default. Precedence: an explicit stored
+// choice (from ThemeToggle, anywhere it's rendered) wins outright; failing
+// that, light — never the OS's prefers-color-scheme. A prior "Product
+// Quality Pass" (2026-08-10) had introduced a prefers-color-scheme fallback
+// here, which meant a brand-new visitor with a dark OS setting got dark
+// mode with zero action on their part; reverted, since light-by-default is
+// a deliberate product decision, not an accident to defer to the OS on.
 const THEME_INIT_SCRIPT = `
 (function () {
   try {
     var stored = localStorage.getItem('tc-theme');
-    var theme = stored === 'dark' || stored === 'light'
-      ? stored
-      : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var theme = stored === 'dark' || stored === 'light' ? stored : 'light';
     document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {
     document.documentElement.setAttribute('data-theme', 'light');
   }
+})();
+`;
+
+// Dev-only marketing-screenshot capture aid: seeds a real session's tokens
+// from a query param into localStorage before React ever mounts, so a
+// headless Chrome CLI screenshot (no click/type capability, just load-then-
+// capture — see design/.build-launch.mjs) can land on an authenticated page
+// in one navigation instead of needing an interactive login. Only wired
+// server-side when NODE_ENV is 'development' (the whole <script> tag is
+// omitted from the tree in any other build), and it does nothing unless the
+// two query params are both explicitly present.
+const DEV_SESSION_SEED_SCRIPT = `
+(function () {
+  try {
+    var p = new URLSearchParams(window.location.search);
+    var at = p.get('__seed_at');
+    var rt = p.get('__seed_rt');
+    if (at && rt) {
+      localStorage.setItem('tc-access-token', at);
+      localStorage.setItem('tc-refresh-token', rt);
+    }
+  } catch (e) {}
 })();
 `;
 
@@ -91,6 +110,9 @@ export default function RootLayout({
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {process.env.NODE_ENV === 'development' && (
+          <script dangerouslySetInnerHTML={{ __html: DEV_SESSION_SEED_SCRIPT }} />
+        )}
       </head>
       <body className="min-h-full flex flex-col">
         <Providers>{children}</Providers>

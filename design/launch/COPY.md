@@ -1,128 +1,161 @@
-# TimelyCapsule — launch copy
+# TimelyCapsule — launch copy (2026-08-25 refresh)
 
-Paste-ready. Every line checked against `07 §VIII`: no exclamation marks, no
-emoji, no "we", no "just", dates literal and absolute.
-
-Character counts are real. `[asset]` names the file to attach.
+> **Supersedes the previous version of this file entirely** — not an edit
+> pass. The product is live at `timelycapsule.com` (not "opening 2026"),
+> and every screenshot below is real, current, light-mode UI, verified
+> hands-on this session, not the marketing homepage's own demo sections
+> (which is what every screenshot in the previous pack actually was — see
+> `REFRESH-2026-08-25-NOTES.md` for the full audit).
+>
+> Paste-ready. Every line checked against `07 §VIII` (no exclamation marks,
+> no emoji, no "we"/"our"/"us" for the institution, no "just") and against
+> real platform character limits — verified programmatically
+> (`design/launch/.raw/copy-check.py`), not by eye. `[asset]` names the
+> exact file to attach.
 
 ---
 
 ## X
 
 **Display name** · `TimelyCapsule`
-**Handle** · `@timelycapsule` (fallbacks, in order: `@timelycapsuleco` · `@timelycapsuleoffice` · `@keptbytimelycapsule`)
+**Handle** · `@timelycapsule`
 **Location** · leave empty
-**Link** · `timelycapsule.com/opening`
+**Link** · `timelycapsule.com`
 
 **Profile image** · `design/brand/social/avatar-paper-400.png`
 **Header** · `design/launch/final/x/header.png`
 
-### Bio — 133 characters
+### Bio — 113 characters
 
 ```
-Letters sealed until a date you choose, and kept until then. Encrypted on the device that wrote them — unreadable here. Opening 2026.
+A letter that arrives exactly when you choose, and not a day sooner. Sealed on your device — unreadable here too.
 ```
 
-### Pinned tweet · `[design/launch/final/x/post-mark.png]`
+### Pinned post · `design/launch/final/x/post-mark.png` — 235 characters
 
 ```
-TimelyCapsule keeps a letter until a date you choose.
+A letter that cannot be read yet is still a letter.
 
-It is sealed on the device that wrote it, so the contents are unreadable to
-anyone else — including this account, and including the people who built it.
+TimelyCapsule keeps it: sealed on the device that wrote it, unreadable to anyone else, including this account, until the date you chose.
 
 Nothing arrives early. Nothing arrives late.
-
-Opening 2026.
 ```
 
 ---
 
-> **Tweets 1–5 are deliberately reworded from their Instagram counterparts**,
-> not copy-pasted. Two independent reasons converged: X's 280-character limit
-> made four of the five originals unpostable as a single tweet (up to 320
-> chars over), and posting the identical paragraph on both platforms gives
-> nobody a reason to follow both. Same ideas, different sentences, each now
-> comfortably under the limit — margins noted so a handle or a short lead-in
-> can be added without re-checking.
-
-### Tweet 1 · the mark · `[design/launch/final/x/post-mark.png]`
+### Post 1 · The mark · `design/launch/final/x/post-mark.png` — 201 characters
 
 ```
 A vertical line, broken once.
 
-The gap is exactly the width of the marker approaching it — not empty space, a place already reserved.
+The gap is exactly as wide as the marker approaching it. Not empty space — a place already reserved.
 
-The marker never crosses it. It holds at half distance, permanently.
+The marker never crosses it. It holds at half distance. Permanently.
 ```
 
-*(203 characters — 77 of headroom.)*
-
-### Tweet 2 · the Dual Clock · `[design/launch/final/x/post-dualclock.png]`
+### Post 2 · The Dual Clock · `design/launch/final/x/post-dualclock.png` — 188 characters
 
 ```
-Most software shows what is left. This also shows what has already passed.
+Most software shows what's left. This also shows what already passed.
 
-Elapsed and remaining, equal weight, always together. A progress bar implies the rest was waiting. This says how far it has come.
+Elapsed and remaining, equal weight, side by side. A progress bar says how much is left. This says how far it's come.
 ```
 
-*(205 characters — 75 of headroom.)*
-
-### Tweet 3 · ten years · `[design/launch/final/x/post-decade.png]`
+### Post 3 · Ten years · `design/launch/final/x/post-decade.png` — 151 characters
 
 ```
 Ten years is 3,653 days.
 
-A person holds about three of them in mind at once. That gap, between the number and the felt length, is why 2036 lands differently than Friday does.
+A calendar makes that feel small. A decade never does. That's the whole argument for choosing the date before writing a word.
 ```
 
-*(175 characters — 105 of headroom.)*
-
-### Tweet 4 · the held beat · `[design/launch/final/x/post-held-beat.png]`
+### Post 4 · The composer · `design/launch/final/x/post-composer.png` — 165 characters
 
 ```
-Three parts: an approach at constant velocity, a full 400ms stop, then an instant state change.
+The composer opens with one dismissible question, then gets out of the way entirely.
 
-Most systems rush the middle. Stopping instead is what turns a transition into a threshold.
+No templates, no suggested phrasing. Writing it for you would defeat the point.
 ```
 
-*(188 characters — 92 of headroom.)*
+### Post 5 · Before it seals · `design/launch/final/x/post-sealing.png` — 186 characters
 
-### Tweet 5 · the refusals · text only
+```
+Before a letter seals, it can gather what belongs with it: a photo, a voice note, the coordinates of where it was written.
+
+Read it back once. Seal it. That's the last edit it ever gets.
+```
+
+### Post 6 · A Tuesday, mid-custody · `design/launch/final/x/post-waiting.png` — 168 characters
+
+```
+This is what ten years of custody looks like on an ordinary Tuesday: a line of text and two numbers.
+
+No notification. No nudge. A sealed letter needs to be left alone.
+```
+
+### Post 7 · On the day · `design/launch/final/x/post-reveal.png` — 213 characters
+
+```
+Nothing crossfades here. The screen empties out, sits in that emptiness for a beat, and only then does paper show up.
+
+A crossfade would suggest the screen simply changed state. This is meant to feel like arrival.
+```
+
+### Post 8 · Not the last word · `design/launch/final/x/post-replies.png` — 186 characters
+
+```
+Opening a capsule isn't the end of the exchange.
+
+Whoever receives it can answer back, sealed under the identical encryption the letter travelled in. Less a thread, more a second letter.
+```
+
+### Post 9 · One reading only · `design/launch/final/x/post-one-reading.png` — 155 characters
+
+```
+Some letters aren't built to last.
+
+Mark one "one reading only" and it survives exactly one open before it's gone for good — no backup, no trace, anywhere.
+```
+
+### Post 10 · The refusals · text only — 197 characters
 
 ```
 A partial list of what this will not have:
 
 No streaks. No badges. No progress bar. No preview of anything sealed. No urgency — the only clock is the one you set. No confetti. No sound at a reveal.
-
-Refusals are easier to state than features, and harder to hold.
 ```
 
-*(262 characters — 18 of headroom. Tightest of the six; do not lengthen without re-counting.)*
+### Post 11 · Kept · `design/launch/final/x/post-kept.png` — 156 characters
 
-> **On hashtags:** zero on X. X hashtags read as 2014, and this account has no
-> campaign to join.
+```
+One word carries the whole thing, and English gives it away for free.
+
+Kept time. Kept safe. Kept its word. A keepsake.
+
+Four meanings, one word, no strain.
+```
+
+> **On hashtags:** zero on X, as before — this account has no campaign to join.
 
 ---
 
 ## Instagram
 
 **Display name** · `TimelyCapsule`
-**Handle** · `@timelycapsule` (fallback: `@timelycapsule.co`)
+**Handle** · `@timelycapsule`
 **Category** · leave blank, or `Software` if forced
-**Link** · `timelycapsule.com/opening`
+**Link** · `timelycapsule.com`
 
 **Profile image** · `design/brand/social/avatar-paper-1024.png`
 
-### Bio — 120 characters
+### Bio — 124 characters
 
 ```
-Letters, sealed until a date you choose, and kept until then.
-Encrypted on your device. Not readable here.
-Opening 2026.
+Letters that arrive exactly when you choose — next month, or 2041.
+Sealed on your device. Unreadable until the date says so.
 ```
 
-### Highlight covers
+### Highlight covers (unchanged — abstract marks, not date- or feature-bound)
 
 | Cover | File | Title to type in-app |
 |---|---|---|
@@ -133,133 +166,125 @@ Opening 2026.
 | Ruled rectangle | `design/launch/final/instagram/highlight-record.png` | `record` |
 | Single stroke | `design/launch/final/instagram/highlight-rules.png` | `rules` |
 
-Titles are lowercase single words. No text inside the circle — Instagram sets
-the title beneath it already.
-
 ---
 
-### The nine-post grid
+### The eleven-post grid
 
-Posted in order. Read as a grid, the nine are a sequence: the mark, the system,
-the instrument, time, the rhythm, the serial, the refusals, the word, the date.
-
-Hashtags: **maximum two, lowercase, on their own line**, separated from the
-caption by a blank line. There is no branded campaign tag — a campaign tag asks
-for participation this account has not earned.
-
----
+Hashtags: maximum two, lowercase, own line, blank line before them. No branded campaign tag.
 
 **1 · The mark** · `design/launch/final/instagram/01-the-mark.png`
 
 ```
 A vertical reference, broken once.
 
-The break is exactly the width of the marker approaching it. The gap is not a
-gap — it is a place that has been kept.
+The break is exactly the width of the marker approaching it. The gap is not a gap — it is a place that has been kept.
 
 The marker never arrives in the mark. It is held at half distance, permanently.
-The brand lives in the years before arrival, so the mark does too.
 
 #kept
 ```
 
-**2 · Two registers** · `design/launch/final/instagram/02-two-registers.png`
-
-```
-One rule governs the colour and the typography at once.
-
-Instruments are dark and set in sans. Records are paper and set in serif.
-
-A dial is read in a dark room. A letter is read on paper. The interface tells
-you which one you are looking at before you have read a word of it — and it
-never crossfades between them. The instrument clears, the frame holds empty,
-and the record arrives.
-
-Two designers given only that sentence would produce interfaces that agree.
-
-#designsystem
-```
-
-**3 · The Dual Clock** · `design/launch/final/instagram/03-dual-clock.png`
+**2 · The Dual Clock** · `design/launch/final/instagram/03-dual-clock.png`
 
 ```
 Almost nothing in software shows you what has already passed.
 
-Elapsed and remaining, weighted equally, always together. A progress bar tells
-you how much is left and implies the rest was waiting. This says how far it has
-come.
+Elapsed and remaining, weighted equally, always together. A progress bar tells you how much is left and implies the rest was waiting around for you. This says how far it has come.
 
-It converts a countdown into a journey, and it is on every screen, which is why
-it carries more of this brand than the mark does.
+It converts a countdown into a journey. It's on every single screen — which might make it the actual logo, more than the logo is.
 
 #kept
 ```
 
-**4 · A decade** · `design/launch/final/instagram/04-a-decade.png`
+**3 · A decade** · `design/launch/final/instagram/04-a-decade.png`
 
 ```
 Ten years is 3,653 days. A person can hold about three of them in mind at once.
 
-That gap — between the number and the felt length — is the reason a letter
-arriving in 2036 will land differently than one arriving on Friday. Nothing
-about the letter changes. The distance does the work.
+That gap — between the number and the felt length — is the reason a letter arriving in 2036 will land differently than one arriving on Friday. Nothing about the letter changes. The distance does the work.
 
-Choose the date first. The writing is easier once the distance is real.
+Choose the date first. The writing gets easier once the distance is real.
 ```
 
-**5 · The held beat** · `design/launch/final/instagram/05-held-beat.png`
+**4 · The composer** · `design/launch/final/instagram/10-composer.png`
 
 ```
-Three parts, in order: an approach at constant velocity, a full stop of 400
-milliseconds, and then an instant state change.
+The blank page is the real problem here.
 
-Every animation library wants to peak in the middle. Stopping instead is what
-turns a transition into a threshold — the stillness is the part that tells you
-something is about to become irreversible.
+The composer asks exactly one question — "what do you want your future self to know that you might not say out loud" — dismissible, never inserted into the letter itself, and then it gets out of the way.
 
-The stop is preserved when a device asks for reduced motion. Silence is timing,
-not motion, so it survives. That version is arguably the purer one.
-
-#motiondesign
+No templates, and there will not be any. A template writes the company's words. A question writes yours.
 ```
 
-**6 · The hallmark** · `design/launch/final/instagram/06-hallmark.png`
+**5 · Before it seals** · `design/launch/final/instagram/11-sealing.png`
 
 ```
-Every instrument carries its maker's mark and its serial number. Every capsule
-carries one too.
+A letter can carry more than words.
 
-It appears in the same monospaced treatment on every surface the record touches:
-the timeline, the letter, the receipt, the export, the email. Quote it to
-support and it identifies the record without revealing anything about it.
+A photo. A voice note, recorded and reviewed before it's kept. The place it was written, if that matters to the story. All of it travels inside the same seal as the letter itself.
 
-It is derived, not sequential. It does not say how many have been sealed,
-because that number is nobody's business and the count is not the achievement.
-
-#typography
+Then: read it once more. After sealing, nothing inside can change — not the words, not what's attached, not by you and not by anyone else.
 ```
 
-**7 · What it will not do** · `design/launch/final/instagram/07-refusals.png`
+**6 · A Tuesday, mid-custody** · `design/launch/final/instagram/12-waiting.png`
+
+```
+This is what a decade of custody looks like on a Tuesday.
+
+Nothing is happening, and that is the entire design brief. A sealed letter does not need tending, does not decay if ignored, and produces no notifications asking you to come back.
+
+The test this screen has to pass: if a capsule sitting untouched for three years reads as empty instead of kept, the design has failed. It doesn't.
+```
+
+**7 · On the day** · `design/launch/final/instagram/13-reveal.png`
+
+```
+On the day, the instrument gives way to the letter.
+
+The screen goes dark first. Holds there for a beat — long enough to notice. Then paper. Never a crossfade, because a crossfade says the screen changed. This says something arrived.
+
+It's skippable at any point. Whoever is waiting on the other end gets the letter the moment they want it, not the moment the animation allows.
+
+#kept
+```
+
+**8 · Not the last word** · `design/launch/final/instagram/14-replies.png`
+
+```
+The letter does not have to be the last word.
+
+Once a capsule opens, the person who received it can write back — encrypted exactly the same way the original letter was, so the reply is exactly as unreadable to everyone who isn't supposed to read it.
+
+Not a message thread. A second letter, answering the first.
+```
+
+**9 · One reading only** · `design/launch/final/instagram/15-one-reading-only.png`
+
+```
+Not every letter is meant to be kept forever.
+
+Choose "one reading only," and the record is destroyed the moment it has been read — not archived, not soft-deleted, not sitting in a backup somewhere. There is no copy. Not one, anywhere, including here.
+
+This is real, verified behavior, not a line in a settings screen nobody checked.
+```
+
+**10 · What it will not do** · `design/launch/final/instagram/07-refusals.png`
 
 ```
 A partial list of things this product will never have.
 
-No streaks. No badges. No "on this day". No preview of anything sealed,
-anywhere, including internally. No progress bar. No confetti. No urgency of any
-kind — the only clock is the one you set. No sound at a reveal, because a reveal
-might happen in a hospital ward and there is no way to know.
+No streaks. No badges. No "on this day." No preview of anything sealed, anywhere, including internally. No progress bar. No confetti. No urgency of any kind — the only clock is the one you set. No sound at a reveal, because a reveal might happen somewhere quiet and there is no way to know that in advance.
 
-A list of refusals is a more reliable description of a product than a list of
-features, because features arrive and refusals have to be held.
+A list of refusals is a more reliable description of a product than a list of features. Features arrive. Refusals have to be held.
 ```
 
-**8 · Kept** · `design/launch/final/instagram/08-kept.png`
+**11 · Kept** · `design/launch/final/instagram/08-kept.png`
 
 ```
 One word carries the whole thing, and English gives it away for free.
 
 Kept time — the horological term. A chronometer keeps time.
-Kept safe — stewardship. The institution keeps the record.
+Kept safe — the record is kept, not merely stored.
 Kept its word — the promise, and the reason any of the rest matters.
 A keepsake — what the recipient is left holding.
 
@@ -268,198 +293,58 @@ Four meanings, one word, no strain.
 #kept
 ```
 
-**9 · The date** · `design/launch/final/instagram/09-the-date.png`
-
-```
-It opens in 2026.
-
-There is no countdown on this account and there will not be one. The only clock
-this product runs is the one a person sets themselves, and manufacturing a
-second one to sell the first would contradict the entire thing.
-
-The date is above. It will not move.
-```
-
 ---
 
-## Marketing screenshots — captions
+## Video / Reel recommendations (not produced this session — see the notes doc for why)
 
-Real UI, captured from the running product. Cropped and framed; no pixel of the
-interface itself altered, no invented screens.
+These are motion-worthy and would outperform a static post, but need a real screen recording (not something a headless capture pipeline can produce honestly):
 
-**`design/launch/final/screenshots/01-dual-clock.png`**
-
-```
-The component that is on every screen, so it is the honest thing to lead with.
-Tabular figures wherever digits stack — a product asking to be trusted for
-twenty years cannot have a number two pixels off its column.
-```
-
-**`design/launch/final/screenshots/02-waiting.png`**
-
-```
-This is what a decade of custody looks like on a Tuesday.
-
-Nothing is happening, and that is the design brief. A sealed record does not
-need tending, does not decay if ignored, and produces no notifications.
-
-The test this screen has to pass: if a capsule sitting untouched for three years
-reads as empty rather than as kept, the design has failed.
-```
-
-**`design/launch/final/screenshots/03-composer.png`**
-
-```
-The blank page is the real problem this product has.
-
-There are no templates here and there will not be any. A template produces the
-company's words; a question produces the writer's own. So the composer asks one thing, dismissible,
-never inserted into the document — and then gets out of the way.
-
-The date field comes before the writing. Naming the distance makes the writing
-possible.
-```
-
-**`design/launch/final/screenshots/04-reveal.png`**
-
-```
-A dark screen goes empty first, holds there for a beat, and only then does
-paper appear.
-
-Never a crossfade — that would say the screen changed, not that something
-had arrived.
-
-It is skippable at any point. A recipient who wants the letter now gets the
-letter now. The moment belongs to them.
-```
-
-**`design/launch/final/screenshots/05-hero.png`**
-
-```
-Write a letter, choose the day it opens, and it is kept until then — encrypted
-on your device before it leaves.
-```
-
-**`design/launch/final/screenshots/06-survival.png`**
-
-```
-The only question that really matters, and charm is not an answer.
-
-What happens to sealed capsules if the company dies. What happens if you lose
-your key. Whether anyone here can read what you wrote. The answers are specific,
-boring and verifiable, which is the only kind worth publishing.
-```
-
----
-
-## Launch artwork — captions
-
-**`design/launch/final/artwork/coming-soon.png`** — an empty frame. The held beat as a still image:
-the instrument has cleared and the record has not arrived.
-
-```
-Not yet.
-```
-
-**`design/launch/final/artwork/launch-day.png`**
-
-```
-Open.
-
-Write a letter. Choose the day it opens. It is kept until then.
-```
-
-**`design/launch/final/artwork/quote-1.png`** — no caption. The card is the caption.
-
-**`design/launch/final/artwork/quote-2.png`**
-
-```
-From the gate that decided the whole colour system. Paper had to be a bounded
-object with the instrument visible around it — the moment it became the page
-ground, the ceremony read as a theme toggle instead.
-```
-
-**`design/launch/final/artwork/quote-3.png`**
-
-```
-Rule ten of fifteen. It decides more than it looks like it does: it is why the
-mark never animates, and why the letter is always paper.
-```
-
-**`design/launch/final/artwork/waiting-1.png` · `design/launch/final/artwork/waiting-2.png`**
-
-```
-The same screen, nine years apart. Same component, same position, different
-reading — and the marker has moved almost the whole way to the meridian.
-
-The colour warms as the date approaches. It never carries meaning alone; there
-is always a literal date beside it.
-```
+1. **The live decade scrubber** (`OrbitScrub`, landing page). Drag from day one to unlock in real time — the interaction *is* the demonstration. A prior session captured a version of this as `decade-scrub.gif`/`.mp4`; regenerate the same way (documented in git history) when there's time for a dedicated capture pass.
+2. **A real voice note being recorded.** The recorder UI is real and confirmed working (`Enclosures` → "A voice recording" → "Start recording"), but a synthetic/silent recording would read as fake. This needs someone to actually record ~15 seconds saying something they'd want kept, on camera, once.
+3. **The full write → seal → wait (sped up) → reveal journey**, stitched as one sequence. Every piece exists as a standalone screenshot above; nobody has recorded the whole arc back to back.
 
 ---
 
 ## CTAs — the permitted set
 
-In ascending order of ask. Most posts use the first.
-
-1. **None.** The default.
-2. **A statement of where something is.** *"The full system is published at timelycapsule.com/opening"*
+1. **None.** The default — used on most posts above.
+2. **A statement of where something is.** *"The full system is published at timelycapsule.com"*
 3. **An instruction about their own life, not the product.** *"Choose the date first."*
-4. **`Keep me informed`** — used once, on the last post of the month.
+4. **`Keep me informed`** — reserve for a genuine list-building moment, not used in this set since there's no waitlist anymore (the product is live — anyone can just go write one).
 
-**Never:** Buy now · Sign up · Join the waitlist · Get early access · Link in
-bio · Don't miss · Limited spots · DM us · Tag someone who… · What would you
-write? Comment below · any question posed to drive engagement.
-
-**Replies** are answered factually, in the third person, without exclamation
-marks and without thanking people for their support. No milestone posts, no
-trend participation, no quote-tweeting competitors.
+**Never:** Buy now · Sign up · Join the waitlist · Get early access · Link in bio · Don't miss · Limited spots · DM us · Tag someone who… · Comment below · any question posed purely to drive engagement.
 
 ---
 
-## Posting calendar
+## Recommended posting order
 
-> **Supersedes `20-LAUNCH-PACK.md` Part 7.** That calendar referenced asset IDs
-> (`P01`–`P10`, `S01`–`S06`, `M01`–`M06`) from before production — none of them
-> are real filenames. Every slot below points at a file that exists in
-> `design/launch/final/` and a caption already written above. Dates are given
-> as week/weekday, not fixed calendar dates — `2026` for the opening itself is
-> already a placeholder (§ below), so pinning weekday-1 to a real date here
-> would just be a second guess stacked on the first. Once the opening date is
-> confirmed, back-count 30 days and lay these onto real dates in one pass.
+**Cadence: 3 posts/week.** Pinned post and profile setup (bios, avatars, header, highlights) happen once, before Post 1.
 
-**Cadence: 3 posts/week, Monday/Wednesday/Friday, 13 slots.** The pinned tweet
-and the profile setup (bios, avatars, header, highlights) happen once, before
-Week 1 Day 1, and aren't part of the weekly cadence.
+| # | Concept | Platforms | CTA |
+|---|---|---|---|
+| — | Pinned | X | None |
+| 1 | The mark | IG + X | None |
+| 2 | The Dual Clock | IG + X | None |
+| 3 | A decade | IG + X | "Choose the date first." |
+| 4 | The composer | IG + X | None |
+| 5 | Before it seals | IG + X | None |
+| 6 | A Tuesday, mid-custody (waiting) | IG + X | None |
+| 7 | On the day (reveal) | IG + X | None |
+| 8 | Not the last word (replies) | IG + X | None |
+| 9 | One reading only | IG + X | None |
+| 10 | What it will not do (refusals) | IG + X | "The full list is at timelycapsule.com" |
+| 11 | Kept | IG + X | None |
 
-| # | Slot | Platform | Asset | Post | CTA |
-|---|---|---|---|---|---|
-| 1 | Wk1 Mon | IG + X | `instagram/01-the-mark.png` (IG) · `x/post-mark.png` (X) | The mark / Tweet 1 | None |
-| 2 | Wk1 Wed | IG | `instagram/02-two-registers.png` | Two registers | *"The full system is published at timelycapsule.com/opening"* |
-| 3 | Wk1 Fri | IG + X | `instagram/03-dual-clock.png` (IG) · `x/post-dualclock.png` (X) | The Dual Clock / Tweet 2 | None |
-| 4 | Wk2 Mon | IG + X | `instagram/04-a-decade.png` (IG) · `x/post-decade.png` (X) | A decade / Tweet 3 | *"Choose the date first."* |
-| 5 | Wk2 Wed | X | `x/post-held-beat.png` | Tweet 4 · the held beat | None |
-| 6 | Wk2 Fri | IG | `instagram/05-held-beat.png` | The held beat | None |
-| 7 | Wk3 Mon | IG | `instagram/06-hallmark.png` | The hallmark | None |
-| 8 | Wk3 Wed | IG + X | `instagram/07-refusals.png` (IG) · Tweet 5, text only (X) | What it will not do | *"The full list is at timelycapsule.com/opening"* |
-| 9 | Wk3 Fri | IG | `screenshots/03-composer.png` | The composer | *"The blank page is the problem. Read how it is handled."* |
-| 10 | Wk4 Mon | IG | `instagram/08-kept.png` | Kept | None |
-| 11 | Wk4 Wed | IG | `screenshots/02-waiting.png` | The waiting screen | None |
-| 12 | Wk4 Fri | IG | `screenshots/06-survival.png` | Will you still be here in 2041? | *"See the full survival case at timelycapsule.com/opening"* |
-| 13 | Wk5 Mon | IG + X | `instagram/09-the-date.png` (IG) · `artwork/coming-soon.png` (X, as a quiet close rather than a duplicate of post 1) | The date | `Keep me informed` |
+Rationale for the order: identity first (mark, clock, decade — evergreen, no product literacy required), then the actual journey in the order a real writer experiences it (compose → seal → wait → reveal → reply → the one-reading-only variant), then the two closers (refusals as the trust argument, kept as the sign-off).
 
-**Held in reserve, not scheduled:** `screenshots/04-reveal.png`, `screenshots/05-hero.png`, `artwork/launch-day.png`, `artwork/quote-1.png`, `artwork/quote-2.png`, `artwork/quote-3.png`, `artwork/waiting-1.png`, `artwork/waiting-2.png`. Deliberate, not an oversight — `19-T21-MARKETING-REVIEW.md`'s own logic applies here too: the reveal and the launch-day payoff are worth more unspent than spent in week two. The quote cards and waiting cards have no fixed slot; use them to fill a week if a real-world event (a press mention, a delay) knocks a planned post out, rather than pre-committing them to a date.
+**Not scheduled, held in reserve:** `screenshots/01-dual-clock.png` (superseded by the real dual-clock post above), `screenshots/05-hero.png`, `artwork/*` (quote cards, waiting cards, launch-day) — still accurate, no fixed slot, useful to fill a week on short notice. `instagram/02-two-registers.png`, `instagram/05-held-beat.png`, `instagram/06-hallmark.png`, `x/post-held-beat.png` — still accurate design-philosophy posts, deliberately left out of this pass to keep the set to eleven rather than reopening the old thirteen-slot calendar; good material for a follow-up pass, not stale.
 
-**Slot 5/6 is the one deliberate same-week repeat** (the held beat, on both platforms three days apart) — everywhere else, a subject appears on one platform per week, not both, so following both accounts is worth doing rather than redundant.
+**Retired, not deleted from disk:** `instagram/09-the-date.png`, `artwork/coming-soon.png` (both said "opening 2026" or "not yet" — the product has opened), `og/og-capsule-shared.png` (no public route exists to attach it to).
 
 ---
 
-## Before publishing — two things to settle
+## Before publishing — one thing to settle, not two
 
-1. **The name.** `brand/IDENTITY.md §8` records it as the largest unresolved
-   brand risk and the wordmark as provisional. Registering handles is the first
-   irreversible public commitment to it. Recommended: claim defensively, publish
-   nothing, settle the name first.
-2. **The date.** Every bio and post 9 say *2026*. A year is low-risk; a specific
-   date is not. Publishing a date and then moving it would do more damage than
-   launching late in silence.
+The previous version of this file listed two open items: the product name, and the launch date. **The date question is closed** — the product is live, there is no date to protect, every reference to "2026" as a placeholder is gone from this pass.
+
+**The name question is technically still open on paper** (`design/brand/IDENTITY.md §8` still calls "TimelyCapsule" provisional and the largest unresolved brand risk) but has been functionally settled by shipping: the product has been live at `timelycapsule.com` under this exact name for weeks, with real signups. Worth a deliberate close-out edit to that doc at some point so it stops contradicting reality, but not this pack's authority to decide — flagged, not resolved, per instruction not to reopen brand identity in this pass.

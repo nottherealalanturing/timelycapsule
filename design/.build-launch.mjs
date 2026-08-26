@@ -586,7 +586,7 @@ const og = (title, sub) =>
     <div style="position:absolute;left:80px;right:80px;bottom:132px;height:1px;background:${T.rule}"></div>
   `);
 
-add('og/og-home.png', 1200, 630, og('What you seal will come back. Exactly when you said.', 'Sealed on your device · opening 2026'));
+add('og/og-home.png', 1200, 630, og('What you seal will come back. Exactly when you said.', 'Sealed on your device — kept until the date you chose'));
 add('og/og-pricing.png', 1200, 630, og('If you stop paying, everything you have already sealed still arrives.', 'What it costs'));
 add('og/og-help.png', 1200, 630, og('Questions, answered plainly.', 'Help'));
 add('og/og-capsule-shared.png', 1200, 630, og('A record has been sealed.', 'Contents are unreadable to anyone but its recipient'));
@@ -802,6 +802,106 @@ add(
     `),
   );
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   5 · REAL-UI POSTS (2026-08-25 marketing refresh)
+
+   Real authenticated app + real public reveal-page UI — not the marketing
+   homepage's own demo sections (which is all §4 above, and everything the
+   pre-refresh pack ever drew from, ever hit). Captured via
+   design/.capture-marketing-raw.mjs: a dev-only session-token seed
+   (apps/web/src/app/layout.tsx's DEV_SESSION_SEED_SCRIPT, NODE_ENV-gated)
+   for the dashboard, the existing dev/schedule composer harness (now
+   accepting ?movement=) for the composer, and the real public /c/[token]
+   link — needing no auth at all — for reveal + replies. Light theme
+   throughout, per the corrected default; nothing here is the product's old
+   dark-mode face.
+
+   One-reading-only has no screenshot: the Conditions panel that shows it is
+   real but only reachable by a click, and headless Chrome's --screenshot
+   mode has no interaction capability (see .capture-marketing-raw.mjs's own
+   notes) — a typographic card quoting the product's own verbatim copy
+   (confirmed live) stands in, same idiom as REFUSALS/KEPT below. */
+const rawCrop = (name) =>
+  'data:image/png;base64,' + readFileSync(join(CROPS_DIR, `${name}.png`)).toString('base64');
+const rawFramed = (name, w, radius = 6) =>
+  `<img src="${rawCrop(name)}" style="display:block;width:${w}px;height:auto;
+     border:1px solid ${T.rule};border-radius:${radius}px">`;
+
+/** One real-UI concept, rendered as both an X 16:9 plate and an IG 4:5 plate. */
+function realUIPost({ xPath, igPath, crop, label, caption, xImgW = 1000, igImgW = 860 }) {
+  add(
+    xPath, 1600, 900,
+    page(1600, 900, T.paper, `
+      <div class="mono" style="position:absolute;left:100px;top:64px;font-size:15px;color:${T.muted}">${label}</div>
+      <div style="position:absolute;left:100px;top:50%;transform:translateY(-46%)">${rawFramed(crop, xImgW)}</div>
+      <div class="serif" style="position:absolute;right:90px;top:50%;transform:translateY(-50%);width:430px;
+                  font-size:29px;line-height:1.46;color:${T.ink}">${caption}</div>
+    `),
+  );
+  add(
+    igPath, 1080, 1350,
+    page(1080, 1350, T.paper, `
+      <div class="mono" style="position:absolute;left:80px;top:96px;font-size:16px;color:${T.muted}">${label}</div>
+      <div style="position:absolute;left:50%;top:420px;transform:translate(-50%,0)">${rawFramed(crop, igImgW)}</div>
+      <div class="serif" style="position:absolute;left:80px;right:80px;bottom:110px;font-size:31px;
+                  line-height:1.46;color:${T.ink}">${caption}</div>
+    `),
+  );
+}
+
+realUIPost({
+  xPath: 'x/post-composer.png', igPath: 'instagram/10-composer.png', crop: 'composer-write',
+  label: 'The composer', xImgW: 980, igImgW: 900,
+  caption: 'It asks one question, then gets out of the way. No templates — those write the company&rsquo;s words. This is supposed to be yours.',
+});
+
+realUIPost({
+  xPath: 'x/post-sealing.png', igPath: 'instagram/11-sealing.png', crop: 'composer-review',
+  label: 'Before it seals', xImgW: 980, igImgW: 900,
+  caption: 'A photo, a voice note, the place it was written &mdash; attached, then read once more. After that, nothing inside can change. Not by you, not by anyone.',
+});
+
+realUIPost({
+  xPath: 'x/post-waiting.png', igPath: 'instagram/12-waiting.png', crop: 'dashboard-row',
+  label: 'A Tuesday, mid-custody', xImgW: 980, igImgW: 900,
+  caption: 'No notification. No nudge. No reason to check. A sealed letter needs to be left alone until the date says otherwise.',
+});
+
+realUIPost({
+  xPath: 'x/post-reveal.png', igPath: 'instagram/13-reveal.png', crop: 'reveal-letter',
+  label: 'On the day', xImgW: 620, igImgW: 640,
+  caption: 'The screen goes dark first. Holds there for a beat. Then paper. Never a crossfade &mdash; a crossfade says the screen changed. This says something arrived.',
+});
+
+realUIPost({
+  xPath: 'x/post-replies.png', igPath: 'instagram/14-replies.png', crop: 'replies-thread',
+  label: 'Not the last word', xImgW: 560, igImgW: 620,
+  caption: 'Once it opens, the person who received it can write back &mdash; sealed exactly the way the original was. Not a thread. A second letter, answering the first.',
+});
+
+/* One-reading-only — typographic, real quoted product copy, no screenshot
+   (see the note above for why). Same idiom as x/post-kept.png. */
+add(
+  'x/post-one-reading.png', 1600, 900,
+  page(1600, 900, T.dark, `
+    <div class="mono" style="position:absolute;left:110px;top:96px;font-size:16px;color:${T.darkMuted}">One reading only</div>
+    <div class="serif" style="position:absolute;left:110px;right:140px;top:220px;font-size:52px;line-height:1.28;
+                color:${T.darkInk};letter-spacing:-.012em">Not every letter is meant to be kept forever.</div>
+    <div class="serif" style="position:absolute;left:110px;right:220px;bottom:120px;font-size:28px;line-height:1.55;
+                color:${T.darkMuted}">Choose it, and the record is destroyed the instant it has been read &mdash; no copy, not one, anywhere.</div>
+  `),
+);
+add(
+  'instagram/15-one-reading-only.png', 1080, 1350,
+  page(1080, 1350, T.dark, `
+    <div class="mono" style="position:absolute;left:80px;top:110px;font-size:16px;color:${T.darkMuted}">One reading only</div>
+    <div class="serif" style="position:absolute;left:80px;right:80px;top:280px;font-size:50px;line-height:1.3;
+                color:${T.darkInk};letter-spacing:-.012em">Not every letter is meant to be kept forever.</div>
+    <div class="serif" style="position:absolute;left:80px;right:80px;bottom:130px;font-size:27px;line-height:1.6;
+                color:${T.darkMuted}">Choose it, and the record is destroyed the instant it has been read &mdash; no copy, not one, anywhere.</div>
+  `),
+);
 
 /* ── run ────────────────────────────────────────────────────────────── */
 const list = ONLY ? ASSETS.filter((a) => a.path.includes(ONLY)) : ASSETS;

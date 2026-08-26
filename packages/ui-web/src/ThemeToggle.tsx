@@ -12,51 +12,40 @@ function currentTheme(): Theme {
   return attr === 'dark' ? 'dark' : 'light';
 }
 
-function hasStoredPreference(): boolean {
-  try {
-    return localStorage.getItem('tc-theme') !== null;
-  } catch {
-    // Storage blocked (private mode, etc.) — treat as "nothing stored" so
-    // the OS-follow behaviour below still applies rather than freezing.
-    return false;
-  }
-}
-
 /**
  * The single shared theme control — every page that needs a toggle imports
  * this one; there is intentionally no second implementation anywhere in the
  * app (Product Quality Pass, 2026-08 audit confirmed this and widened where
  * it's rendered, not what renders it).
  *
- * Manual override on top of the system default (see
- * apps/web/src/app/layout.tsx's THEME_INIT_SCRIPT, which owns the pre-paint
- * instant). As long as nothing has been explicitly chosen yet, this also
- * keeps following the OS live via `matchMedia` — otherwise a visitor who
- * first opened the app in light and later switches their OS to dark sees
- * stale light on every future visit until they touch this control
- * themselves, which isn't "following the system," it's following the first
- * visit.
+ * Manual override on top of the light default (see apps/web/src/app/
+ * layout.tsx's THEME_INIT_SCRIPT, which owns the pre-paint instant). This
+ * does not follow the OS live — light is a deliberate default, not a stand-
+ * in for the system preference, so an untouched visitor stays light
+ * regardless of what their OS does after the page has loaded.
  */
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('light');
 
   useEffect(() => {
     setTheme(currentTheme());
-    if (hasStoredPreference() || typeof window.matchMedia !== 'function') return;
 
-    const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    function onSystemChange(e: MediaQueryListEvent) {
-      const next: Theme = e.matches ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', next);
-      setTheme(next);
-    }
-    mq.addEventListener('change', onSystemChange);
-    return () => mq.removeEventListener('change', onSystemChange);
+    // Multiple instances of this control can be mounted at once (sidebar +
+    // Settings, marketing header + /try, etc.), each with its own React
+    // state. `data-theme` on <html> is the single source of truth, so
+    // watching it directly keeps every instance's label in sync with
+    // whichever one was actually clicked — without one, a second instance
+    // would keep showing a stale label until its own next click or a full
+    // reload, and could even read as a silent no-op (see toggle() below).
+    const observer = new MutationObserver(() => setTheme(currentTheme()));
+    observer.observe(document.documentElement, { attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
   }, []);
 
   function toggle() {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(next);
+    // Reads the DOM directly rather than trusting local state, since local
+    // state can be stale relative to another mounted instance's last click.
+    const next: Theme = currentTheme() === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     localStorage.setItem('tc-theme', next);
   }
