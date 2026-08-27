@@ -21,8 +21,13 @@
     "db:studio": "pnpm --filter @tc/api run db:studio"
   },
   "devDependencies": {
-    "turbo": "^2.3.0",
     "prettier": "^3.4.0",
+    "turbo": "^2.3.0",
     "typescript": "^5.7.0"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "expo-modules-jsi@57.0.6": "patches/expo-modules-jsi@57.0.6.patch"
+    }
   }
 }
