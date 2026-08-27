@@ -1,3 +1,40 @@
 packages:
   - "apps/*"
   - "packages/*"
+
+# Toolchain notes (apps/mobile only), both verified empirically rather than
+# assumed from pnpm's docs:
+#
+# 1. patches/expo-modules-jsi@57.0.6.patch (declared in root package.json's
+#    `pnpm.patchedDependencies`, NOT here — pnpm 9.15.0 does not apply a
+#    `patchedDependencies` key placed in pnpm-workspace.yaml; it only takes
+#    effect from package.json). It removes an erroneous
+#    SWIFT_RETURNS_RETAINED annotation on RuntimeScheduler's two
+#    constructors — a Swift/C++ interop bug (a constructor has no explicit
+#    return type for the macro's retain/release lookup to resolve against,
+#    even though the enclosing class IS a valid
+#    SWIFT_SHARED_REFERENCE(retainRuntimeScheduler, releaseRuntimeScheduler))
+#    that fails to compile under Xcode 26.2's Swift 6 toolchain. Confirmed
+#    still present in 57.0.6, the latest stable release in this Expo SDK
+#    line as of 2026-08-26 (only 58.0.0 canaries exist beyond it) — tracked
+#    upstream as github.com/expo/expo#49214. Remove once a release ships
+#    the fix.
+#
+# 2. react-native-worklets/react-native-reanimated are pinned as explicit
+#    direct dependencies in apps/mobile/package.json (0.10.4 / 4.5.4), not
+#    via an `overrides` key anywhere: verified empirically that pnpm 9.15.0
+#    does not apply `overrides` (neither here nor in package.json's
+#    deprecated `pnpm.overrides`) to a package that only ever appears as a
+#    peerDependency in the graph, which is exactly what
+#    react-native-worklets is — with `autoInstallPeers: true`, pnpm's peer
+#    auto-install resolves independently of `overrides`. See the comment in
+#    apps/mobile/package.json's history (this file) for why 0.10.4/4.5.4
+#    specifically: expo-modules-core@57.0.14's native Worklets integration
+#    (iOS's ExpoWorkletsBridgeProvider.mm, Android's
+#    WorkletJSCallInvoker.cpp calling `WorkletRuntime::executeSync`) only
+#    compiles against pre-0.12 worklets on BOTH platforms — confirmed via a
+#    real Podfile validation failure (iOS) and a real C++ compile error
+#    (Android), not just expo-modules-core's declared peer range. Reanimated
+#    4.5.4 is the newest release whose own peerDependencies still declare
+#    worklets 0.10.x-0.11.x. Remove both pins together once expo-modules-core
+#    ships native Worklets integration code compatible with worklets 0.12.x.
