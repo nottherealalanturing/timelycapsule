@@ -4,6 +4,87 @@
 
 ## Current status
 
+### E1.3.10 — Notifications screen (2026-08-28) — DONE, committed, PR open
+
+Replaced the placeholder Notifications tab with a real, cursor-paginated list:
+`notificationsApi.list()` (already existed, unchanged) → new `useNotifications()` hook → new
+`fromNotification()` normalization → new `NotificationRow`. Same hook/screen shape as E1.3.5's
+`useCapsules()`/Home and E1.3.6's `useReceivedCapsules()`/Received: fetch once on mount only (no
+focus refetch, no polling, no pull-to-refresh — in-app notifications are pull-only per the final
+readiness audit, and `/notifications` has no application-level rate limit), `loadMore()` guarded
+against duplicate concurrent requests via a `useRef`, append-not-replace, a failed next-page
+request preserves already-loaded rows and sets a footer-level `nextPageError` rather than
+replacing the whole list with an error.
+
+**Key finding — there is no client-side "event type" to model.** Traced all four writers that
+currently produce a notification row to their exact `writeNotification()` call sites:
+`apps/api/src/modules/reveal/service.ts` (recipient-opened, `category: 'social'`, title
+`"${displayName} opened your capsule"`), `modules/replies/service.ts` (reply, `social`, title
+`"${who} replied"`), `modules/scheduler/handlers/media-release-warning.ts` (`delivery`, title
+"Enclosures due to be released"), `modules/email/webhook.ts` (email-bounce, `delivery`, title "We
+couldn't reach a recipient" + a body). `category` (the schema's real enum:
+`unlock|reminder|delivery|social|security|billing|product|digest`) is a coarser bucket than these
+four events and isn't used for display — every writer already sends a complete, ready-to-render
+`title`. So `NotificationRowItem` doesn't invent a discriminated union the API doesn't provide; it
+only extracts `capsuleId` from `data` (UUID-shape-validated, since `data: z.unknown().nullable()`
+is genuinely not schema-enforced per the contract's own comment lineage) and reads the real
+`readAt` field for unread/read — both actual API-provided signals, nothing invented. This also
+makes the model automatically safe for any future category or event type without needing new code
+for it.
+
+**Also confirmed: web has no notification list/inbox screen at all** — only a
+`settings/notifications` preferences page (email opt-out + quiet hours). This is the first
+notification-list UI in the whole product; there was no existing web behavior to match, so the
+screen was purpose-built from the mobile visual language Home/Received already established.
+
+**Tests:** 191/191 passing (22 files, up from 151/151 before this session — 40 new tests this
+ticket: 12 presentation-model tests covering all four real event shapes, unread/read via
+`readAt`, and safe handling of `null`/non-object/missing/empty/malformed `data.capsuleId` plus an
+unknown future category; 10 pagination-hook tests mirroring E1.3.5/6's coverage exactly; 7
+row-component tests for navigable-vs-not press/accessibilityRole and no crypto/storage imports;
+11 screen tests covering every state, all four event types, footer states, and exact route+id
+navigation). Typecheck clean. Lint clean.
+
+**Manual on-device verification, Android emulator, real backend:** seeded one disposable account
+with 25 real notifications — the four real event shapes with verbatim server-composed
+titles/bodies, 20 padding rows, and one with `data: null` — confirmed correct rendering (bold for
+unread, correct dates); scrolled the full list, confirming the second page appended without
+duplicates or gaps and correctly settled on "That's everything."; tapped a notification with a
+valid `capsuleId` and landed on the real E1.3.8 detail screen; confirmed the `data: null`
+notification neither navigates nor crashes when tapped; verified the empty state
+("Nothing yet.") with a second, notification-less account. All disposable test data deleted
+afterward.
+
+**Found, not fixed (shared navigation architecture, not this ticket's code):** returning from the
+detail screen after navigating from Notifications lands on the Home tab rather than back on
+Notifications specifically — the same class of finding already recorded in E1.3.5's entry above
+for Home→detail→back. This is a characteristic of the shared tab/stack navigator interacting with
+a route pushed from outside the tabs group (`(app)/capsule/[id]` lives outside
+`(app)/(tabs)/`), not something E1.3.10 introduced or can fix in its own files.
+
+**Files changed (this PR):** `apps/mobile/app/(app)/(tabs)/notifications.tsx` (replaced
+placeholder). New: `apps/mobile/src/lib/{notification-model,notification-model.test,
+use-notifications,use-notifications.test}.ts(x)`, `apps/mobile/src/components/
+{notification-row,notification-row.test}.tsx`, `apps/mobile/src/screens/notifications.test.tsx`.
+No other tickets' dependency files needed committing — `notificationsApi`, the loading/empty/error
+primitives, and the E1.3.8 detail route were already merged. **Deliberately excluded:** both
+`plan/STAGE-E-MOBILE-V1-E1.3-*` audit documents and the pre-existing uncommitted push-token
+backend work (`apps/api/src/modules/notifications/*`, `packages/contracts/src/notifications.ts`)
+— confirmed still present, uncommitted, and untouched after this commit.
+
+**Branch/commit/PR:** `e1.3.10-notifications-screen`, commit `a7555ed`, PR
+[nottherealalanturing/timelycapsule#54](https://github.com/nottherealalanturing/timelycapsule/pull/54)
+against `main`. Not merged — awaiting review, per this session's explicit instruction not to
+merge.
+
+**Exact next ticket:** Home/Received/Notifications are now all real screens — E1.3.5/6/10 are the
+full list of Stage E's "list screen" tickets, and all three are done (though only E1.3.8 and
+E1.3.5 are merged to `main` as of this entry; E1.3.6 was merged earlier in the session sequence,
+E1.3.10 is this PR). `E1.3.9` (optional read-only replies/recipient list, an addition to the
+existing E1.3.8 detail screen) remains available and is the only item before `E1.3.11`
+(accessibility pass, which needs E1.3.5–E1.3.10 all complete — now true once this PR merges).
+`E1.3.12` (`random.native.ts`) remains parallel/non-blocking, prerequisite for E1.4.
+
 ### E1.3.5 — Home screen (2026-08-28) — DONE, committed, PR open
 
 Replaced the placeholder Home tab (`apps/mobile/app/(app)/(tabs)/home.tsx`) with a real,
