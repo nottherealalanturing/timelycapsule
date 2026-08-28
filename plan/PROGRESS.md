@@ -4,6 +4,86 @@
 
 ## Current status
 
+### E1.3.8 — Capsule detail screen (2026-08-28) — DONE, committed, PR open
+
+New read-only route `apps/mobile/app/(app)/capsule/[id].tsx` — `capsulesApi.get(id)` →
+classify → (maybe) decrypt → render. Reproduces `apps/web/src/components/capsule/
+LetterRecord.tsx`'s exact state model and copy, not reworded: **Destroyed**
+(`expiryStrict && state === 'expired'`), **Withheld** (`self`-type, still `sealed`), **Closed**
+(master key absent), **Open** (decrypt via `decryptCapsuleContent`, render), plus the fifth state
+the final readiness audit added explicitly — **no-content** (an owned `draft` with
+`contentDocEnc`/`ownerKeyWrap` both `null`). State is classified by a new pure, synchronous
+`classifyCapsuleRecord()` (`apps/mobile/src/lib/capsule-detail-state.ts`) *before* any decryption
+is attempted, so destroyed/withheld/no-content capsules are structurally incapable of reaching
+`decryptCapsuleContent` — not just conventionally prevented.
+
+**Finding, not silently assumed:** web gates only the "open the letter" action behind its
+master-key check; mobile's `app/(app)/_layout.tsx` wraps the *entire* authenticated app in one
+global `MasterKeyGate` instead. By the time this (or any) screen under `(app)/` mounts, the master
+key is already unlocked or the account has none. **Closed** is implemented and unit-tested
+(`useMasterKey()` always returns `Uint8Array | null`, so the type demands handling it) but is
+structurally unreachable via the current global-gate architecture — confirmed by design reading,
+not observed as a bug; documented here rather than left for the next person to rediscover.
+
+**New:** `apps/mobile/src/lib/capsule-detail-state.ts` (+test — pure classifier, 10 tests),
+`apps/mobile/src/lib/use-capsule-detail.ts` (+test — same screen-local fetch-hook shape as
+`use-received-capsules.ts`, no React Query, 5 tests), `apps/mobile/src/screens/
+capsule-detail.test.tsx` (15 tests — full integration: loading/error/retry, route-param handling,
+back navigation, all five record states, real end-to-end decryption using genuine `@tc/crypto`
+fixtures, wrong master key, corrupted ciphertext, malformed content, and static source-scans
+confirming no `SecureStore`/`AsyncStorage`/`@tc/crypto` import and no crypto/plaintext leakage in
+any rendered string). **Extended** the still-uncommitted E1.3.7 `capsule-crypto.ts` (this screen is
+the first to actually use it) with `envelopeText()` — TipTap-doc-to-paragraphs, mirroring
+`apps/web/src/lib/letter-envelope.ts`'s function of the same name exactly (+3 tests).
+
+**Tests:** 131/131 passing (16 files, up from 98/98 before this session — 33 new tests this
+ticket). Typecheck clean. Lint clean (one real `react-hooks/set-state-in-effect` error, fixed by
+deriving the decrypting/done phase at render time from a `{capsule, result}` tuple instead of
+calling `setState` synchronously at the top of the decrypt effect — not suppressed).
+
+**Manual on-device verification, Android emulator, real backend, real crypto — all four
+interactively-reachable states confirmed:** seeded one disposable owner account with a *real*
+`@tc/crypto` master-key wrap (not the dummy placeholder used for pure backend tests) and four real
+capsules (Open/Destroyed/Withheld/Draft-no-content), reached each via a direct deep link
+(`timelycapsule:///capsule/<id>`) after a real login. **Open** decrypted and rendered its actual
+letter text on-device end to end. **Destroyed**/**Withheld**/**Draft-no-content** each rendered
+their exact distinct, correct copy — no crash, no decrypt attempt for the latter two. A real bug
+was caught and fixed *in the seeding script* (not application code) during this pass: `capsules.
+ownerKeyWrap`/`contentDocEnc` are `bytea` columns (`db/schema/capsules.ts`'s custom `bytea` type,
+`{ data: Buffer }`) — seeding with a raw base64url string instead of a decoded `Buffer` silently
+double-base64-encoded the value on read-back, which surfaced as a genuine (fixture-only)
+`decryption_failed` on first attempt. Fixed by `Buffer.from(str, 'base64url')` before insert;
+confirmed byte-for-byte via a direct API round-trip before returning to the device. All disposable
+test data (the account and its four capsules) deleted afterward; scratch seeding scripts removed.
+Back-button behavior confirmed correctly wired to `router.back()` (unit-tested and present
+on-device); its no-op when reached via a direct deep link with no navigation history is expected
+Expo Router behavior (there is nothing to go back to), not exercised as a push→back round trip
+this session — that exact mechanism was already proven live in E1.3.6's Received→detail flow using
+the identical `router.back()` call.
+
+**iOS:** not rebuilt this session — no new native dependencies since E1.3.6's iOS build (which
+succeeded); interactive iOS input remains the same simulator-automation limitation already
+recorded in E1.2's and E1.3.6's entries. Not re-claimed as tested.
+
+**Files changed (this PR):** new `apps/mobile/app/(app)/capsule/[id].tsx`. Also commits the
+still-uncommitted E1.3.7 prerequisite (`capsule-crypto.ts`/`.test.ts`) this screen is the first to
+use, extended with `envelopeText()`. **Deliberately excluded:** both `plan/
+STAGE-E-MOBILE-V1-E1.3-*` audit documents and the pre-existing uncommitted push-token backend work
+(`apps/api/src/modules/notifications/*`, `packages/contracts/src/notifications.ts`) — confirmed
+still present, uncommitted, and untouched after this commit.
+
+**Branch/commit/PR:** `e1.3.8-capsule-detail-screen`, commit `a719504`, PR
+[nottherealalanturing/timelycapsule#52](https://github.com/nottherealalanturing/timelycapsule/pull/52)
+against `main`. Not merged — awaiting review, per this session's explicit instruction not to
+merge.
+
+**Exact next ticket:** `E1.3.5` (Home screen, real owned-capsule list — currently still a
+placeholder, and the only reason this session's manual verification needed a direct deep link
+instead of tapping a real row) or `E1.3.10` (Notifications tab, real data) — both now have every
+dependency they need (`capsulesApi`, `CapsuleRow`, and, for Home, this ticket's detail screen as
+their tap target). `E1.3.9` (optional read-only replies/recipient list) is also unblocked now that
+E1.3.8 exists, per its own stated dependency.
+
 ### E1.3.6 — Received screen (2026-08-28) — DONE, committed, PR open
 
 Replaced the placeholder Received tab (`apps/mobile/app/(app)/(tabs)/received.tsx`) with a real
