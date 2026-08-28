@@ -4,6 +4,96 @@
 
 ## Current status
 
+### E1.3.9 — Read-only replies/recipients on capsule detail (2026-08-28) — DONE, committed, PR open
+
+Extends the E1.3.8 capsule detail screen (`app/(app)/capsule/[id].tsx`) with two optional,
+read-only sections, in the order `CapsuleHeader → RecordSection (the letter) → RepliesSection
+("What was written back") → RecipientsSection ("Addressed to")` — replies sit with the letter
+(same capsule key, same content), recipients further down as page-level addressing metadata,
+mirroring `apps/web/src/components/reply/Correspondence.tsx`'s own stated design ("no bubbles, no
+avatars, no alignment-by-author, no unread dots, no typing state") and the capsule detail page's
+section order, reproduced with mobile-native composition rather than pixel-copied.
+
+**Key finding — reply plaintext is bare text, not the letter's JSON/TipTap envelope.** Confirmed by
+reading `apps/web/src/lib/reply-crypto.ts` directly: `sealReply`/`openReply` never call
+`JSON.stringify`/`JSON.parse`. This meant the existing `decryptField` primitive was directly
+reusable for the new `decryptReplyBody` (`capsule-crypto.ts`) with no envelope-parsing logic and no
+`malformed_content` case — only `decryption_failed`/`ok`.
+
+**Key finding — neither owner-facing endpoint gates on capsule state server-side.**
+`GET /capsules/:id/recipients` and `GET /capsules/:id/replies` (both owner-only, both unpaginated)
+return their rows regardless of Destroyed/Withheld/draft state; all product-semantic gating for
+this ticket is the mobile app's own responsibility. Two deliberate, disclosed narrowings from web's
+literal behavior were made and documented inline: recipients are hidden for Destroyed/Withheld
+(shown for no-content/needs_decrypt) — web's own query has no such gate but the product's copy
+would otherwise contradict itself ("addressed to Ada" beside "destroyed, no copy anywhere"); replies
+are attempted only once the letter itself has successfully decrypted, narrower than web's
+independent per-state query, avoiding a second redundant failure box for the same key problem.
+
+The capsule key is re-resolved a second time (a cheap, redundant `resolveCapsuleKey()` call, reusing
+E1.3.7's own function unmodified) once the letter's decrypt has already proven it valid, rather than
+widening `decryptCapsuleContent`'s already-shipped return shape. A single reply that fails to
+decrypt (corrupted `bodyEnc`) is isolated as `text: null` on that one entry without failing the rest
+of the thread. Recipients/replies fetch failures render an inline `ErrorState` + retry without
+touching the already-loaded letter — the letter remains readable even when this supporting data
+fails.
+
+**New:** `apps/mobile/src/lib/{use-capsule-recipients,use-capsule-recipients.test}.ts(x)`,
+`apps/mobile/src/lib/{use-capsule-replies,use-capsule-replies.test}.ts(x)` (screen-local fetch/
+fetch+decrypt hooks, same derived-state-not-stored-state shape as every prior list hook this stage
+— no React Query). **Extended:** `apps/mobile/src/lib/capsule-crypto.ts` (+`decryptReplyBody`, +4
+tests), `apps/mobile/src/lib/api-client.ts` (+`capsulesApi.recipients`), `apps/mobile/app/(app)/
+capsule/[id].tsx` (+`RepliesSection`/`ReplyEntry`/`RecipientsSection`/`RecipientRow` and their
+styles), `apps/mobile/src/screens/capsule-detail.test.tsx` (+28 tests covering recipient rendering/
+fallback chain/empty/error+retry/state-gating, reply rendering/ordering/multi-thread/loading/
+error+retry/"Them" fallback/corrupted-reply isolation/state-gating, and detail-integration ordering/
+letter-survives-supporting-failure/back-navigation/no-leakage).
+
+**Tests:** 238/238 passing (24 files, up from 191/191 before this session — 47 new tests this
+ticket: 4 crypto, 6 recipients-hook, 9 replies-hook, 28 screen). Typecheck clean. Lint clean.
+
+**Manual on-device verification, Android emulator (Pixel_7), real backend, real crypto, real
+disposable data:** seeded one owner account via the real `/v1/auth/signup` endpoint (real
+Argon2id-hashed password, real client-generated master key wrapped for both password and recovery
+code) plus four capsules seeded directly via DB insert (Open/Destroyed/Withheld/Draft-no-content,
+matching E1.3.8's own seeding pattern) — the Open capsule additionally seeded with one real
+recipient and two real end-to-end-encrypted replies (sealed under the same capsule key as the
+letter). Logged in for real and confirmed live, on-device: the **Open** capsule decrypted and
+rendered its actual letter text, both replies decrypted and rendered in correct chronological order
+with correct author labels ("Ada Lovelace" for the recipient's reply, "You" for the sender's own),
+and the recipient rendered as "Ada Lovelace — opened"; **Destroyed** and **Withheld** correctly
+rendered their existing exact copy with **no** recipients or replies sections, despite the
+Destroyed capsule having a seeded recipient row (confirming the state-gating is real, not just
+unit-tested); **Draft/no-content** correctly rendered "Nothing was written yet." plus its seeded
+recipient ("bob@example.com", proving the displayName→email fallback chain live) with no replies
+section. Back navigation confirmed via the Android system back gesture; the in-app "‹ Back" tap
+target is unreachable by tap under this emulator-automation tooling — a **pre-existing E1.3.8
+finding** already recorded in E1.3.10's own entry, not something this ticket introduced or fixed
+(out of scope). No plaintext, ciphertext, or key material observed in the UI or in `adb logcat`
+during the session. All disposable data (the account, its four capsules, and their recipients/
+replies — all cascade-deleted via the user row) removed afterward via a scratch cleanup script;
+both scratch seeding/cleanup scripts themselves deleted, nothing left behind.
+
+**iOS:** not rebuilt this session — no new native dependencies since the last iOS build (this
+ticket is pure TS/TSX), consistent with E1.3.8's and E1.3.10's own reasoning. Not claimed as tested.
+
+**Files changed (this PR):** `apps/mobile/app/(app)/capsule/[id].tsx`, `apps/mobile/src/lib/
+api-client.ts`, `apps/mobile/src/lib/capsule-crypto.ts` (+`.test.ts`), `apps/mobile/src/screens/
+capsule-detail.test.tsx`. New: `apps/mobile/src/lib/{use-capsule-recipients,
+use-capsule-recipients.test,use-capsule-replies,use-capsule-replies.test}.ts(x)`. **Deliberately
+excluded:** both `plan/STAGE-E-MOBILE-V1-E1.3-*` audit documents and the pre-existing uncommitted
+push-token backend work (`apps/api/src/modules/notifications/*`, `packages/contracts/src/
+notifications.ts`) — confirmed still present, uncommitted, and untouched after this commit.
+
+**Branch/commit/PR:** `e1.3.9-replies-recipients`, commit `f030700`, PR
+[nottherealalanturing/timelycapsule#55](https://github.com/nottherealalanturing/timelycapsule/pull/55)
+against `main`. Not merged — awaiting review, per this session's explicit instruction not to merge.
+
+**Exact next ticket:** `E1.3.9` was the only remaining item before `E1.3.11` (accessibility pass,
+needs E1.3.5–E1.3.10 all complete — now true once the open PRs merge). `E1.3.12`
+(`random.native.ts`) remains parallel/non-blocking, prerequisite for E1.4. Per this session's
+explicit instruction, do not automatically start either — stop here.
+
 ### E1.3.10 — Notifications screen (2026-08-28) — DONE, committed, PR open
 
 Replaced the placeholder Notifications tab with a real, cursor-paginated list:

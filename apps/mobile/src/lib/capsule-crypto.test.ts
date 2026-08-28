@@ -1,6 +1,6 @@
 import { encryptBytes, generateMasterKey, toBase64Url, wrapCapsuleKeyForOwner, wrapMasterKeyWithPassword } from '@tc/crypto';
 import { describe, expect, it } from 'vitest';
-import { decryptCapsuleContent, decryptField, envelopeText, readEnvelope, resolveCapsuleKey, type LetterEnvelope } from './capsule-crypto';
+import { decryptCapsuleContent, decryptField, decryptReplyBody, envelopeText, readEnvelope, resolveCapsuleKey, type LetterEnvelope } from './capsule-crypto';
 
 /** Matches apps/web/src/lib/capsule-crypto.ts's `encodeIvCiphertext` wire format: iv(12)||ciphertext, base64'd once. */
 function encodeField(iv: Uint8Array, ciphertext: Uint8Array): string {
@@ -181,6 +181,37 @@ describe('capsule-crypto.ts', () => {
       const passwordWrap = await wrapMasterKeyWithPassword(masterKey, 'irrelevant-password');
       const result = await resolveCapsuleKey(passwordWrap, generateMasterKey());
       expect(result.status).toBe('invalid_key_wrap');
+    });
+  });
+
+  describe('decryptReplyBody', () => {
+    it('decrypts a real reply body correctly — bare text, no JSON envelope', async () => {
+      const capsuleKey = generateMasterKey();
+      const { iv, ciphertext } = await encryptBytes(capsuleKey, new TextEncoder().encode('Thank you for this.'));
+      const bodyEnc = encodeField(iv, ciphertext);
+      const result = await decryptReplyBody(capsuleKey, bodyEnc);
+      expect(result).toEqual({ status: 'ok', text: 'Thank you for this.' });
+    });
+
+    it('reports decryption_failed for the wrong capsule key, not a crash', async () => {
+      const { iv, ciphertext } = await encryptBytes(generateMasterKey(), new TextEncoder().encode('hello'));
+      const result = await decryptReplyBody(generateMasterKey(), encodeField(iv, ciphertext));
+      expect(result.status).toBe('decryption_failed');
+    });
+
+    it('reports decryption_failed for tampered ciphertext, not a crash', async () => {
+      const capsuleKey = generateMasterKey();
+      const { iv, ciphertext } = await encryptBytes(capsuleKey, new TextEncoder().encode('hello'));
+      ciphertext[0] = ciphertext[0]! ^ 0xff;
+      const result = await decryptReplyBody(capsuleKey, encodeField(iv, ciphertext));
+      expect(result.status).toBe('decryption_failed');
+    });
+
+    it('does not attempt any JSON parsing — a plaintext that looks like broken JSON still decrypts fine', async () => {
+      const capsuleKey = generateMasterKey();
+      const { iv, ciphertext } = await encryptBytes(capsuleKey, new TextEncoder().encode('{not valid json'));
+      const result = await decryptReplyBody(capsuleKey, encodeField(iv, ciphertext));
+      expect(result).toEqual({ status: 'ok', text: '{not valid json' });
     });
   });
 });

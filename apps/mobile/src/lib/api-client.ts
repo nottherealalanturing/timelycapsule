@@ -9,6 +9,7 @@ import {
   MediaViewResponseSchema,
   NotificationsListResponseSchema,
   ReceivedListResponseSchema,
+  RecipientsListResponseSchema,
   RefreshResponseSchema,
   ReplyThreadListResponseSchema,
   type ListCapsulesQuery,
@@ -182,12 +183,20 @@ export const capsulesApi = {
   media: (id: string) => request(`/capsules/${id}/media`, MediaListResponseSchema, { auth: true }),
 
   /**
-   * Optional E1.3.9 scope — exposed here because the contract makes it a
-   * one-line addition, but no reply UI is built by this ticket. Ciphertext
-   * only (`bodyEnc`); decrypting a thread's replies uses the same capsule
-   * key `capsule-crypto.ts` resolves for the letter, via `decryptField`.
+   * Ciphertext only (`bodyEnc`); decrypting a thread's replies uses the
+   * same capsule key `capsule-crypto.ts` resolves for the letter, via
+   * `decryptField`.
    */
   replies: (id: string) => request(`/capsules/${id}/replies`, ReplyThreadListResponseSchema, { auth: true }),
+
+  /**
+   * Plaintext recipient metadata (name/email/phone/status) — never
+   * ciphertext, so no decryption is involved. Unpaginated: `listRecipients`
+   * (apps/api/src/modules/recipients/service.ts) returns every row for the
+   * capsule in one response, naturally small (bounded by the product's own
+   * per-capsule recipient limit).
+   */
+  recipients: (id: string) => request(`/capsules/${id}/recipients`, RecipientsListResponseSchema, { auth: true }),
 };
 
 /**
