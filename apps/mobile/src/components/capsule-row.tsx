@@ -13,12 +13,29 @@ import { colors, fontSize, fontWeight, space } from '../lib/tokens';
  *
  * `onPress` is a plain callback the caller wires to navigation; this
  * component has no opinion on what screen "pressing a row" leads to.
+ *
+ * `accessibilityLabel` is composed explicitly (title/subtitle/teaser/state/
+ * date, in the same order they render visually) rather than left to the
+ * platform's default child-text concatenation — a deliberate choice so a
+ * screen reader announces one coherent item ("A letter to future me.
+ * Unlocked. Aug 28, 2026.") instead of forcing a user to swipe through the
+ * status dot, label, and date as separate stops. The dot itself carries no
+ * label and is never individually focusable once grouped this way — state
+ * reaches the accessibility tree as the same text already shown sighted
+ * users (`statusLabel`), never as color alone. `accessibilityRole` follows
+ * `onPress`: a row rendered without a press handler is exposed as static
+ * text, not a button that would do nothing when activated.
  */
 export function CapsuleRow({ item, onPress }: { item: CapsuleRowItem; onPress?: (id: string) => void }) {
+  const label = [item.title ?? 'Untitled capsule', item.subtitle, item.teaser, item.statusLabel, item.dateLabel]
+    .filter((part): part is string => Boolean(part))
+    .join('. ');
+
   return (
     <Pressable
       onPress={onPress ? () => onPress(item.id) : undefined}
-      accessibilityRole="button"
+      accessibilityRole={onPress ? 'button' : 'text'}
+      accessibilityLabel={label}
       style={styles.container}
     >
       <View style={styles.main}>

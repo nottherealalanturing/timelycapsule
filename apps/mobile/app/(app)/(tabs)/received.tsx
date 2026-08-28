@@ -71,7 +71,9 @@ export default function ReceivedTab() {
             if (sectionItems.length === 0) return null;
             return (
               <View key={section}>
-                <Text style={styles.sectionHeading}>{SECTION_HEADING[section]}</Text>
+                <Text style={styles.sectionHeading} accessibilityRole="header">
+                  {SECTION_HEADING[section]}
+                </Text>
                 {sectionItems.map((item) => (
                   <CapsuleRow key={item.recipientId} item={fromReceivedCapsule(item)} onPress={openCapsule} />
                 ))}

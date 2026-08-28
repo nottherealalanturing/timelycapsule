@@ -8,6 +8,7 @@ import { Pressable, Text, TouchableOpacity } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LetterEnvelope } from '../lib/capsule-crypto';
+import { space } from '../lib/tokens';
 
 /**
  * react-native's real package can't be parsed by Vitest's transform (it
@@ -29,6 +30,10 @@ let routeId = '11111111-1111-1111-1111-111111111111';
 vi.mock('expo-router', () => ({
   useRouter: () => ({ back, push: vi.fn() }),
   useLocalSearchParams: () => ({ id: routeId }),
+}));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 40, bottom: 0, left: 0, right: 0 }),
 }));
 
 const get = vi.fn();
@@ -748,6 +753,127 @@ describe('CapsuleDetailScreen', () => {
       expect(rendered).not.toContain(bodyEnc);
       expect(rendered).not.toContain(ownerKeyWrap);
       expect(rendered).not.toMatch(/masterKey|capsuleKey|AES-GCM|Argon2id/i);
+    });
+  });
+
+  describe('accessibility (E1.3.11)', () => {
+    it('groups the capsule header into one accessible block stating state, date, and title', async () => {
+      const envelope: LetterEnvelope = { doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dear future me,' }] }] }, writtenAt: null };
+      const { masterKey, ownerKeyWrap, contentDocEnc } = await buildRealCiphertext(envelope);
+      mockMasterKey = masterKey;
+      get.mockResolvedValue({ capsule: capsuleFixture({ contentDocEnc, ownerKeyWrap }) });
+      const instance = renderScreen();
+      await flush();
+      await flush();
+
+      const date = new Date('2026-01-01T00:00:00.000Z').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      const header = instance.root.findByProps({ accessibilityRole: 'header', accessibilityLabel: `Unlocked. ${date}. A letter to future me` });
+      expect(header.props.accessible).toBe(true);
+    });
+
+    it('exposes "What was written back" and "Addressed to" as headers so a screen reader can navigate by heading', async () => {
+      const envelope: LetterEnvelope = { doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dear future me,' }] }] }, writtenAt: null };
+      const { masterKey, capsuleKey, ownerKeyWrap, contentDocEnc } = await buildRealCiphertext(envelope);
+      mockMasterKey = masterKey;
+      get.mockResolvedValue({ capsule: capsuleFixture({ contentDocEnc, ownerKeyWrap }) });
+      const bodyEnc = await sealReply(capsuleKey, 'A reply.');
+      replies.mockResolvedValue({ data: [threadFixture({ replies: [{ id: 'r1', author: 'recipient', bodyEnc, createdAt: '2026-08-01T00:00:00.000Z' }] })] });
+      recipients.mockResolvedValue({ data: [recipientFixture()] });
+
+      const instance = renderScreen();
+      await flush();
+      await flush();
+      await flush();
+
+      expect(instance.root.findByProps({ children: 'What was written back' }).props.accessibilityRole).toBe('header');
+      expect(instance.root.findByProps({ children: 'Addressed to' }).props.accessibilityRole).toBe('header');
+    });
+
+    it('groups a reply into one accessible block naming who wrote it, when, and what it said', async () => {
+      const envelope: LetterEnvelope = { doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dear future me,' }] }] }, writtenAt: null };
+      const { masterKey, capsuleKey, ownerKeyWrap, contentDocEnc } = await buildRealCiphertext(envelope);
+      mockMasterKey = masterKey;
+      get.mockResolvedValue({ capsule: capsuleFixture({ contentDocEnc, ownerKeyWrap }) });
+      const bodyEnc = await sealReply(capsuleKey, 'Thank you for writing this.');
+      replies.mockResolvedValue({
+        data: [threadFixture({ recipientLabel: 'Ada Lovelace', replies: [{ id: 'r1', author: 'recipient', bodyEnc, createdAt: '2026-08-01T00:00:00.000Z' }] })],
+      });
+
+      const instance = renderScreen();
+      await flush();
+      await flush();
+      await flush();
+
+      const date = new Date('2026-08-01T00:00:00.000Z').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+      const entry = instance.root.findByProps({ accessibilityLabel: `Ada Lovelace. ${date}. Thank you for writing this.` });
+      expect(entry.props.accessible).toBe(true);
+      expect(entry.props.accessibilityRole).toBe('text');
+    });
+
+    it('never puts ciphertext or key material into a reply\'s grouped accessibilityLabel', async () => {
+      const envelope: LetterEnvelope = { doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Dear future me,' }] }] }, writtenAt: null };
+      const { masterKey, capsuleKey, ownerKeyWrap, contentDocEnc } = await buildRealCiphertext(envelope);
+      mockMasterKey = masterKey;
+      get.mockResolvedValue({ capsule: capsuleFixture({ contentDocEnc, ownerKeyWrap }) });
+      const bodyEnc = await sealReply(capsuleKey, 'A private reply.');
+      replies.mockResolvedValue({ data: [threadFixture({ replies: [{ id: 'r1', author: 'recipient', bodyEnc, createdAt: '2026-08-01T00:00:00.000Z' }] })] });
+
+      const instance = renderScreen();
+      await flush();
+      await flush();
+      await flush();
+
+      const allLabels = instance.root
+        .findAll((node) => typeof node.props.accessibilityLabel === 'string')
+        .map((node) => node.props.accessibilityLabel as string);
+      for (const label of allLabels) {
+        expect(label).not.toContain(bodyEnc);
+        expect(label).not.toContain(ownerKeyWrap);
+        expect(label).not.toMatch(/masterKey|capsuleKey|AES-GCM|Argon2id/i);
+      }
+    });
+
+    it('groups a recipient row into one accessible block naming who and their status', async () => {
+      mockMasterKey = generateMasterKey();
+      get.mockResolvedValue({ capsule: capsuleFixture({ state: 'draft', contentDocEnc: null, ownerKeyWrap: null }) });
+      recipients.mockResolvedValue({ data: [recipientFixture({ displayName: 'Ada Lovelace', status: 'viewed_locked' })] });
+
+      const instance = renderScreen();
+      await flush();
+
+      const row = instance.root.findByProps({ accessibilityLabel: 'Ada Lovelace, viewed locked' });
+      expect(row.props.accessible).toBe(true);
+      expect(row.props.accessibilityRole).toBe('text');
+    });
+
+    it('marks the transient "Opening." state as a polite live region so a screen reader hears the transition', () => {
+      const here = dirname(fileURLToPath(import.meta.url));
+      const source = readFileSync(join(here, '../../app/(app)/capsule/[id].tsx'), 'utf-8');
+      const decryptingBlock = source.match(/decrypt\.phase === 'decrypting'[\s\S]{0,200}/)?.[0] ?? '';
+      expect(decryptingBlock).toContain('accessibilityLiveRegion="polite"');
+      expect(decryptingBlock).toContain('Opening.');
+    });
+
+    it('back button keeps its accessible role and label', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture() });
+      const instance = renderScreen();
+      await flush();
+      const backButton = instance.root.findByType(TouchableOpacity);
+      expect(backButton.props.accessibilityRole).toBe('button');
+      expect(backButton.props.accessibilityLabel).toBe('Back');
+    });
+
+    it('pads the back button below the status bar using the real safe-area inset, so it is not swallowed by the system status bar for touch or TalkBack activation', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture() });
+      const instance = renderScreen();
+      await flush();
+      const backButton = instance.root.findByType(TouchableOpacity);
+      const style = [backButton.props.style].flat();
+      const paddingTop = style.map((s) => s?.paddingTop).find((v) => v !== undefined);
+      // The mock's inset (`top: 40`) is a value distinct from the style's
+      // own base padding, so this proves the inset is actually read and
+      // added — not merely that some unrelated paddingTop happens to exist.
+      expect(paddingTop).toBe(40 + space[4]);
     });
   });
 });

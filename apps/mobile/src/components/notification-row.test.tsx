@@ -93,6 +93,27 @@ describe('NotificationRow', () => {
     expect(instance.root.findByType(Pressable).props.accessibilityRole).toBe('text');
   });
 
+  it('prefixes the accessibilityLabel with "Unread" when the item is unread, and omits it when read', () => {
+    let instance!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      instance = TestRenderer.create(<NotificationRow item={{ ...base, unread: true }} />);
+    });
+    expect(instance.root.findByType(Pressable).props.accessibilityLabel).toBe('Unread. Ada opened your capsule. Aug 28, 2026');
+
+    act(() => {
+      instance = TestRenderer.create(<NotificationRow item={{ ...base, unread: false }} />);
+    });
+    expect(instance.root.findByType(Pressable).props.accessibilityLabel).toBe('Ada opened your capsule. Aug 28, 2026');
+  });
+
+  it('includes the body in the accessibilityLabel when present', () => {
+    let instance!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      instance = TestRenderer.create(<NotificationRow item={{ ...base, body: 'Emails keep bouncing.' }} />);
+    });
+    expect(instance.root.findByType(Pressable).props.accessibilityLabel).toBe('Unread. Ada opened your capsule. Emails keep bouncing.. Aug 28, 2026');
+  });
+
   it('renders without crashing for a read (non-unread) item', () => {
     let instance!: TestRenderer.ReactTestRenderer;
     act(() => {

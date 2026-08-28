@@ -145,6 +145,39 @@ describe('CapsuleRow', () => {
     expect(pressable.props.onPress).toBeUndefined();
   });
 
+  it('exposes one composed accessibilityLabel combining title, subtitle, teaser, state, and date', () => {
+    let instance!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      instance = TestRenderer.create(<CapsuleRow item={receivedRow} />);
+    });
+    const label = instance.root.findByType(Pressable).props.accessibilityLabel as string;
+    const date = new Date('2026-12-25T00:00:00.000Z').toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    expect(label).toBe(`Happy birthday. From Ada Lovelace. Open when the day comes. Still sealed. ${date}`);
+  });
+
+  it('composes a label without stray separators when subtitle/teaser/date are absent', () => {
+    let instance!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      instance = TestRenderer.create(
+        <CapsuleRow item={{ id: 'x', title: 'A title', teaser: null, subtitle: null, statusLabel: 'Draft', statusColor: '#000', dateLabel: null }} />,
+      );
+    });
+    expect(instance.root.findByType(Pressable).props.accessibilityLabel).toBe('A title. Draft');
+  });
+
+  it('marks a pressable row accessibilityRole="button" and a non-interactive one "text"', () => {
+    let instance!: TestRenderer.ReactTestRenderer;
+    act(() => {
+      instance = TestRenderer.create(<CapsuleRow item={ownedRow} onPress={vi.fn()} />);
+    });
+    expect(instance.root.findByType(Pressable).props.accessibilityRole).toBe('button');
+
+    act(() => {
+      instance = TestRenderer.create(<CapsuleRow item={ownedRow} />);
+    });
+    expect(instance.root.findByType(Pressable).props.accessibilityRole).toBe('text');
+  });
+
   it('never imports the decrypt utility or any crypto primitive — the normalized model cannot carry ciphertext', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(join(here, 'capsule-row.tsx'), 'utf-8');
