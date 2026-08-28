@@ -4,6 +4,84 @@
 
 ## Current status
 
+### E1.3.6 — Received screen (2026-08-28) — DONE, committed, PR open
+
+Replaced the placeholder Received tab (`apps/mobile/app/(app)/(tabs)/received.tsx`) with a real
+screen: `receivedApi.list()` → new screen-local `useReceivedCapsules()` hook (loading/ready/error
++ retry; no React Query anywhere in this app, so none was introduced for one unpaginated GET) →
+`fromReceivedCapsule()` → `CapsuleRow`. Three sections (`waiting`/`upcoming`/`opened`), order and
+heading copy ("Ready to open"/"Still sealed"/"Opened") taken directly from `apps/web/src/app/
+(app)/received/page.tsx`, not invented; an empty section is omitted entirely, matching web. Row
+press calls `router.push('/(app)/capsule/${id}')` — `E1.3.8` hasn't built that route yet, so this
+currently lands on Expo Router's own "Unmatched Route" screen, confirmed live (see below) as the
+correct, expected behavior for this ticket, not a bug.
+
+**Defect found and fixed (required for this ticket to build/run at all):** Expo Router's Metro
+integration bundles every file under `apps/mobile/app/` into the native route graph, including
+non-route files matched by its `require.context` glob. The screen's own test used `node:fs`/
+`node:path`/`node:url` for a static import-scan assertion ("this screen never imports
+capsule-crypto") and, sitting next to `received.tsx` under `app/`, broke the real iOS/Android
+bundle (`Bundling failed ... You attempted to import the Node standard library module "node:fs"`).
+Fixed by relocating the test to `apps/mobile/src/screens/received.test.tsx` — no test file lives
+under `app/` now; documented in the test file's own comment so the reason isn't rediscovered later.
+
+**Tests:** 8 new screen tests (`src/screens/received.test.tsx`) + 5 new hook tests
+(`use-received-capsules.test.tsx`) — loading, populated (multi-section, correct order), empty,
+error, retry, section omitted when empty, null-title fallback ("Untitled capsule"), press → exact
+nav target, and a static source-scan asserting the screen's own import lines never reference
+`capsule-crypto`/`@tc/crypto`. Full `apps/mobile` suite: **98/98 tests pass** (13 files, up from
+85/85 before this session — the 13 new tests are this ticket's). Typecheck clean, lint clean (one
+real `react-hooks/set-state-in-effect` lint error surfaced and was fixed by moving the
+loading-state reset from the effect body into the `retry` event handler, not suppressed).
+
+**Manual on-device verification, Android emulator (Pixel_7) — real backend, real evidence:** three
+disposable test accounts seeded directly via DB inserts (bypassing UI, matching
+`received.test.ts`'s own backend-test fixture pattern) with real `@tc/crypto`-generated master-key
+wraps (not the dummy placeholder used for pure backend tests) so the app's actual `MasterKeyGate`
+unlock flow could be exercised for real, not skipped. Logged in as a real account with three seeded
+received capsules (one per section) → all three section headings render in the correct
+waiting/upcoming/opened order, correct status dot colors (green for ready-to-open/opened, brass
+for still-sealed), sender name, teaser, and date per row; the `opened`-section item (seeded with
+`title: null`) correctly renders "Untitled capsule," proving the null-title fallback live, not just
+in a mock. Pressing a row correctly reached Expo Router's "Unmatched Route" screen (no crash) —
+exactly the expected behavior since `E1.3.8`'s destination route doesn't exist yet. A second,
+freshly-seeded account with zero received capsules correctly rendered "Nothing has been sent to
+you yet." All three disposable accounts and their seeded capsules were deleted from the database
+afterward (`like(users.email, 'e136-%@example.com')` cleanup, then the scratch seeding/cleanup
+scripts themselves were deleted — nothing left behind).
+
+**iOS Simulator — build succeeded, interactive login not completed, same known gap as E1.2's own
+entry below:** the app built and launched cleanly (after fixing a separate, pre-existing local
+environment gap — `apps/mobile/android/local.properties` didn't exist yet, needed for any Android
+Gradle build to find the SDK; this is a per-machine, gitignored file, not application code) and the
+login screen rendered with correct styling. Coordinate-based taps could enter text into both
+fields, but the specific combination of taps needed to reliably reach a clean submit proved as
+unreliable as E1.2's own iOS note already predicted ("do not reliably focus/type into Fabric
+`TextInput`s under this specific simulator-automation tool") — recorded honestly as unverified
+beyond build+render, not claimed as tested. Android remains the reliable interactive-verification
+platform for this tooling, consistent with E1.2's own finding.
+
+**Files changed (this PR):** `apps/mobile/app/(app)/(tabs)/received.tsx` (replaced placeholder).
+New: `apps/mobile/src/lib/{use-received-capsules,use-received-capsules.test}.ts(x)`,
+`apps/mobile/src/screens/received.test.tsx`. Also commits the still-uncommitted E1.3.1/E1.3.2/
+E1.3.3/E1.3.4 prerequisite files this screen actually imports (`api-client.ts`'s `receivedApi`,
+`tokens.ts`, `CapsuleRow`/`capsule-row-model.ts`, the loading/empty/error primitives) — there was
+no earlier point at which to land them, and this screen doesn't build without them. **Deliberately
+excluded from this commit:** `capsule-crypto.ts`/`.test.ts` (E1.3.7 — nothing here imports it),
+both `plan/STAGE-E-MOBILE-V1-E1.3-*` audit documents, and the pre-existing uncommitted push-token
+backend work (`apps/api/src/modules/notifications/*`, `packages/contracts/src/notifications.ts`) —
+all confirmed still present and untouched after this commit.
+
+**Branch/commit/PR:** `e1.3.6-received-screen`, commit `0028466`, PR
+[nottherealalanturing/timelycapsule#51](https://github.com/nottherealalanturing/timelycapsule/pull/51)
+against `main`. Not merged — awaiting review, per this session's explicit instruction not to
+merge.
+
+**Exact next ticket:** `E1.3.8` (capsule detail screen, `app/(app)/capsule/[id].tsx`) — both its
+dependencies (`capsulesApi.get`, `decryptCapsuleContent`) are ready, and it's now also the screen
+this ticket's row-press navigation is waiting to land on. Home (owned capsules) can also proceed in
+parallel using the same `CapsuleRow`/API-client pattern this ticket established.
+
 ### E1.3.2 + E1.3.3 + E1.3.4 — Mobile tokens, loading/empty/error primitives, CapsuleRow (2026-08-28) — DONE, not committed
 
 Continues directly from the E1.3.7/E1.3.1 session below, in the dependency order that session's
