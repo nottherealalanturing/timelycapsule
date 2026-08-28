@@ -191,3 +191,31 @@ export async function decryptCapsuleContent(
     return { status: 'malformed_content', error: asError(error) };
   }
 }
+
+export type DecryptReplyResult = { status: 'decryption_failed'; error: Error } | { status: 'ok'; text: string };
+
+/**
+ * E1.3.9's one addition to this file — a reply is capsule content, so it is
+ * encrypted exactly like the letter, under the same capsule key, with the
+ * same `iv||ciphertext` wire format (`bodyEnc`; see
+ * packages/contracts/src/replies.ts's own comment and apps/web/src/lib/
+ * reply-crypto.ts's `openReply`, which this mirrors). The one real
+ * difference from `decryptCapsuleContent`: a reply's plaintext is bare
+ * text, not a JSON-encoded `LetterEnvelope` — `sealReply`/`openReply` on
+ * web never call `JSON.stringify`/`JSON.parse` at all — so there is no
+ * `malformed_content` case here and no envelope to read; `decryptField`'s
+ * own two outcomes (`decryption_failed`/`ok`) are already the complete
+ * result space for this function. Callers resolve the capsule key once
+ * (via `resolveCapsuleKey`, reusing whatever the letter's own decrypt
+ * already resolved) and pass it in — this function never touches the
+ * master key or `ownerKeyWrap` itself.
+ */
+export async function decryptReplyBody(capsuleKey: Uint8Array, bodyEnc: string): Promise<DecryptReplyResult> {
+  const fieldResult = await decryptField(capsuleKey, bodyEnc);
+  if (fieldResult.status !== 'ok') return fieldResult;
+  try {
+    return { status: 'ok', text: new TextDecoder().decode(fieldResult.plaintext) };
+  } catch (error) {
+    return { status: 'decryption_failed', error: asError(error) };
+  }
+}
