@@ -4,7 +4,256 @@
 
 ## Current status
 
+### E1.3.2 + E1.3.3 + E1.3.4 — Mobile tokens, loading/empty/error primitives, CapsuleRow (2026-08-28) — DONE, not committed
+
+Continues directly from the E1.3.7/E1.3.1 session below, in the dependency order that session's
+own "exact next ticket(s)" note recommended.
+
+**E1.3.2** — `apps/mobile/src/lib/tokens.ts` (extended). Added `success`/`warning` to `colors`
+(copied from `tokens.css`'s light `--i-*` register, not approximated), a `capsuleStateColors`
+map typed to exactly the six `CapsuleStateSchema` values (no state invented or omitted — enforced
+by a test asserting parity against `CapsuleStateSchema.options` itself, not a hardcoded list, so
+a future schema addition fails this test until the map is updated too), and a minimal `fontSize`/
+`fontWeight` scale. Brass (`sealed`) confirmed as the map's only use of that color, matching
+`tokens.css`'s own stated rule. `expired` has no RN equivalent for `color-mix()`, so it's a literal
+`rgba(22, 24, 26, 0.38)` with a comment showing the derivation. New: `tokens.test.ts` (3 tests).
+
+**E1.3.3** — Three new presentational components, one file each, no shared framework:
+`components/loading-state.tsx` (static text, never a spinner — matches
+`design/07-EXPERIENCE-BIBLE.md`'s "state is stated in text" motion rule), `components/
+empty-state.tsx` (required `title` + optional `message`), `components/error-state.tsx` (`message`
+is a required plain `string` — deliberately typed to exclude `Error`/`ApiClientError`, so a caller
+cannot pass a raw error object without a type error; optional `onRetry` renders a retry
+`Pressable` only when provided). None of the three know anything about API or crypto errors.
+New: `loading-state.test.tsx`, `empty-state.test.tsx`, `error-state.test.tsx` (7 tests) —
+established this session's convention for testing real RN component trees: `vi.mock('react-native',
+...)` mapping `View`/`Text`/`Pressable` to their own tag-name strings (the real `react-native`
+package has Flow syntax Vitest's transform can't parse, same reason `auth-context.test.tsx`
+already mocked it for `Platform`) + `react-test-renderer` (already the project's convention,
+`master-key-context.test.tsx`/`auth-context.test.tsx`) to build and query the tree.
+
+**E1.3.4** — New `apps/mobile/src/lib/capsule-row-model.ts`: a normalized `CapsuleRowItem` type
+plus `fromCapsuleListItem`/`fromReceivedCapsule` mappers — the only two places that know
+`CapsuleListItem` (`id`, real `CapsuleState`) and `ReceivedCapsule` (`capsuleId`, `section:
+upcoming|waiting|opened`, no `CapsuleState` at all) are different shapes. `section` has no
+server-defined color, so it borrows the nearest owned-state meaning from `capsuleStateColors`
+rather than inventing a second palette (`upcoming`→`sealed`/brass, `waiting`+`opened`→`unlocked`/
+success — matching `apps/web/.../received/page.tsx`'s own section semantics, confirmed by reading
+it fresh rather than assumed). New `components/capsule-row.tsx` renders only `CapsuleRowItem` —
+zero knowledge of either backend shape, `id`/`capsuleId`, or `CapsuleState`/`section`; `onPress`
+is a caller-supplied `(id: string) => void`, no navigation hard-coded. Neither `CapsuleListItem`
+nor `ReceivedCapsule` carries `contentDocEnc`/`ownerKeyWrap` (the list endpoints' schemas omit
+ciphertext outright), so the model — and `CapsuleRow` built on it — is structurally incapable of
+decrypting anything; the 5th reachable state (draft, no content yet) just renders as a row with
+`title: null` → "Untitled capsule," never as an error or a decrypt attempt. New:
+`capsule-row-model.test.ts` (16 tests: both mappers, all six states / all three sections, null
+title/teaser, date-field fallback order) + `capsule-row.test.tsx` (6 tests: owned rendering,
+received rendering through the normalized model, fallback title, press interaction, no-op with no
+`onPress`, and a static source-scan asserting `capsule-row.tsx`'s import lines never reference
+`capsule-crypto` or `@tc/crypto`).
+
+**Tests:** 32 new (3 + 7 + 16 + 6) across 7 new test files, all passing. `apps/mobile` full suite:
+11 files, **85/85 tests pass** (was 53/53 before this session). Typecheck clean (`tsc --noEmit`),
+lint clean (`eslint .`). No manual/device verification was performed — these are unit-level
+component/data tests only, not exercised in Expo Go or a simulator.
+
+**Not built, deliberately, per this ticket's exact scope:** no screens (Home/Received/
+Notifications/detail all remain unbuilt), no React Query wiring of `CapsuleRow` to the API client,
+no date/duration-countdown formatting beyond a plain `toLocaleDateString()` (the web app's
+Dual-Clock-style elapsed/remaining math is a distinct, more involved feature this ticket didn't
+ask for and would have been scope creep here).
+
+**Files changed:** `apps/mobile/src/lib/tokens.ts` (extended). New: `apps/mobile/src/lib/
+{tokens.test,capsule-row-model,capsule-row-model.test}.ts`, `apps/mobile/src/components/
+{loading-state,loading-state.test,empty-state,empty-state.test,error-state,error-state.test,
+capsule-row,capsule-row.test}.tsx`.
+
+**Exact next E1.3 ticket(s):** `E1.3.6` (Received screen) and the Home screen (owned capsules)
+can now both consume `CapsuleRow` + the API client directly; `E1.3.8` (capsule detail screen) has
+both its dependencies (`capsulesApi.get`, `decryptCapsuleContent`) ready. No React Query
+provider/hooks exist yet anywhere in the mobile app — whichever screen ticket goes first will need
+to add that wiring, since none of E1.3.1/E1.3.2/E1.3.3/E1.3.4 introduced it.
+
+### E1.3.7 + E1.3.1 — Capsule-decrypt utility + capsule domain API client (2026-08-28) — DONE, not committed
+
+First real E1.3 implementation, per the final readiness audit's exact recommended starting pair.
+
+**E1.3.7** — `apps/mobile/src/lib/capsule-crypto.ts` (new). Two composable building blocks —
+`resolveCapsuleKey(ownerKeyWrap, masterKey)` (master key → capsule key, via `@tc/crypto`'s
+existing `unwrapCapsuleKeyForOwner`, unchanged) and `decryptField(capsuleKey, ivCiphertextB64)`
+(one `iv||ciphertext` blob → plaintext, via existing `decryptBytes`) — composed into
+`decryptCapsuleContent(capsule, masterKey)` for the letter-content case E1.3.8 needs. No new
+cryptography, no format change; the master key is never read internally, only passed in by the
+caller. Returns a discriminated result (`no_content` / `invalid_key_wrap` / `decryption_failed`
+/ `malformed_content` / `ok`) rather than throwing, so a real, reachable state — an owned
+`draft` capsule with `contentDocEnc`/`ownerKeyWrap` both `null` — resolves to `no_content`
+instead of crashing, matching the exact instruction not to make the utility choke on that state.
+`LetterEnvelope`/`readEnvelope`/`PlaceMemory` are ported (not imported — `apps/web/src/lib` isn't
+reachable from `apps/mobile`) verbatim from `apps/web/src/lib/letter-envelope.ts`, same
+never-throws tolerance. One flagged, not fully proven, assumption: `TextDecoder` (used once, to
+turn decrypted bytes into a string before `JSON.parse`) is not yet exercised on a real device by
+any prior ticket — it runs correctly under Vitest/Node (proven, 19/19 new tests pass) and Expo's
+own "winter" runtime declares a `TextDecoder` polyfill, but this is the first ticket to actually
+need it in a reachable code path; noted in the file's own comment as a real-device open question,
+not asserted as proven.
+
+**E1.3.1** — `apps/mobile/src/lib/api-client.ts` (extended, additive only — `request()` itself
+untouched). Added `capsulesApi` (`list`, `get`, `media`, `replies`), `receivedApi` (`list`),
+`notificationsApi` (`list`), `mediaApi` (`view`) — all consuming `@tc/contracts` schemas
+unchanged, zero duplicated Zod types. Deliberately preserves every backend inconsistency the
+final readiness audit found rather than papering over it: `receivedApi.list()` returns the flat,
+non-paginated shape as-is (no invented cursor logic); `ReceivedCapsule.capsuleId` is left exactly
+as the server sends it (not renamed to `id` — that normalization is `CapsuleRow`'s job, E1.3.4,
+not this layer's); `capsulesApi.list()`'s `nextCursor: null` is returned identically for true
+end-of-list and for `collectionId`-filtered requests, since the server itself doesn't distinguish
+them; `mediaApi.view()` lets a `media_released` error surface as a normal `ApiClientError`
+untranslated. Query-string building follows web's own existing inline-`URLSearchParams` pattern
+exactly (`apps/web/src/lib/api-client.ts`'s `capsulesApi.list`), not a new convention.
+
+**Tests:** 19 new (`capsule-crypto.test.ts`) + 14 new (`api-client.test.ts`), all passing —
+covering successful decrypt, the `draft`-capsule no-content case, a wrong master key, a
+corrupted/tampered wrap and ciphertext, non-JSON decrypted content, a legacy bare-TipTap-doc
+payload, real pagination shapes, the `received` flat-list shape, and the `media_released` error
+passthrough. `apps/mobile` full suite: 5 files, **53/53 tests pass** (was 20/20 before this
+session). Typecheck clean, lint clean. `packages/crypto`/`packages/contracts` were only
+*consumed*, not modified, by this session's work — not re-run, since nothing in them changed.
+
+**Not built, deliberately, per this ticket's exact scope:** no UI of any kind (Home/Received/
+Notifications/detail screens, `CapsuleRow`, loading/empty/error components all remain
+untouched placeholders) — those are separate, later E1.3 tickets. No React Query provider/hooks
+were added — the ticket asked for the minimum foundation only, and the API client functions are
+plain, usable without React Query, exactly as specified.
+
+**Files changed:** `apps/mobile/src/lib/api-client.ts` (extended), new
+`apps/mobile/src/lib/{capsule-crypto,capsule-crypto.test,api-client.test}.ts`.
+
+**Exact next E1.3 ticket(s):** `E1.3.2`/`E1.3.3` (mobile design tokens extended with the
+`CapsuleState` color map; loading/empty/error primitives) can start immediately in parallel with
+`E1.3.4` (`CapsuleRow`, once E1.3.2 lands) — per the final readiness audit's dependency graph,
+these are the next zero-to-low-dependency items before the screens themselves (E1.3.5/E1.3.6/
+E1.3.10) and the detail screen (E1.3.8, which now has both of its dependencies —
+`capsulesApi.get` and `decryptCapsuleContent` — ready to consume).
+
+### Stage E, E1.3 final readiness audit (2026-08-28) — READY WITH CHANGES, no code changed
+
+Final pre-implementation audit before returning to normal ticket-by-ticket execution. Confirmed
+via fresh `git` inspection: E0.1/E1.1/E1.2 are all merged to `main` (PR #47/#49/#50); nothing else
+landed on `main` since E1.2; the only uncommitted work is the push-token registration pair added
+during the E1.3 audit session, and it is confirmed (independently re-verified, not re-trusted)
+correctly isolated — touches only `apps/api/src/modules/notifications/*` and
+`packages/contracts/src/notifications.ts`, zero overlap with any capsule/received/mobile/crypto
+file or contract shape.
+
+**Verdict: E1.3 is ready to implement now — no blocker.** A fresh, skeptical re-audit of every
+backend endpoint E1.3 will consume (not a re-trust of the prior audit) found six real,
+previously-undocumented backend characteristics that change ticket *acceptance criteria* but
+block nothing: `GET /received` is completely unpaginated and unbounded (unlike `/capsules`/
+`/notifications`, which are both cursor-paginated); **none** of the seven read endpoints E1.3
+uses carry any rate limit; `ReceivedCapsule` uses `capsuleId` where `Capsule`/`CapsuleListItem`
+use `id` (a real normalization gotcha for any shared list component); a capsule detail screen
+must handle a fifth reachable state (own, still-`draft`, both ciphertext fields `null`) beyond
+the four already documented; `GET /capsules/:id/media` can include `released` items that will
+always fail `GET /media/:id/view` and must be shown as unavailable, not loading-forever; and
+in-app notifications are pull-only (no WebSocket/badge-count endpoint exists despite
+`03-ARCHITECTURE.md` describing one) with only four event types (recipient-opened, reply,
+media-release-warning, email-bounce) ever producing a row, all carrying `data.capsuleId` by
+convention (not schema-enforced).
+
+Also ran a fresh documentation-contradiction pass against three documents the original E1.3
+audit hadn't covered (`plan/01-PRODUCT.md`, `plan/03-ARCHITECTURE.md`,
+`design/11-IMPLEMENTATION-ALIGNMENT.md`) — found `03-ARCHITECTURE.md` still describes a
+Redis/BullMQ queue and Socket.IO in-app push, both superseded by the actual pg-boss/polling
+design (code already self-documents this override citing `plan/04-ZERO-COST-PLAN.md`); recorded,
+not silently rewritten.
+
+**Every E1.3 ticket (`E1.3.1`–`E1.3.12`) re-checked against current code: none removed, none
+newly required, three (`E1.3.6` Received, `E1.3.8` capsule detail, `E1.3.10` Notifications) had
+their acceptance criteria updated with the findings above; `E1.3.4` (`CapsuleRow`) gained an
+explicit `capsuleId`→`id` normalization requirement.** `random.native.ts` (`E1.3.12`) and the
+recovery-code UI gap are both reconfirmed unchanged, still correctly parked/parallel, not pulled
+into E1.3.
+
+**Artifact:** `plan/STAGE-E-MOBILE-V1-E1.3-FINAL-READINESS-AUDIT.md` (new — a concise delta
+document, not a duplicate of `plan/STAGE-E-MOBILE-V1-E1.3-AUDIT-AND-IMPLEMENTATION-BLUEPRINT.md`,
+which remains fully accurate and is the primary reference for architecture/crypto
+boundary/IA; this new document is the one to read first for current ticket-by-ticket status).
+
+**Exact first implementation ticket:** `E1.3.7` (shared capsule-decrypt utility), in parallel
+with `E1.3.1` (API client extension) — the highest-uncertainty, zero-dependency pair, per the
+new artifact's §17.
+
+### Push-token registration endpoints (2026-08-27) — DONE, not committed
+
+Closed a gap the E1.3 audit found: `push_tokens` (`apps/api/src/db/schema/identity.ts:133`)
+had a schema but zero routes/services anywhere referencing it — confirmed by a fresh
+full-repo grep (schema + one migration file only, no cron/admin-tool usage either) before
+touching anything. Added `POST /me/push-tokens` (register/upsert-on-token, moves an
+already-registered token to a new caller instead of erroring — covers the same-device,
+different-account-login case) and `DELETE /me/push-tokens/:id` (unregister, 404s on a
+token owned by someone else) to `apps/api/src/modules/notifications/{routes,service}.ts`,
+following that module's exact existing pattern (same rate limit, same `validate`/`IdParamSchema`
+idiom as `tags`/`collections`). New contracts: `PushPlatformSchema`, `RegisterPushTokenRequestSchema`,
+`PushTokenSchema`, `RegisterPushTokenResponseSchema` in `packages/contracts/src/notifications.ts`.
+The response schema deliberately omits the raw token value (nothing to gain by echoing it
+back; test asserts it's absent). 5 new tests (register, re-register-moves-owner, unregister,
+cross-user-unregister-404s, invalid-platform-rejected) — full API suite 40/40 files, 305/305
+tests pass. Typecheck clean on `@tc/contracts`, `@tc/api`, `@tc/web`, `@tc/mobile`. This closes
+only the *registration* half of push notifications — no adapter (Expo/FCM/APNs), no dispatch
+wiring, no native mobile registration call yet; those remain parked exactly as the E1.3 audit
+described them. **Files changed:** `packages/contracts/src/notifications.ts`,
+`apps/api/src/modules/notifications/{routes,service,notifications.test}.ts`.
+
 > **Read this block first.** Everything below the horizontal rule is the older, ticket-numbered history and is preserved as written. Where the two disagree, this block wins.
+
+### Stage E, E1.3 audit — Scope + implementation blueprint (2026-08-27) — AUDIT COMPLETE, no code changed
+
+Read-only audit + planning session (explicitly no application code, no branches, no commits, no PR).
+Answered "what should E1.3 actually be?" by re-auditing the current shipped web product
+(capsule creation/reveal/replies/media/expiry, all traced end-to-end via `apps/web`/`apps/api`
+code, not old ticket text) and cross-checking it against the pre-existing
+`plan/STAGE-E-MOBILE-V1-IMPLEMENTATION-BLUEPRINT.md`/`-EXECUTION-BACKLOG.md`, which predate
+E1.1/E1.2 and were confirmed still largely accurate, with E1.2 in practice compressing that
+backlog's Phase 1 + most of Phase 2 into one ticket.
+
+**Verdict: E1.3 is ready to build now, no blocker.** Recommended scope (full detail and
+ticket-by-ticket breakdown in the new artifact below): **read-only capsule browsing** — real
+Home/Received/Notifications lists (`GET /capsules`, `GET /received`, `GET /notifications`, all
+confirmed complete/production-ready backend endpoints) and a real capsule-detail screen that
+unwraps the capsule key and decrypts real content via the master key already resolved by E1.2.
+Capsule creation, replies (write side), reveal/recipient flow, media upload, and every other
+E1.2-deferred item (signup, OAuth, password change, recovery UI, biometrics, push) remain
+explicitly out of scope — parked, not forgotten (see the artifact's §20).
+
+**Two concrete findings worth surfacing here:** (1) `packages/crypto/src/random.ts` has no
+`.native.ts` override and calls `crypto.getRandomValues` directly — Hermes has no native
+implementation and nothing polyfills it in `apps/mobile`. This does **not** block E1.3
+(read-only decrypt never calls it) but **is** a real blocker for E1.4 (capsule creation, which
+must generate keys/IVs) — recommended fix is a small, independent, parallel ticket
+(`random.native.ts` backed by `react-native-libsodium`'s already-installed `randombytes_buf`,
+same pattern as the existing `aes.native.ts`/`kdf.native.ts`), not urgent for E1.3 itself. (2)
+E1.1's recovery-code backend contract still has zero UI consuming it anywhere — web or mobile —
+confirmed still true; this is a pre-existing, tracked, cross-platform gap, not something E1.3
+should absorb.
+
+**No refactor of E1.2 is required before E1.3** — every function E1.3 needs (`useAuth`,
+`useMasterKey`, `MasterKeyGate`, `api-client.ts`'s `request()` pattern) already exists and needs
+no signature change; extending `api-client.ts` with capsule-domain calls is additive. Two small
+net-new pieces (extending `src/lib/tokens.ts` with capsule-state colors; building
+loading/empty/error primitives that never existed because E1.2's auth screens didn't need them)
+are folded into E1.3's own ticket list rather than treated as a prerequisite fix.
+
+**Artifact:** `plan/STAGE-E-MOBILE-V1-E1.3-AUDIT-AND-IMPLEMENTATION-BLUEPRINT.md` (new, durable,
+25-section report — web capability inventory, full API/contract matrix, crypto boundary map,
+design-doc contradiction audit, mobile IA confirmation, security/performance/offline/test
+strategy, three scope options with a recommendation, a 12-ticket backlog for E1.3 with
+dependencies/parallelization, a parking lot, and documentation-drift findings). Nothing in this
+audit was committed or rewritten in older documents — contradictions are recorded, not silently
+resolved.
+
+**Exact next implementation ticket:** E1.3 itself, per the artifact's ticket backlog
+(`E1.3.1`–`E1.3.12`) — start with `E1.3.7` (the shared capsule-decrypt utility) and `E1.3.1`
+(API client extension) in parallel, since everything else in the ticket depends on one or both.
+`E1.3.12` (`random.native.ts`) can run fully in parallel, any time, no rush before E1.4.
 
 ### Stage E, E1.2 — Mobile authentication foundation (2026-08-27) — DONE, not committed
 

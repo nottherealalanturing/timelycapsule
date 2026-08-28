@@ -1,10 +1,19 @@
 import {
   AuthResponseSchema,
+  CapsuleListResponseSchema,
+  CapsuleResponseSchema,
   LoginRequestSchema,
   LogoutRequestSchema,
   MeResponseSchema,
+  MediaListResponseSchema,
+  MediaViewResponseSchema,
+  NotificationsListResponseSchema,
+  ReceivedListResponseSchema,
   RefreshResponseSchema,
+  ReplyThreadListResponseSchema,
+  type ListCapsulesQuery,
   type LoginRequest,
+  type PaginatedQuery,
 } from '@tc/contracts';
 import { Platform } from 'react-native';
 import { z } from 'zod';
@@ -131,4 +140,92 @@ export const authApi = {
   logout: () => request('/auth/logout', z.void(), { method: 'POST', auth: true, body: LogoutRequestSchema.parse({}) }),
 
   getMe: () => request('/me', MeResponseSchema, { auth: true }),
+};
+
+/**
+ * Builds a query string from a plain object, dropping `undefined` values —
+ * matches apps/web/src/lib/api-client.ts's `capsulesApi.list`/`(reveal)`
+ * inline pattern exactly (a `URLSearchParams` built per-caller), not a new
+ * convention. `request()` itself is untouched — the query string is just
+ * part of the path, the same way web's own client does it.
+ */
+function toQueryString(query: Record<string, string | number | boolean | undefined>): string {
+  const entries = Object.entries(query).filter((entry): entry is [string, string | number | boolean] => entry[1] !== undefined);
+  if (entries.length === 0) return '';
+  const params = new URLSearchParams(entries.map(([k, v]) => [k, String(v)]));
+  return `?${params}`;
+}
+
+/**
+ * Read-only capsule-domain endpoints for E1.3 (browsing only — no create/
+ * patch/seal/etc., those belong to the creation ticket). Response shapes
+ * are consumed exactly as the server returns them, deliberately including
+ * their real, sometimes-inconsistent characteristics rather than
+ * normalizing them away at this layer (per the E1.3 final readiness
+ * audit): `list`'s `nextCursor` is `null` both at true end-of-list and,
+ * separately, whenever `collectionId` is set (the server bypasses
+ * pagination entirely for that filter) — this client does not try to tell
+ * those two cases apart, since the server itself doesn't distinguish them
+ * in the response. `get`'s `contentDocEnc`/`ownerKeyWrap` are `null` for an
+ * owned capsule that hasn't been through its first autosave yet — this
+ * client returns that null-shaped `Capsule` as-is; classifying it as
+ * "nothing to decrypt" is `capsule-crypto.ts`'s job (E1.3.7), not this
+ * layer's.
+ */
+export const capsulesApi = {
+  list: (query: Partial<ListCapsulesQuery> = {}) =>
+    request(`/capsules${toQueryString(query)}`, CapsuleListResponseSchema, { auth: true }),
+
+  get: (id: string) => request(`/capsules/${id}`, CapsuleResponseSchema, { auth: true }),
+
+  /** Unpaginated — the server returns every media row for the capsule in one response (naturally small, bounded by storage quota). */
+  media: (id: string) => request(`/capsules/${id}/media`, MediaListResponseSchema, { auth: true }),
+
+  /**
+   * Optional E1.3.9 scope — exposed here because the contract makes it a
+   * one-line addition, but no reply UI is built by this ticket. Ciphertext
+   * only (`bodyEnc`); decrypting a thread's replies uses the same capsule
+   * key `capsule-crypto.ts` resolves for the letter, via `decryptField`.
+   */
+  replies: (id: string) => request(`/capsules/${id}/replies`, ReplyThreadListResponseSchema, { auth: true }),
+};
+
+/**
+ * `GET /received` returns a flat, complete array — confirmed via the final
+ * readiness audit that the server applies no `LIMIT`/cursor to this query
+ * at all, unlike `capsulesApi.list`. Do not add cursor/infinite-query
+ * handling here; there is no cursor for the server to accept. Note the
+ * response's `ReceivedCapsule` items key the capsule by `capsuleId`, not
+ * `id` (unlike `Capsule`/`CapsuleListItem`) — this client preserves that
+ * field name exactly as the server sends it; normalizing it to `id` is a
+ * UI-layer concern (E1.3.4's `CapsuleRow`), not this client's.
+ */
+export const receivedApi = {
+  list: () => request('/received', ReceivedListResponseSchema, { auth: true }),
+};
+
+/**
+ * In-app notifications are pull-only — confirmed via the final readiness
+ * audit that no WebSocket/real-time push exists despite
+ * `plan/03-ARCHITECTURE.md`'s older description of one; callers must poll
+ * (on-foreground, pull-to-refresh), which is a UI-layer concern, not
+ * something this client papers over with an invented subscription API.
+ */
+export const notificationsApi = {
+  list: (query: Partial<PaginatedQuery> = {}) =>
+    request(`/notifications${toQueryString(query)}`, NotificationsListResponseSchema, { auth: true }),
+};
+
+/**
+ * `view` returns a time-limited (15-minute) presigned URL, not the bytes
+ * themselves — the caller fetches that URL separately and decrypts the
+ * response body with `capsule-crypto.ts`'s `decryptField`, the same as
+ * content. A `released` media item's `view` call fails server-side with a
+ * dedicated `media_released` error code (surfaced here as a normal
+ * `ApiClientError`, code `media_released`) — this client does not hide or
+ * reinterpret that; a caller must check a media item's `status` before
+ * calling `view` if it wants to avoid the round-trip entirely.
+ */
+export const mediaApi = {
+  view: (mediaId: string) => request(`/media/${mediaId}/view`, MediaViewResponseSchema, { auth: true }),
 };
