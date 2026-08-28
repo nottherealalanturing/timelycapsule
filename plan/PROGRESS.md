@@ -4,6 +4,86 @@
 
 ## Current status
 
+### E1.3.5 — Home screen (2026-08-28) — DONE, committed, PR open
+
+Replaced the placeholder Home tab (`apps/mobile/app/(app)/(tabs)/home.tsx`) with a real,
+cursor-paginated list of the owner's own capsules: `capsulesApi.list()` → new screen-local
+`useCapsules()` hook → `fromCapsuleListItem()` → `CapsuleRow` (all three already existed;
+this ticket added zero new presentation logic, only data fetching/pagination/composition).
+
+**Pagination**, against the real `items`/`nextCursor`/`limit` contract (`GET /capsules`, default
+limit 20): `FlatList`'s `onEndReached` calls `loadMore()`, which appends to the existing list
+rather than replacing it, stops once `nextCursor` is `null`, and is guarded against firing twice
+concurrently by a `useRef` flag (checked synchronously, unlike state) — `onEndReached` is
+documented to fire more than once in quick succession, and the final readiness audit's warning
+that `/capsules` has no application-level rate limit made that worth guarding explicitly rather
+than assuming FlatList's own defaults were enough. A failed next-page request sets a
+`nextPageError` flag on the existing `ready` state (never `{status:'error'}`) so already-loaded
+rows stay on screen; the list's footer shows a small retry control instead of a full-screen error,
+and calling `loadMore()` again *is* the retry (the last successful cursor is left untouched by a
+failed attempt). Fetches exactly once on mount — no focus listener, no polling, no
+pull-to-refresh — matching the audit's explicit "don't refetch a rate-limit-free paginated
+endpoint on every navigation" warning and the blueprint's E1.3.5 acceptance criteria, which asks
+for pagination only, not refresh-on-focus.
+
+**Deliberately not reproduced from web:** `apps/web/src/app/(app)/home/page.tsx`'s "In custody"
+summary line (a live "3 sealed, 1 draft, nearest opens Aug 29" reading) and its time-bucketed
+grouping. Both need every loaded page's data to stay correct and be recomputed as more pages
+arrive — real complexity outside this ticket's scope — and web itself never actually paginates (it
+fetches up to 100 in one request), so there was no existing precedent for how that combination
+should behave under real pagination. Filters (state/type/tag/favorite, which web's dashboard has)
+are likewise not added — not in the Stage E blueprint's E1.3.5 acceptance criteria, and the
+ticket's own instructions were explicit not to invent them.
+
+**Tests:** 151/151 passing (18 files, up from 131/131 before this session — 20 new tests this
+ticket: 9 pagination-hook tests covering loading/first-page/error/retry/append/cursor-drives-
+next-page/`nextCursor: null` stops/duplicate-request prevention/next-page-error-preserves-items/
+recovery-clears-error, and 11 screen tests covering every `CapsuleState` render, the null-title
+fallback, `onEndReached` → `loadMore`, all three footer states, row press → exact route+id, and a
+static no-crypto-import scan). Typecheck clean. Lint clean.
+
+**Manual on-device verification, Android emulator, real backend:** seeded one disposable owner
+account with 25 real capsules spanning all six `CapsuleState` values (including null-title items,
+staggered `createdAt` for a stable real order) — every state rendered with the correct label/color/
+date; scrolled the full list and confirmed the second page (`nextCursor` → 5 more items) appended
+without duplicates or gaps, correctly settling on a "That's everything." footer once exhausted;
+tapped a row and landed on the real E1.3.8 detail screen; confirmed return-to-Home (see note
+below); verified the empty state ("Nothing sealed yet.") with a second, capsule-less account. All
+disposable test data deleted afterward. Initial-load error/retry was not exercised interactively
+(would need a simulated network failure) — covered by two unit tests instead, per instruction not
+to fake a claim where real conditions weren't practically available.
+
+**Found, not fixed (out of this ticket's scope) — E1.3.8's in-app back button:** while confirming
+return-to-Home, the *detail* screen's own "‹ Back" tap target (built in E1.3.8, a different
+ticket's file) appeared to sit mostly behind the status bar on this emulator/theme combination —
+taps on it did not register in several attempts at different coordinates. The Android hardware
+back button (same underlying stack-pop as `router.back()`) worked correctly and was used to
+complete this ticket's own back-navigation verification. Flagged here rather than silently
+patched into a different ticket's screen, per this session's explicit scope instruction not to
+redesign or modify E1.3.8 absent a blocker to *this* ticket's own implementation — worth a small,
+dedicated fix (likely a `SafeAreaView`/top-inset on that one screen) whenever E1.3.8 is next
+touched.
+
+**Files changed (this PR):** `apps/mobile/app/(app)/(tabs)/home.tsx` (replaced placeholder). New:
+`apps/mobile/src/lib/{use-capsules,use-capsules.test}.ts(x)`, `apps/mobile/src/screens/
+home.test.tsx`. No dependency files needed committing this time — unlike E1.3.6, everything E1.3.5
+depends on (`capsulesApi`, `CapsuleRow`, `fromCapsuleListItem`, the loading/empty/error primitives)
+was already merged to `main` via E1.3.1–4/7/8's PRs. **Deliberately excluded:** both `plan/
+STAGE-E-MOBILE-V1-E1.3-*` audit documents and the pre-existing uncommitted push-token backend work
+(`apps/api/src/modules/notifications/*`, `packages/contracts/src/notifications.ts`) — confirmed
+still present, uncommitted, and untouched after this commit.
+
+**Branch/commit/PR:** `e1.3.5-home-screen`, commit `a0c3d33`, PR
+[nottherealalanturing/timelycapsule#53](https://github.com/nottherealalanturing/timelycapsule/pull/53)
+against `main`. Not merged — awaiting review, per this session's explicit instruction not to
+merge.
+
+**Exact next ticket:** `E1.3.10` (Notifications tab, real data) is now the only remaining
+placeholder list screen (Home/Received/Notifications), with every dependency it needs already
+merged. `E1.3.9` (optional read-only replies/recipient list, an addition to the existing E1.3.8
+detail screen) remains available if there's room. `E1.3.11` (accessibility pass) needs
+E1.3.5–E1.3.10 all complete, so it's not next yet.
+
 ### E1.3.8 — Capsule detail screen (2026-08-28) — DONE, committed, PR open
 
 New read-only route `apps/mobile/app/(app)/capsule/[id].tsx` — `capsulesApi.get(id)` →
