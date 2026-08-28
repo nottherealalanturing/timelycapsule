@@ -156,6 +156,13 @@ describe('ReceivedTab', () => {
     expect(push).toHaveBeenCalledWith('/(app)/capsule/99999999-9999-9999-9999-999999999999');
   });
 
+  it('exposes each section heading with accessibilityRole="header" so a screen reader can navigate by heading', () => {
+    mockState = { status: 'ready', items: [receivedItem({ section: 'waiting' })] };
+    const instance = renderScreen();
+    const heading = instance.root.findAllByType(Text).find((node) => node.props.children === 'Ready to open');
+    expect(heading?.props.accessibilityRole).toBe('header');
+  });
+
   it('never imports the decrypt utility or any crypto primitive in the screen itself', () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const source = readFileSync(join(here, '../../app/(app)/(tabs)/received.tsx'), 'utf-8');

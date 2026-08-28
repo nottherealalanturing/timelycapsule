@@ -15,7 +15,7 @@ export default function Index() {
 
   if (authState === 'unknown') {
     return (
-      <View style={styles.container}>
+      <View style={styles.container} accessible accessibilityRole="progressbar" accessibilityLabel="Loading" accessibilityLiveRegion="polite">
         <ActivityIndicator size="large" color={colors.brass} />
       </View>
     );

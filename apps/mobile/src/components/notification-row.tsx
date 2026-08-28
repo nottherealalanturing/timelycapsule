@@ -17,15 +17,25 @@ import { colors, fontSize, fontWeight, space } from '../lib/tokens';
  * are exactly two, and a weight change is the plainer, more honest way to
  * say "read" vs "unread" in text terms rather than borrowing a visual
  * language built for something else).
+ *
+ * Font weight alone reaches sighted users only — a screen reader has no way
+ * to hear "bold," so `accessibilityLabel` prefixes "Unread" as actual text
+ * whenever `item.unread` is true, the same signal sighted users get, just
+ * spoken instead of seen. The label also groups title/body/date into one
+ * announcement, same reasoning as `CapsuleRow`.
  */
 export function NotificationRow({ item, onPress }: { item: NotificationRowItem; onPress?: (capsuleId: string) => void }) {
   const navigable = item.capsuleId !== null;
   const capsuleId = item.capsuleId;
+  const label = [item.unread ? 'Unread' : null, item.title, item.body, item.dateLabel]
+    .filter((part): part is string => Boolean(part))
+    .join('. ');
 
   return (
     <Pressable
       onPress={navigable && onPress ? () => onPress(capsuleId!) : undefined}
       accessibilityRole={navigable ? 'button' : 'text'}
+      accessibilityLabel={label}
       style={styles.container}
     >
       <View style={styles.main}>

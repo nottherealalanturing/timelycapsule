@@ -4,6 +4,143 @@
 
 ## Current status
 
+### E1.3.11 — Accessibility pass (2026-08-28) — DONE, committed, PR open
+
+VoiceOver/TalkBack correctness pass over every screen/component E1.3 shipped
+(Login, Home, Received, Notifications, Capsule detail, replies, recipients,
+`CapsuleRow`, `NotificationRow`, `LoadingState`/`EmptyState`/`ErrorState`,
+`MasterKeyGate`, tab navigation, logout). Scope was audit-then-minimally-fix,
+not a redesign: no visual change, no copy change, no new product
+functionality — only `accessible`/`accessibilityRole`/`accessibilityLabel`/
+`accessibilityLiveRegion` additions, plus one real defect found and fixed
+via live device testing (below).
+
+**Audit found most of E1.2's own screens (login, `MasterKeyGate`, logout)
+already correctly labeled** — role/label/`accessibilityState` were already
+present from that ticket's own work, confirmed by direct on-device
+inspection rather than assumed. The real gaps were in E1.3's own newer
+surfaces:
+
+- `CapsuleRow`/`NotificationRow` relied on the platform's implicit
+  child-text concatenation for their accessible name (Pressable defaults
+  `accessible: true`, which merges descendant text) rather than a
+  deliberate, explicit label — fragile phrasing/ordering across iOS/Android,
+  and for `NotificationRow` specifically, **unread state (font-weight only)
+  had no textual representation at all**, meaning a screen-reader user
+  could not perceive it. Fixed by composing an explicit `accessibilityLabel`
+  on both (title/subtitle/teaser/state/date for `CapsuleRow`; an "Unread."
+  prefix + title/body/date for `NotificationRow`) and making
+  `accessibilityRole` follow whether the row is actually interactive
+  (`onPress` present), mirroring a pattern `NotificationRow` already used
+  for its navigable/non-navigable distinction.
+- Capsule detail's header (state/date/title), each reply (author/date/text),
+  and each recipient (name/status) were three-plus separate un-grouped
+  `Text`/`View` nodes each, forcing a screen-reader user to swipe through
+  fragments of one semantic item. Grouped each into a single `accessible`
+  block with a composed label — deliberately *not* applied to the letter's
+  own paragraphs, which stay individually swipeable (a reader should be
+  able to navigate a long letter paragraph by paragraph, the same
+  affordance sighted scrolling gives).
+- Section headings ("Ready to open"/"Still sealed"/"Opened" on Received;
+  "What was written back"/"Addressed to" on capsule detail) lacked
+  `accessibilityRole="header"`, unlike every screen-level title in the app —
+  added for heading-navigation gesture parity.
+- The splash/hydration gate (`app/index.tsx`) rendered a bare
+  `ActivityIndicator` with no label at all — the one place in the app that
+  actually violated its own already-stated design principle ("state is
+  stated in text, never carried by an indeterminate animation," quoted
+  verbatim in `loading-state.tsx`'s own comment). Added a "Loading" label +
+  live region.
+
+**Real defect found via live on-device testing, not just static review —
+the capsule detail back button was genuinely unreachable by TalkBack, not
+just visually cramped.** Two earlier tickets (E1.3.8, E1.3.10) had already
+documented that the back button's tap target could sit behind the status
+bar visually. This session's explicit instruction to actually verify the
+back control's TalkBack accessibility (rather than assume the earlier
+finding was purely cosmetic) surfaced that it is the *same* underlying
+cause but a *worse* consequence: the control had correct
+`accessibilityRole`/`accessibilityLabel` (confirmed via `uiautomator dump`
+inspection of the live accessibility-node tree) and so LOOKED correctly
+implemented from source alone — but a real double-tap at its reported
+bounds, with TalkBack active, produced no navigation at all, because the
+Android status bar's own system window sits above the app and swallows the
+touch before it reaches the control's y=0 region, for a raw touch and for
+TalkBack's touch-dispatch-based double-tap-to-activate alike. Fixed with
+the minimal targeted change the original finding had already recommended —
+`useSafeAreaInsets()` added to `app/(app)/capsule/[id].tsx` only, padding
+just the back button below the inset — not a broader navigation/layout
+refactor of anything else. Re-tested live after the fix: a real double-tap
+at the (now correctly positioned, below the status bar) control produced a
+real back-stack pop, confirmed via screenshot.
+
+**Tests:** 252/252 passing (24 files, up from 238/238 before this session —
+14 new tests this ticket: 3 on `CapsuleRow`'s composed label/conditional
+role, 2 on `NotificationRow`'s "Unread" prefix, 1 on Received's section
+heading role, 8 on capsule detail's header/reply/recipient grouping,
+heading roles, no-ciphertext-in-accessibility-props, the back button's
+role/label, and the safe-area padding fix). Typecheck clean. Lint clean.
+
+**Manual verification, Android emulator (Pixel 7), TalkBack actually
+enabled (not just code review) — real accessibility-node-tree inspection
+via `uiautomator dump`, the same data TalkBack itself reads to decide what
+to speak:** seeded one disposable account (real signup, real capsules —
+one unlocked with a real recipient and two real end-to-end-encrypted
+replies, one draft with a recipient, plus a claimed received capsule and
+two notifications, one read one unread) and confirmed live, on-device:
+Login's fields/button already correctly labeled and focusable/clickable
+once enabled; Home/Received rows exposed as single focusable
+`android.widget.Button` nodes with exactly the composed label text (e.g.
+"Not written yet. Draft. Aug 28, 2026", "Happy birthday. From Ada Lovelace.
+Ready to open. Aug 28, 2026"); Notifications' unread row correctly prefixed
+"Unread." and the read row correctly not; capsule detail's header grouped
+to "Unlocked. Aug 28, 2026. A letter to future me", both replies grouped
+correctly with "You" resolved for the sender's own reply, and the recipient
+row grouped to "Grace Hopper, opened"; the back-button defect and its fix,
+as described above, both reproduced live. Tab bar labels (Home/Received/
+Notifications/Profile) are focusable/clickable with the tab name present in
+the label — **found, not fixed:** each tab's composed accessibility label
+also includes a leading glyph character (renders as a tofu/placeholder box
+visually) from React Navigation's own default tab-icon fallback, since
+`(tabs)/_layout.tsx` specifies no `tabBarIcon` — pre-existing since E1.2,
+present in the label but not blocking comprehension (the tab name itself
+is still clearly present and spoken), and adding real tab icons is a
+design decision explicitly out of this ticket's scope, not a labeling
+defect this ticket introduced or should fix. All disposable test data
+deleted afterward; scratch seed/cleanup scripts removed.
+
+**iOS:** not interactively verified this session — the same
+simulator-automation limitation already documented in E1.2's and every
+subsequent E1.3 ticket's own PROGRESS.md entries. Not claimed as tested;
+VoiceOver correctness on iOS remains unverified beyond the fact that the
+same cross-platform React Native accessibility props were used (no
+platform-specific code path).
+
+**Files changed (this PR):** `apps/mobile/app/index.tsx`, `apps/mobile/app/
+(app)/(tabs)/received.tsx`, `apps/mobile/app/(app)/capsule/[id].tsx`,
+`apps/mobile/src/components/{capsule-row,notification-row}.tsx` (+ their
+`.test.tsx`), `apps/mobile/src/screens/{capsule-detail,received}.test.tsx`.
+**Deliberately excluded:** both `plan/STAGE-E-MOBILE-V1-E1.3-*` audit
+documents, the pre-existing uncommitted push-token backend work
+(`apps/api/src/modules/notifications/*`, `packages/contracts/src/
+notifications.ts`), and an unrelated, concurrently-in-progress personal/
+LinkedIn presence-pack task (`design/launch/{linkedin,personal}/`,
+`design/.build-linkedin.mjs`, and its own prepended `plan/PROGRESS.md`
+entry above) that this session found already uncommitted in the working
+tree partway through — confirmed still present, untouched, and this
+specific entry surgically inserted alongside it rather than overwriting or
+reordering it.
+
+**Branch/commit/PR:** `e1.3.11-accessibility-pass`, commit `d925b25`, PR
+[nottherealalanturing/timelycapsule#56](https://github.com/nottherealalanturing/timelycapsule/pull/56)
+against `main`. Not merged — awaiting review, per this session's explicit
+instruction not to merge.
+
+**Exact next ticket:** `E1.3.12` (`random.native.ts` — parallel, non-blocking,
+prerequisite for E1.4) is the only item left before Stage E1.4. Per this
+session's explicit instruction, do not automatically start it or E1.4 —
+stop here.
+
 ### E1.3.9 — Read-only replies/recipients on capsule detail (2026-08-28) — DONE, committed, PR open
 
 Extends the E1.3.8 capsule detail screen (`app/(app)/capsule/[id].tsx`) with two optional,

@@ -2,6 +2,7 @@ import type { Capsule, Recipient } from '@tc/contracts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EmptyState } from '../../../src/components/empty-state';
 import { ErrorState } from '../../../src/components/error-state';
 import { LoadingState } from '../../../src/components/loading-state';
@@ -124,9 +125,31 @@ export default function CapsuleDetailScreen() {
   const { state: recipientsState, retry: retryRecipients } = useCapsuleRecipients(capsule?.id ?? '', Boolean(capsule) && showRecipients);
   const { state: repliesState, retry: retryReplies } = useCapsuleReplies(capsule?.id ?? '', capsuleKey);
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" style={styles.back}>
+      {/*
+       * `paddingTop: insets.top` — without it, this is the only screen in
+       * the app with a touchable sitting flush at y=0: every tab screen's
+       * title has enough padding to clear the status bar incidentally, but
+       * this back control didn't, so on some devices the status bar's own
+       * system window sits on top of it and swallows the touch before it
+       * ever reaches the app — for a sighted tap and, confirmed this
+       * session via a real on-device accessibility-tree inspection with
+       * TalkBack running, for TalkBack's focus+double-tap activation too
+       * (the control was correctly labeled/focusable, but genuinely
+       * unreachable). A previously-known, previously-documented visual
+       * finding (see plan/PROGRESS.md's E1.3.8/E1.3.10 entries) turned out
+       * to be a real accessibility defect, not just a cosmetic one — this
+       * is the minimal fix, not a broader nav/layout change.
+       */}
+      <TouchableOpacity
+        onPress={() => router.back()}
+        accessibilityRole="button"
+        accessibilityLabel="Back"
+        style={[styles.back, { paddingTop: insets.top + space[4] }]}
+      >
         <Text style={styles.backLabel}>‹ Back</Text>
       </TouchableOpacity>
 
@@ -145,10 +168,19 @@ export default function CapsuleDetailScreen() {
   );
 }
 
+/**
+ * Grouped into one accessible header block (state, date, and title spoken
+ * together as "Unlocked. Aug 28, 2026. A letter to future me.") rather than
+ * three separate swipe stops — the status dot carries no label of its own
+ * and is never individually focusable once grouped, so state reaches a
+ * screen reader as the same text sighted users see (`statusLabel`), never
+ * as color alone.
+ */
 function CapsuleHeader({ capsule }: { capsule: Capsule }) {
   const row = fromCapsuleListItem(capsule);
+  const label = [row.statusLabel, row.dateLabel, capsule.title ?? 'Untitled capsule'].filter(Boolean).join('. ');
   return (
-    <View style={styles.header}>
+    <View style={styles.header} accessible accessibilityRole="header" accessibilityLabel={label}>
       <View style={styles.statusRow}>
         <View style={[styles.statusDot, { backgroundColor: row.statusColor }]} />
         <Text style={styles.statusLabel}>{row.statusLabel}</Text>
@@ -206,7 +238,7 @@ function RecordSection({ record, decrypt }: { record: CapsuleRecordState; decryp
 
   if (decrypt.phase === 'decrypting') {
     return (
-      <View style={styles.record}>
+      <View style={styles.record} accessibilityLiveRegion="polite">
         <Text style={styles.recordText}>Opening.</Text>
       </View>
     );
@@ -278,7 +310,9 @@ function RepliesSection({ state, onRetry }: { state: RepliesState; onRetry: () =
     <>
       {threadsWithReplies.map((thread) => (
         <View key={thread.recipientId} style={styles.section}>
-          <Text style={styles.sectionHeading}>What was written back</Text>
+          <Text style={styles.sectionHeading} accessibilityRole="header">
+            What was written back
+          </Text>
           {thread.replies.map((reply) => (
             <ReplyEntry key={reply.id} reply={reply} theirName={thread.recipientLabel ?? 'Them'} />
           ))}
@@ -288,12 +322,23 @@ function RepliesSection({ state, onRetry }: { state: RepliesState; onRetry: () =
   );
 }
 
+/**
+ * Grouped into one accessible block ("Ada Lovelace. Aug 28, 2026. Thank you
+ * for writing this.") rather than separate stops for author, date, and each
+ * line — a short reply read as a single coherent unit, not three-plus
+ * fragments a screen-reader user has to swipe through and mentally
+ * reassemble. The composed label carries only text already rendered
+ * on-screen (already-decrypted plaintext, or the same safe failure copy
+ * shown sighted users) — never ciphertext, never a key.
+ */
 function ReplyEntry({ reply, theirName }: { reply: DecryptedReply; theirName: string }) {
   const who = reply.author === 'sender' ? 'You' : theirName;
   const lines = reply.text ? reply.text.split('\n').filter((line) => line.trim().length > 0) : [];
+  const body = reply.text === null ? "This could not be opened with the key for this capsule." : lines.join(' ');
+  const label = [who, formatDate(reply.createdAt), body].filter(Boolean).join('. ');
 
   return (
-    <View style={styles.replyEntry}>
+    <View style={styles.replyEntry} accessible accessibilityRole="text" accessibilityLabel={label}>
       <View style={styles.replyMeta}>
         <Text style={styles.replyWho}>{who}</Text>
         <Text style={styles.date}>{formatDate(reply.createdAt)}</Text>
@@ -333,7 +378,9 @@ function RecipientsSection({ state, onRetry }: { state: RecipientsState; onRetry
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionHeading}>Addressed to</Text>
+      <Text style={styles.sectionHeading} accessibilityRole="header">
+        Addressed to
+      </Text>
       {state.recipients.map((recipient) => (
         <RecipientRow key={recipient.id} recipient={recipient} />
       ))}
@@ -341,14 +388,16 @@ function RecipientsSection({ state, onRetry }: { state: RecipientsState; onRetry
   );
 }
 
+/** Grouped into one accessible block ("Ada Lovelace, opened") rather than two separate stops for name and status — the status text is the same product terminology sighted users see, never color alone. */
 function RecipientRow({ recipient }: { recipient: Recipient }) {
   const label = recipient.displayName || recipient.email || recipient.phone || 'Someone';
+  const status = recipient.status.replace(/_/g, ' ');
   return (
-    <View style={styles.recipientRow}>
+    <View style={styles.recipientRow} accessible accessibilityRole="text" accessibilityLabel={`${label}, ${status}`}>
       <Text style={styles.recipientLabel} numberOfLines={1}>
         {label}
       </Text>
-      <Text style={styles.recipientStatus}>{recipient.status.replace(/_/g, ' ')}</Text>
+      <Text style={styles.recipientStatus}>{status}</Text>
     </View>
   );
 }
