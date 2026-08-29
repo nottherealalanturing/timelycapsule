@@ -4,6 +4,70 @@
 
 ## Current status
 
+### E1.3.12 — React Native crypto randomness (2026-08-29) — DONE, committed, PR open
+
+Closes the gap E1.3.7 flagged and the final-readiness audit's §6.4: `packages/crypto/src/
+random.ts` calls `crypto.getRandomValues`, which Hermes/React Native doesn't implement —
+`apps/mobile` had no native randomness path at all, which would have blocked E1.4's need
+to generate real capsule keys/IVs/salts client-side.
+
+**Implementation:** new `packages/crypto/src/random.native.ts`, resolved automatically
+over `random.ts` by Metro's platform-extension convention when bundling for ios/android —
+the exact same mechanism `aes.native.ts`/`kdf.native.ts` already established. No caller
+(`aes.ts`, `aes.native.ts`, `capsule-key.ts`, `master-key.ts`, `recovery-kit.ts`,
+`index.ts`) needed any change — the public API (four synchronous functions returning
+`Uint8Array`) is unchanged, platform-specific caller code was never needed. Backed by
+`react-native-libsodium`'s `randombytes_buf` — libsodium's own CSPRNG via a synchronous
+JSI binding, seeded from the OS's secure random source, already proven in this app via
+`kdf.native.ts`'s Argon2id path. **No new native dependency:** the library is already a
+dependency of both `packages/crypto` and `apps/mobile`, and already registered as an Expo
+config plugin. No insecure fallback exists — if the native module were ever unavailable,
+the call throws rather than degrading to weaker randomness. Also corrected a stale
+`README.md` line describing an unbuilt "WebCrypto polyfill" approach, already contradicted
+twice by existing code and now a third time by this file.
+
+**Tests:** `packages/crypto` 61/61 passing (10 files, +16 new in `random.native.test.ts`).
+These genuinely exercise real CSPRNG output — byte lengths, `Uint8Array` shape,
+independence across calls, no all-zero output, no collisions across 200 samples, arity/
+length parity with `random.ts` — because `react-native-libsodium` turns out to have a
+working WASM fallback build under plain Node (confirmed directly this session, not
+assumed), unlike `kdf.native.ts`'s Argon2id path, which genuinely cannot run there.
+`apps/mobile` suite unaffected: 252/252 passing. Both packages: typecheck clean, lint
+clean.
+
+**Security review:** grepped the full diff for `Math.random`, `console.*`, predictable
+counters/timestamps, `globalThis.crypto` mutation — clean. No random bytes or key material
+appear in any log, test fixture, or source comment.
+
+**Manual verification, Android emulator, real Hermes/JSI runtime (not just Node/WASM):**
+built a disposable, unlinked route reached only via a direct deep link, calling all four
+generators plus a real `encryptBytes`/`decryptBytes` round-trip using the natively-
+generated key and IV — deliberately never logging actual byte values, only booleans/
+lengths. Result: **PASS** — correct byte lengths (32/12/16/16), two independently
+generated keys differ, two independently generated IVs differ, the generated key is not
+all-zero, and the full AES-256-GCM round-trip succeeded using key/IV material this ticket's
+own code produced on-device. Confirmed no errors and no key material anywhere in `logcat`.
+The harness was deleted immediately after — nothing from it remains in the tree.
+
+**Files changed (this PR):** new `packages/crypto/src/{random.native,random.native.test}.ts`.
+Modified: `packages/crypto/README.md` (one stale-architecture correction, see above).
+**Deliberately excluded:** the pre-existing uncommitted push-token backend work
+(`apps/api/src/modules/notifications/*`, `packages/contracts/src/notifications.ts`), both
+`plan/STAGE-E-MOBILE-V1-E1.3-*` audit documents, and the unrelated, concurrently-in-progress
+personal/LinkedIn presence-pack work (now two entries above this one) — all confirmed still
+present, untouched, and this entry surgically inserted alongside them rather than
+overwriting or reordering anything.
+
+**Branch/commit/PR:** `e1.3.12-random-native`, commit `9040a9f`, PR
+[nottherealalanturing/timelycapsule#57](https://github.com/nottherealalanturing/timelycapsule/pull/57)
+against `main`. Not merged — awaiting review, per this session's explicit instruction not
+to merge.
+
+**Exact next ticket:** `E1.3.12` was the last item before Stage E's next phase.
+`E1.4` (capsule creation — Address/Compose/Seal) is next, now unblocked (it needed exactly
+this ticket's client-side key generation). Per this session's explicit instruction, do not
+automatically start it — stop here.
+
 ### E1.3.11 — Accessibility pass (2026-08-28) — DONE, committed, PR open
 
 VoiceOver/TalkBack correctness pass over every screen/component E1.3 shipped
