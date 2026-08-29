@@ -2,8 +2,13 @@
 
 Zero-access encryption primitives for TimelyCapsule (plan/06-FEATURE-ADDENDUM.md §A,
 plan/03-ARCHITECTURE.md §8). This package runs **client-side only** — web (browser
-WebCrypto) and, once mobile crypto work starts, React Native (`react-native-quick-crypto`
-or an equivalent WebCrypto polyfill). The API surface is plain `Uint8Array` in/out
+WebCrypto) and React Native, which has no WebCrypto at all (Hermes implements neither
+`crypto.subtle` nor `crypto.getRandomValues`). Rather than polyfilling WebCrypto, each
+WebCrypto-dependent file has a same-named `*.native.ts` sibling (`aes.native.ts`,
+`kdf.native.ts`, `random.native.ts`) that Metro resolves over the web version
+automatically when bundling for ios/android, backed by `@noble/ciphers`/`@noble/hashes`
+(pure JS) or `react-native-libsodium` (native JSI) as each primitive requires — see each
+file's own header comment for which. The API surface is plain `Uint8Array` in/out
 specifically so it doesn't assume Node, the DOM, or any one platform's buffer type.
 
 **The backend never imports this package and never sees plaintext capsule content,
