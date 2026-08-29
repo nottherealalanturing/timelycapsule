@@ -19,7 +19,7 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
-const { capsulesApi, receivedApi, notificationsApi, mediaApi, ApiClientError } = await import('./api-client');
+const { capsulesApi, recipientsApi, receivedApi, notificationsApi, mediaApi, ApiClientError } = await import('./api-client');
 const { setTokens } = await import('./token-store');
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -151,6 +151,88 @@ describe('api-client.ts — capsule domain', () => {
       vi.mocked(fetch).mockResolvedValue(jsonResponse({ data: [thread] }));
       const result = await capsulesApi.replies(capsule.id);
       expect(result.data[0]!.replies[0]!.bodyEnc).toBe('abc');
+    });
+  });
+
+  describe('capsulesApi.create', () => {
+    it('POSTs only {type} and returns the new draft capsule', async () => {
+      const draft = { ...capsule, state: 'draft' as const, contentDocEnc: null, ownerKeyWrap: null };
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ capsule: draft }, 201));
+      const result = await capsulesApi.create({ type: 'personal' });
+
+      expect(result.capsule.state).toBe('draft');
+      const [, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(init).toMatchObject({ method: 'POST' });
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ type: 'personal' });
+    });
+  });
+
+  describe('capsulesApi.patch', () => {
+    it('PATCHes only the provided fields', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ capsule }));
+      await capsulesApi.patch(capsule.id, { unlockAt: '2027-06-01T09:00:00.000Z' });
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(url).toContain(`/capsules/${capsule.id}`);
+      expect(init).toMatchObject({ method: 'PATCH' });
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ unlockAt: '2027-06-01T09:00:00.000Z' });
+    });
+
+    it('propagates a capsule_sealed rejection (patch on a non-draft capsule) as ApiClientError', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse({ error: { code: 'capsule_sealed', message: 'Only a draft can be edited.', requestId: 'x' } }, 409),
+      );
+      await expect(capsulesApi.patch(capsule.id, { type: 'self' })).rejects.toMatchObject({ code: 'capsule_sealed' });
+    });
+  });
+
+  describe('recipientsApi.create', () => {
+    it('POSTs the recipient input and returns the recipient plus its one-time access token', async () => {
+      const recipient = {
+        id: '77777777-7777-7777-7777-777777777777',
+        capsuleId: capsule.id,
+        userId: null,
+        email: 'amara@example.com',
+        phone: null,
+        displayName: null,
+        status: 'added' as const,
+        firstOpenedAt: null,
+        lastViewedAt: null,
+        resolvedUnlockAt: null,
+        verificationRequired: null,
+        verifiedAt: null,
+        isFallback: null,
+        fallbackAfter: null,
+        createdAt: '2026-01-01T00:00:00.000Z',
+      };
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ recipient, accessToken: 'raw-token' }));
+      const result = await recipientsApi.create(capsule.id, { email: 'amara@example.com' });
+
+      expect(result.recipient.email).toBe('amara@example.com');
+      expect(result.accessToken).toBe('raw-token');
+      const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(url).toContain(`/capsules/${capsule.id}/recipients`);
+      expect(init).toMatchObject({ method: 'POST' });
+    });
+
+    it('surfaces recipient_already_added without reinterpreting it', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse({ error: { code: 'recipient_already_added', message: 'Already added.', requestId: 'x' } }, 409),
+      );
+      await expect(recipientsApi.create(capsule.id, { email: 'amara@example.com' })).rejects.toMatchObject({
+        code: 'recipient_already_added',
+      });
+    });
+  });
+
+  describe('recipientsApi.delete', () => {
+    it('DELETEs the exact recipient and resolves with no body', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse(null, 204));
+      const result = await recipientsApi.delete(capsule.id, 'recipient-1');
+      expect(result).toBeUndefined();
+      const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(url).toContain(`/capsules/${capsule.id}/recipients/recipient-1`);
+      expect(init).toMatchObject({ method: 'DELETE' });
     });
   });
 

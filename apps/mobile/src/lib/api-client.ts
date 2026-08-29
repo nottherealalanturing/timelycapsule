@@ -2,19 +2,26 @@ import {
   AuthResponseSchema,
   CapsuleListResponseSchema,
   CapsuleResponseSchema,
+  CreateCapsuleRequestSchema,
+  CreateRecipientRequestSchema,
+  CreateRecipientResponseSchema,
   LoginRequestSchema,
   LogoutRequestSchema,
   MeResponseSchema,
   MediaListResponseSchema,
   MediaViewResponseSchema,
   NotificationsListResponseSchema,
+  PatchCapsuleRequestSchema,
   ReceivedListResponseSchema,
   RecipientsListResponseSchema,
   RefreshResponseSchema,
   ReplyThreadListResponseSchema,
+  type CreateCapsuleRequest,
+  type CreateRecipientRequest,
   type ListCapsulesQuery,
   type LoginRequest,
   type PaginatedQuery,
+  type PatchCapsuleRequest,
 } from '@tc/contracts';
 import { Platform } from 'react-native';
 import { z } from 'zod';
@@ -158,26 +165,34 @@ function toQueryString(query: Record<string, string | number | boolean | undefin
 }
 
 /**
- * Read-only capsule-domain endpoints for E1.3 (browsing only — no create/
- * patch/seal/etc., those belong to the creation ticket). Response shapes
- * are consumed exactly as the server returns them, deliberately including
- * their real, sometimes-inconsistent characteristics rather than
- * normalizing them away at this layer (per the E1.3 final readiness
- * audit): `list`'s `nextCursor` is `null` both at true end-of-list and,
- * separately, whenever `collectionId` is set (the server bypasses
- * pagination entirely for that filter) — this client does not try to tell
- * those two cases apart, since the server itself doesn't distinguish them
- * in the response. `get`'s `contentDocEnc`/`ownerKeyWrap` are `null` for an
- * owned capsule that hasn't been through its first autosave yet — this
- * client returns that null-shaped `Capsule` as-is; classifying it as
- * "nothing to decrypt" is `capsule-crypto.ts`'s job (E1.3.7), not this
- * layer's.
+ * Capsule-domain endpoints. `list`/`get`/`media`/`replies`/`recipients`
+ * (read-only) shipped with E1.3 — see that ticket's own audit for why their
+ * response shapes are consumed exactly as the server returns them, not
+ * normalized. `create`/`patch` are E1.4.1's own addition (the Address
+ * movement): `create` starts a new draft (`{type}` only — every other
+ * field is set by a later `patch`, matching web's own `/capsule/new` →
+ * `PATCH /capsules/:id` two-step exactly); `patch` is a **partial** merge
+ * server-side — a field omitted from the body is left untouched, an
+ * explicit `null` clears it (confirmed against `apps/api/src/modules/
+ * capsules/service.ts`'s `patchCapsule`, not assumed). Neither call ever
+ * carries `contentDocEnc`/`ownerKeyWrap` — those are E1.4.3's job (Compose),
+ * once a capsule key exists to encrypt anything with.
  */
 export const capsulesApi = {
   list: (query: Partial<ListCapsulesQuery> = {}) =>
     request(`/capsules${toQueryString(query)}`, CapsuleListResponseSchema, { auth: true }),
 
   get: (id: string) => request(`/capsules/${id}`, CapsuleResponseSchema, { auth: true }),
+
+  create: (input: CreateCapsuleRequest) =>
+    request('/capsules', CapsuleResponseSchema, { method: 'POST', auth: true, body: CreateCapsuleRequestSchema.parse(input) }),
+
+  patch: (id: string, input: Partial<PatchCapsuleRequest>) =>
+    request(`/capsules/${id}`, CapsuleResponseSchema, {
+      method: 'PATCH',
+      auth: true,
+      body: PatchCapsuleRequestSchema.parse(input),
+    }),
 
   /** Unpaginated — the server returns every media row for the capsule in one response (naturally small, bounded by storage quota). */
   media: (id: string) => request(`/capsules/${id}/media`, MediaListResponseSchema, { auth: true }),
@@ -197,6 +212,29 @@ export const capsulesApi = {
    * per-capsule recipient limit).
    */
   recipients: (id: string) => request(`/capsules/${id}/recipients`, RecipientsListResponseSchema, { auth: true }),
+};
+
+/**
+ * Owner-side recipient management for the Address movement (E1.4.1) — the
+ * same `POST`/`DELETE /capsules/:id/recipients[/:id]` contracts web's
+ * `AddresseeBeat.tsx` already calls, unchanged. `create`'s response
+ * includes a one-time `accessToken` (the raw, never-stored-again recipient
+ * link token) that this ticket has no use for yet — announcing a link is
+ * E1.4.8's job (Seal), once a capsule is actually sealed — so it is simply
+ * left unused by callers rather than discarded here; the full response is
+ * still returned in case a future ticket needs it without re-deriving the
+ * contract.
+ */
+export const recipientsApi = {
+  create: (capsuleId: string, input: CreateRecipientRequest) =>
+    request(`/capsules/${capsuleId}/recipients`, CreateRecipientResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CreateRecipientRequestSchema.parse(input),
+    }),
+
+  delete: (capsuleId: string, recipientId: string) =>
+    request(`/capsules/${capsuleId}/recipients/${recipientId}`, z.void(), { method: 'DELETE', auth: true }),
 };
 
 /**
