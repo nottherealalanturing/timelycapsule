@@ -60,3 +60,29 @@ export const SendAnnounceRequestSchema = z.object({
   link: z.string().url(),
 });
 export type SendAnnounceRequest = z.infer<typeof SendAnnounceRequestSchema>;
+
+/**
+ * Push device registration (`push_tokens` table — schema existed since T-14
+ * but had no endpoint until this addition). `token` is the opaque
+ * platform-push-service device token (Expo push token, in practice, for
+ * `apps/mobile`) — not a secret, just an addressable-device identifier.
+ */
+export const PushPlatformSchema = z.enum(['ios', 'android', 'web']);
+export type PushPlatform = z.infer<typeof PushPlatformSchema>;
+
+export const RegisterPushTokenRequestSchema = z.object({
+  token: z.string().min(1).max(4096),
+  platform: PushPlatformSchema,
+});
+export type RegisterPushTokenRequest = z.infer<typeof RegisterPushTokenRequestSchema>;
+
+export const PushTokenSchema = z.object({
+  id: z.string().uuid(),
+  platform: PushPlatformSchema,
+  lastSeenAt: z.string().nullable(),
+  createdAt: z.string(),
+});
+export type PushToken = z.infer<typeof PushTokenSchema>;
+
+export const RegisterPushTokenResponseSchema = z.object({ pushToken: PushTokenSchema });
+export type RegisterPushTokenResponse = z.infer<typeof RegisterPushTokenResponseSchema>;

@@ -1,14 +1,24 @@
-import { MarkNotificationsReadRequestSchema, NotificationPrefsSchema, PaginatedQuerySchema, type PaginatedQuery } from '@tc/contracts';
+import { MarkNotificationsReadRequestSchema, NotificationPrefsSchema, PaginatedQuerySchema, RegisterPushTokenRequestSchema, type PaginatedQuery } from '@tc/contracts';
 import { Router } from 'express';
+import { z } from 'zod';
 import type { Database } from '../../db/client.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { validate } from '../../middleware/validate.js';
 import { requireAuth } from '../auth/index.js';
-import { getNotificationPrefs, listNotifications, markNotificationsRead, putNotificationPrefs } from './service.js';
+import {
+  getNotificationPrefs,
+  listNotifications,
+  markNotificationsRead,
+  putNotificationPrefs,
+  registerPushToken,
+  unregisterPushToken,
+} from './service.js';
+
+const IdParamSchema = z.object({ id: z.string().uuid() });
 
 export function notificationsRouter(db: Database): Router {
   const router = Router();
-  router.use(['/notifications', '/me/notification-prefs'], requireAuth());
+  router.use(['/notifications', '/me/notification-prefs', '/me/push-tokens'], requireAuth());
 
   router.get('/notifications', validate({ query: PaginatedQuerySchema }), async (req, res, next) => {
     try {
@@ -51,6 +61,34 @@ export function notificationsRouter(db: Database): Router {
       try {
         const prefs = await putNotificationPrefs(db, req.user!.id, req.body);
         res.status(200).json({ prefs });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.post(
+    '/me/push-tokens',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ body: RegisterPushTokenRequestSchema }),
+    async (req, res, next) => {
+      try {
+        const pushToken = await registerPushToken(db, req.user!.id, req.body);
+        res.status(200).json({ pushToken });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  router.delete(
+    '/me/push-tokens/:id',
+    rateLimit({ windowMs: 15 * 60 * 1000, max: 60, keyFn: (r) => r.user?.id ?? (r.ip ?? 'unknown') }),
+    validate({ params: IdParamSchema }),
+    async (req, res, next) => {
+      try {
+        await unregisterPushToken(db, req.user!.id, req.params.id as string);
+        res.status(204).end();
       } catch (err) {
         next(err);
       }
