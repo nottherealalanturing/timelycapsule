@@ -1,8 +1,9 @@
-import type { MarkNotificationsReadRequest, Notification, NotificationCategory, NotificationPrefs } from '@tc/contracts';
+import type { MarkNotificationsReadRequest, Notification, NotificationCategory, NotificationPrefs, PushToken, RegisterPushTokenRequest } from '@tc/contracts';
 import { and, desc, eq, inArray, isNull, lt } from 'drizzle-orm';
 import type { Database } from '../../db/client.js';
+import { ApiError } from '../../lib/errors.js';
 import { buildPage, decodeCursor, type PageResult } from '../../lib/pagination.js';
-import { notificationPrefs, notifications } from '../../db/schema/index.js';
+import { notificationPrefs, notifications, pushTokens } from '../../db/schema/index.js';
 
 const DEFAULT_PREFS: NotificationPrefs = { quietHours: null, emailOptOut: [] };
 
@@ -97,4 +98,44 @@ export async function writeNotification(
 export function shouldSendEmail(prefs: NotificationPrefs, category: NotificationCategory): boolean {
   if (category === 'security') return true;
   return !prefs.emailOptOut.includes(category);
+}
+
+function toPushToken(row: typeof pushTokens.$inferSelect): PushToken {
+  return {
+    id: row.id,
+    platform: row.platform,
+    lastSeenAt: row.lastSeenAt ? row.lastSeenAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * Upserts on `token` (unique) rather than inserting unconditionally: the
+ * same device token re-registering (app relaunch, or a different account
+ * logging in on the same device) must move to the new `userId`/`platform`
+ * rather than violate the unique constraint or leave a stale row pointing
+ * at the wrong account. Re-registering also clears `invalidAt` — a token
+ * the push provider previously reported as dead is live again once the
+ * device demonstrably re-registers it.
+ */
+export async function registerPushToken(db: Database, userId: string, input: RegisterPushTokenRequest): Promise<PushToken> {
+  const [row] = await db
+    .insert(pushTokens)
+    .values({ userId, token: input.token, platform: input.platform, lastSeenAt: new Date() })
+    .onConflictDoUpdate({
+      target: pushTokens.token,
+      set: { userId, platform: input.platform, lastSeenAt: new Date(), invalidAt: null },
+    })
+    .returning();
+  return toPushToken(row!);
+}
+
+export async function unregisterPushToken(db: Database, userId: string, id: string): Promise<void> {
+  const [row] = await db
+    .select({ id: pushTokens.id })
+    .from(pushTokens)
+    .where(and(eq(pushTokens.id, id), eq(pushTokens.userId, userId)))
+    .limit(1);
+  if (!row) throw ApiError.notFound('Push token not found');
+  await db.delete(pushTokens).where(eq(pushTokens.id, id));
 }

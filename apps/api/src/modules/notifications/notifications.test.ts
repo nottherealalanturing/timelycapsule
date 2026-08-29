@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import '../../env.js';
 import { createApp } from '../../app.js';
 import { db, pool } from '../../db/client.js';
-import { notificationPrefs, notifications, users } from '../../db/schema/index.js';
+import { notificationPrefs, notifications, pushTokens, users } from '../../db/schema/index.js';
 
 const createdUserIds: string[] = [];
 
@@ -36,6 +36,7 @@ function authed(app: ReturnType<typeof createApp>, token: string) {
     get: (url: string) => request(app).get(url).set('Authorization', `Bearer ${token}`),
     put: (url: string) => request(app).put(url).set('Authorization', `Bearer ${token}`),
     post: (url: string) => request(app).post(url).set('Authorization', `Bearer ${token}`),
+    delete: (url: string) => request(app).delete(url).set('Authorization', `Bearer ${token}`),
   };
 }
 
@@ -46,6 +47,9 @@ describe('notifications module (T-14)', () => {
     }
     for (const id of createdUserIds) {
       await db.delete(notificationPrefs).where(eq(notificationPrefs.userId, id));
+    }
+    for (const id of createdUserIds) {
+      await db.delete(pushTokens).where(eq(pushTokens.userId, id));
     }
     for (const id of createdUserIds) {
       await db.delete(users).where(eq(users.id, id));
@@ -114,5 +118,68 @@ describe('notifications module (T-14)', () => {
 
     const bList = await authed(b.app, b.accessToken).get('/v1/notifications');
     expect(bList.body.data).toHaveLength(0);
+  });
+
+  describe('push token registration', () => {
+    it('registers a push token and returns it without the raw token value', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const res = await authed(app, accessToken)
+        .post('/v1/me/push-tokens')
+        .send({ token: `expo-token-${randomUUID()}`, platform: 'ios' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.pushToken).toMatchObject({ platform: 'ios' });
+      expect(res.body.pushToken.id).toBeTypeOf('string');
+      expect(res.body.pushToken.token).toBeUndefined();
+    });
+
+    it('re-registering the same token moves it to the new caller instead of erroring', async () => {
+      const a = await createVerifiedUser();
+      const b = await createVerifiedUser();
+      const token = `expo-token-${randomUUID()}`;
+
+      const first = await authed(a.app, a.accessToken).post('/v1/me/push-tokens').send({ token, platform: 'android' });
+      expect(first.status).toBe(200);
+
+      const second = await authed(b.app, b.accessToken).post('/v1/me/push-tokens').send({ token, platform: 'android' });
+      expect(second.status).toBe(200);
+      expect(second.body.pushToken.id).toBe(first.body.pushToken.id);
+
+      const [row] = await db.select().from(pushTokens).where(eq(pushTokens.token, token));
+      expect(row?.userId).toBe(b.userId);
+    });
+
+    it('unregisters a push token the caller owns', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const register = await authed(app, accessToken)
+        .post('/v1/me/push-tokens')
+        .send({ token: `expo-token-${randomUUID()}`, platform: 'web' });
+
+      const del = await authed(app, accessToken).delete(`/v1/me/push-tokens/${register.body.pushToken.id}`);
+      expect(del.status).toBe(204);
+
+      const [row] = await db.select().from(pushTokens).where(eq(pushTokens.id, register.body.pushToken.id));
+      expect(row).toBeUndefined();
+    });
+
+    it('refuses to unregister a push token belonging to another user', async () => {
+      const a = await createVerifiedUser();
+      const b = await createVerifiedUser();
+      const register = await authed(a.app, a.accessToken)
+        .post('/v1/me/push-tokens')
+        .send({ token: `expo-token-${randomUUID()}`, platform: 'ios' });
+
+      const del = await authed(b.app, b.accessToken).delete(`/v1/me/push-tokens/${register.body.pushToken.id}`);
+      expect(del.status).toBe(404);
+
+      const [row] = await db.select().from(pushTokens).where(eq(pushTokens.id, register.body.pushToken.id));
+      expect(row).toBeDefined();
+    });
+
+    it('rejects an unrecognized platform value', async () => {
+      const { app, accessToken } = await createVerifiedUser();
+      const res = await authed(app, accessToken).post('/v1/me/push-tokens').send({ token: 'x', platform: 'windows' });
+      expect(res.status).toBe(400);
+    });
   });
 });
