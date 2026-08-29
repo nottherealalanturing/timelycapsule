@@ -4,6 +4,87 @@
 
 ## Current status
 
+### Personal + LinkedIn presence pack, part 2 — content strategy + 30-day calendar (2026-08-29) — not a numbered ticket, not committed
+
+Continues the 2026-08-28 entry below rather than replacing it. Full
+writeup: **`design/launch/personal/CONTENT-CALENDAR.md`**.
+
+Audited the prior pass's personal-post pool against a sharper brief
+("TimelyCapsule is something Assad is currently working on, not his whole
+identity") and found the one real problem: **all 10 personal posts from the
+prior pass referenced TimelyCapsule — zero were TC-free**, directly
+contradicting "some personal posts should have zero mention." Replaced with
+a 26-post pool (10 LinkedIn, 16 X), only 13 touching TimelyCapsule at all
+(9 explicit, 4 adjacent), all character-count-verified by script, not
+eyeballed. One small correction elsewhere: the GitHub profile README draft
+opened with "most of my time currently goes to TimelyCapsule," softened to
+"currently building TimelyCapsule, among other things." Everything else
+from the prior pass (positioning, all four profile bios, the LinkedIn
+company page, the 9 company posts, both banners) re-verified as still
+correct and left unchanged.
+
+New this pass: content pillars for both TimelyCapsule (7) and Assad (8); a
+real 30-day cross-account calendar (Aug 31–Sep 29, every slot has real
+written copy, no "TBD" rows, no invented launch date); a cross-account
+staggering map (e.g. Assad's own "one reading only" post deliberately runs
+two weeks *before* TimelyCapsule's own post on the same feature, not
+same-day); a repurposing matrix (every reuse is an adaptation or a personal
+commentary, never identical copy twice); an Instagram plan (TimelyCapsule
+active on the existing 8-post sequence, Assad's personal account
+deliberately kept to one post in 30 days — evaluated and recommended
+against forcing a cadence there); and a consolidated publishing dashboard.
+Re-verified no `design/launch/` or product changes since 2026-08-25 before
+writing anything (`git status`), so no product claim needed re-checking
+against the live app.
+
+Same artifact URL updated in place (not a new one) —
+`design/launch/personal/personal-presence-artifact.html`, now with a
+top-of-page "what changed" audit section, the full rewritten personal-post
+pool tagged TC/adjacent/non-TC, the 30-day calendar as real tables, the
+cross-account/repurposing matrices, the Instagram section, and a
+consolidated dashboard replacing the old matrix+manual sections.
+
+**Not committed, nothing pushed to any live platform** — same posture as
+the prior entry.
+
+
+### Personal + LinkedIn presence pack (2026-08-28) — not a numbered ticket, not committed
+
+Full writeup: **`design/launch/personal/PERSONAL-PRESENCE.md`**. Extends
+`design/launch/COPY.md` (the product's own X/Instagram pack) to a personal
+layer: positioning for Assad's LinkedIn/X/Instagram/GitHub profiles, a
+LinkedIn company page (page copy, About, specialties), 9 LinkedIn company
+posts, 10 personal posts (5 LinkedIn/5 X), and two new assets.
+
+Grounded in real current facts pulled via `gh api user` rather than assumed:
+GitHub bio/company/location, the `timelycapsule` repo's private visibility
+and its generic, off-voice repo description, the existing (2024, generic
+badge-template) profile README, and the real LinkedIn URL. Positioning
+recommendation: **"Software engineer. Currently: TimelyCapsule."** — eight
+systems evaluated against LinkedIn/X/Instagram/GitHub credibility and
+brand-fit; full table in the doc's §1.
+
+New assets (`design/.build-linkedin.mjs`, same real-fonts/real-tokens
+approach as `.build-launch.mjs`, no image model): `design/launch/linkedin/
+company-banner.png` (1128×191, the real lockup) and `personal-banner.png`
+(1584×396, a stretched abstract rendering of the Meridian mark's own
+marker-approaching-a-notch geometry — chosen over a literal logo lockup or
+a generic dev-themed banner after evaluating three directions; explicitly
+laid out clear of LinkedIn's bottom-left profile-photo overlap). Every
+other visual asset reuses existing `design/launch/final/` files — no
+redundant art produced for LinkedIn's own dimensions.
+
+All copy character-limit-checked (script output, not eyeballed) and
+checked against `07 §VIII`'s voice rules, with one explicit calibration
+noted: the "institution never says we" rule governs TimelyCapsule's own
+voice, not Assad's personal first-person posts, which correctly use "I."
+
+**Not committed, and nothing pushed to any live external platform** — every
+deliverable is copy-paste-ready text plus two local image files; GitHub
+profile README replacement, banner uploads, company page creation, and the
+LinkedIn Experience start-date are all flagged as manual/human actions in
+the doc's §10, not performed by this session.
+
 ### E1.3.12 — React Native crypto randomness (2026-08-29) — DONE, committed, PR open
 
 Closes the gap E1.3.7 flagged and the final-readiness audit's §6.4: `packages/crypto/src/
