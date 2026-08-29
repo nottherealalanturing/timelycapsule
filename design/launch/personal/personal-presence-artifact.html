@@ -1,0 +1,966 @@
+<title>Personal Presence Pack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#E9EAE6; --raised:#F3F4F0; --ink:#16181A; --muted:#5E635C;
+    --rule:rgba(22,24,26,.14); --rule-strong:rgba(22,24,26,.28);
+    --accent:#3F6154; --accent-ink:#2c463d;
+    --good-bg:#eef2ea; --good-ink:#3f6154;
+    --code-bg:#dfe1dc;
+    --font-serif:'Source Serif 4',Georgia,serif;
+    --font-sans:'IBM Plex Sans',system-ui,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,monospace;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0B0E14; --raised:#141922; --ink:#E6E8EC; --muted:#8B93A3;
+      --rule:rgba(230,232,236,.11); --rule-strong:rgba(230,232,236,.22);
+      --accent:#7fa393; --accent-ink:#9fc0b1;
+      --good-bg:#132019; --good-ink:#8fb8a4;
+      --code-bg:#1a2029;
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0B0E14; --raised:#141922; --ink:#E6E8EC; --muted:#8B93A3;
+    --rule:rgba(230,232,236,.11); --rule-strong:rgba(230,232,236,.22);
+    --accent:#7fa393; --accent-ink:#9fc0b1;
+    --good-bg:#132019; --good-ink:#8fb8a4;
+    --code-bg:#1a2029;
+  }
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper); color:var(--ink); font-family:var(--font-sans);
+    font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  ::selection{background:var(--accent);color:var(--paper)}
+
+  .wrap{max-width:900px;margin:0 auto;padding:0 24px 140px}
+
+  /* ── masthead ─────────────────────────────────────────────── */
+  header.masthead{
+    max-width:900px;margin:0 auto;padding:56px 24px 32px;
+    display:flex;flex-direction:column;gap:14px;
+  }
+  .mark{display:flex;align-items:center;gap:10px}
+  .mark svg{display:block}
+  .eyebrow{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);
+  }
+  h1.title{
+    font-family:var(--font-serif);font-weight:400;font-size:clamp(32px,5vw,50px);
+    line-height:1.08;letter-spacing:-.01em;max-width:16ch;text-wrap:balance;margin:0;
+  }
+  .dek{max-width:62ch;color:var(--muted);font-size:16.5px;line-height:1.65}
+  .dek b{color:var(--ink);font-weight:600}
+
+  /* ── nav ──────────────────────────────────────────────────── */
+  nav.toc{
+    position:sticky;top:0;z-index:10;background:var(--paper);
+    border-bottom:1px solid var(--rule);
+    padding:14px 24px;margin-bottom:8px;
+  }
+  nav.toc .inner{
+    max-width:900px;margin:0 auto;display:flex;gap:4px 18px;flex-wrap:wrap;
+    font-family:var(--font-mono);font-size:11.5px;letter-spacing:.06em;
+  }
+  nav.toc a{color:var(--muted);text-decoration:none;white-space:nowrap}
+  nav.toc a:hover,nav.toc a:focus-visible{color:var(--accent-ink)}
+  nav.toc a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+
+  /* ── sections ─────────────────────────────────────────────── */
+  section{padding:52px 0;border-top:1px solid var(--rule)}
+  section:first-of-type{border-top:none}
+  .hallmark{
+    font-family:var(--font-mono);font-size:12px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);margin:0 0 10px;
+  }
+  h2{
+    font-family:var(--font-serif);font-weight:400;font-size:clamp(24px,3.4vw,32px);
+    line-height:1.2;letter-spacing:-.008em;margin:0 0 6px;text-wrap:balance;
+  }
+  h3{
+    font-family:var(--font-sans);font-weight:600;font-size:17px;
+    margin:30px 0 10px;letter-spacing:-.005em;
+  }
+  h3 .n{color:var(--muted);font-weight:400;font-family:var(--font-mono);font-size:13px;margin-right:8px}
+  .lede{max-width:66ch;color:var(--muted);margin:0 0 22px;font-size:15.5px}
+  p{max-width:66ch;margin:0 0 14px}
+  p.tight{margin-bottom:8px}
+  .prose{max-width:66ch}
+  strong{font-weight:600}
+  a{color:var(--accent-ink)}
+  ul{max-width:64ch;padding-left:1.2em;margin:0 0 14px}
+  li{margin-bottom:6px}
+
+  /* ── recommendation banner ───────────────────────────────── */
+  .rec{
+    background:var(--good-bg);border:1px solid var(--rule-strong);
+    border-radius:3px;padding:20px 22px;margin:18px 0;max-width:66ch;
+  }
+  .rec .tag{font-family:var(--font-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--good-ink);margin-bottom:6px}
+  .rec .val{font-family:var(--font-serif);font-size:20px;color:var(--ink)}
+  .rec .sub{color:var(--muted);font-size:14px;margin-top:6px}
+
+  /* ── copy blocks (paste-ready) ────────────────────────────── */
+  .copy{
+    background:var(--raised);border:1px solid var(--rule);border-radius:3px;
+    padding:18px 20px;margin:10px 0 18px;white-space:pre-wrap;
+    font-family:var(--font-mono);font-size:13.5px;line-height:1.75;
+    max-width:66ch;color:var(--ink);
+  }
+  .copy .len{
+    display:block;font-family:var(--font-mono);font-size:11px;color:var(--muted);
+    letter-spacing:.06em;margin-bottom:10px;
+  }
+  .field-row{display:flex;gap:10px;flex-wrap:wrap;margin:4px 0 4px;max-width:66ch}
+  .field-row .k{font-family:var(--font-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);min-width:120px}
+  .field-row .v{font-size:14.5px}
+
+  /* ── evaluation cards (positioning systems) ──────────────── */
+  .system{
+    border-top:1px solid var(--rule); padding:20px 0;
+  }
+  .system:first-of-type{border-top:none;padding-top:8px}
+  .system .letter{
+    font-family:var(--font-mono);font-size:12px;color:var(--muted);
+    display:inline-block;width:1.4em;
+  }
+  .system .phrase{font-family:var(--font-serif);font-size:19px}
+  .system .verdict-row{
+    display:flex;flex-wrap:wrap;gap:8px 10px;margin-top:10px;
+  }
+  .chip{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.04em;
+    padding:4px 9px;border-radius:20px;border:1px solid var(--rule-strong);color:var(--muted);
+  }
+  .chip.pos{border-color:var(--good-ink);color:var(--good-ink)}
+  .chip.neg{border-color:#a45a4a;color:#a45a4a}
+  .chip.tc{border-color:var(--accent-ink);color:var(--accent-ink)}
+  .chip.adj{border-color:var(--muted);color:var(--muted)}
+  .chip.none{border-color:var(--good-ink);color:var(--good-ink)}
+  .system p{margin:8px 0 0;font-size:14.5px;color:var(--muted)}
+  .system p b{color:var(--ink)}
+
+  /* ── tables ───────────────────────────────────────────────── */
+  .tbl-wrap{overflow-x:auto;margin:14px 0 24px;max-width:100%}
+  table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+  th{
+    font-family:var(--font-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--muted);text-align:left;padding:8px 14px 8px 0;border-bottom:1px solid var(--rule-strong);
+    white-space:nowrap;
+  }
+  td{padding:11px 14px 11px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+  td.mono{font-family:var(--font-mono);font-size:12.5px}
+  tr:last-child td{border-bottom:1px solid var(--rule-strong)}
+
+  /* ── post cards ───────────────────────────────────────────── */
+  .post{
+    border:1px solid var(--rule);border-radius:4px;overflow:hidden;margin:16px 0;max-width:66ch;
+  }
+  .post .post-head{
+    display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+    padding:12px 18px;background:var(--raised);border-bottom:1px solid var(--rule);
+  }
+  .post .post-head .num{font-family:var(--font-mono);font-size:12px;color:var(--muted)}
+  .post .post-head .img{font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:right}
+  .post .post-body{padding:18px 20px;white-space:pre-wrap;font-size:14.5px;line-height:1.7}
+  .post .post-body b{font-weight:600}
+
+  /* ── figure / images ──────────────────────────────────────── */
+  figure{margin:20px 0;max-width:100%}
+  figure img{width:100%;display:block;border:1px solid var(--rule);border-radius:3px}
+  figcaption{font-family:var(--font-mono);font-size:11.5px;color:var(--muted);margin-top:8px}
+
+  /* ── manual checklist ─────────────────────────────────────── */
+  .steps{list-style:none;padding:0;max-width:66ch}
+  .steps li{
+    display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--rule);
+  }
+  .steps li:first-child{border-top:none}
+  .steps .num{
+    font-family:var(--font-mono);font-size:12px;color:var(--muted);min-width:1.6em;
+  }
+
+  footer{padding:60px 0 20px;color:var(--muted);font-family:var(--font-mono);font-size:11.5px}
+
+  @media (max-width:600px){
+    .field-row .k{min-width:100%}
+  }
+</style>
+
+<header class="masthead">
+  <div class="mark">
+    <svg width="26" height="26" viewBox="0 0 64 64" fill="none"><path d="M45 6V27M45 37V58" stroke="var(--ink)" stroke-width="5"/><circle cx="22" cy="32" r="5" fill="var(--ink)"/></svg>
+    <span class="eyebrow">TimelyCapsule — personal presence pack</span>
+  </div>
+  <h1 class="title">Assad, everywhere TimelyCapsule isn't the whole page.</h1>
+  <p class="dek">Positioning, profile copy, a LinkedIn company page, company
+  posts, a rebalanced personal-post pool, two banners, content pillars, and a
+  real 30-day posting map — for LinkedIn, X, Instagram and GitHub. Continues
+  the 2026-08-28 pass rather than replacing it; §Audit below is what changed.
+  Full source: <code>design/launch/personal/PERSONAL-PRESENCE.md</code> +
+  <code>design/launch/personal/CONTENT-CALENDAR.md</code>.</p>
+</header>
+
+<nav class="toc"><div class="inner">
+  <a href="#audit">Audit</a>
+  <a href="#rules">0 · Rules</a>
+  <a href="#positioning">1 · Positioning</a>
+  <a href="#profiles">2 · Profiles</a>
+  <a href="#company">3 · Company page</a>
+  <a href="#posts">4 · Company posts</a>
+  <a href="#assets">5 · Assets</a>
+  <a href="#banners">6 · Banners</a>
+  <a href="#personal-posts">7 · Personal posts</a>
+  <a href="#pillars">8 · Pillars</a>
+  <a href="#calendar">9 · Calendar</a>
+  <a href="#cross-account">10 · Cross-account</a>
+  <a href="#instagram">11 · Instagram</a>
+  <a href="#dashboard">12 · Dashboard</a>
+</div></nav>
+
+<div class="wrap">
+
+<section id="audit">
+  <p class="hallmark">Continuing from 2026-08-28</p>
+  <h2>What changed, and the one real finding</h2>
+  <p class="lede">Nothing in the repo moved since the last pass — no
+  <code>design/launch/</code> or product changes in <code>git status</code>,
+  only unrelated backend/mobile work. Audited the existing personal-presence
+  work against the sharper clarification this pass brought: <b>TimelyCapsule
+  is something Assad is currently working on, not the entirety of his
+  identity.</b></p>
+  <div class="tbl-wrap"><table>
+    <tr><th>Item</th><th>Verdict</th><th>Why</th></tr>
+    <tr><td>Positioning, all four headlines/bios</td><td><span class="chip none">Keep</span></td><td>Already leads with "software engineer," TC as current work</td></tr>
+    <tr><td>LinkedIn Experience title "Founder"</td><td><span class="chip none">Keep</span></td><td>Correctly scoped to a structured field, not the public identity</td></tr>
+    <tr><td>GitHub README opening line</td><td><span class="chip adj">Rewrite (small)</span></td><td>"Most of my time currently goes to TimelyCapsule" read as TC being the dominant fact about him — changed to "currently building TimelyCapsule, among other things"</td></tr>
+    <tr><td>LinkedIn company page + 9 company posts</td><td><span class="chip none">Keep</span></td><td>Correctly all-TC voice — this account is allowed to be entirely about the product</td></tr>
+    <tr><td><b>The 10 personal posts</b></td><td><span class="chip neg">Rewrite</span></td><td><b>Every single one referenced TimelyCapsule. Zero were TC-free</b> — the opposite of "some personal posts should have zero TimelyCapsule mention." Real finding, not a minor note.</td></tr>
+    <tr><td>Pillars, 30-day calendar, cross-account map, repurposing matrix, Instagram stories/highlights</td><td><span class="chip neg">Create</span></td><td>Didn't exist yet — the prior pass delivered profiles and two content pools, never the scheduling layer</td></tr>
+  </table></div>
+  <p style="font-size:14px;color:var(--muted)">Full account:
+  <code>design/launch/personal/CONTENT-CALENDAR.md</code> §0.</p>
+</section>
+
+<section id="rules">
+  <p class="hallmark">Part 0</p>
+  <h2>The rules everything below was checked against</h2>
+  <p class="lede">Derived from <code>design/07-EXPERIENCE-BIBLE.md</code> Part
+  VIII and the current (2026-08-25) rewrite of <code>COPY.md</code> — shorter
+  and wittier than the pack before it. Don't revert toward the older, more
+  formal register.</p>
+  <div class="prose">
+    <p class="tight"><b>1.</b> No exclamation marks. No emoji. Nowhere.</p>
+    <p class="tight"><b>2.</b> The <i>institution</i> never says "we/our/us" —
+    third person only for TimelyCapsule's own voice. This does not apply to
+    Assad's personal posts: a real person saying "I" is correct, not a
+    violation.</p>
+    <p class="tight"><b>3.</b> Dates literal and absolute; relative time may
+    accompany, never replace.</p>
+    <p class="tight"><b>4.</b> Never "just." State, never sell.</p>
+    <p class="tight"><b>5.</b> No manufactured urgency, no fake traction,
+    funding, customers, press or testimonials. No engagement-bait questions.
+    No hashtag spam.</p>
+    <p class="tight"><b>6.</b> Vocabulary: seal/sealed, record, deliver,
+    travelled/remaining, kept, recipient, the wait — never save/lock,
+    post/content, send/push, progress/ETA, stored, user, the countdown.</p>
+    <p class="tight"><b>7.</b> Banned outright: "excited to announce," "game
+    changer," "revolutionary," "disrupting," "the future of," "journey,"
+    "thrilled," "humbled," and "Founder | CEO | Entrepreneur | Startup Guy |
+    Building in Public" as a headline formula.</p>
+    <p>Platform limits verified per string, not assumed: X bio ≤160, X post
+    ≤280, Instagram bio ≤150, GitHub bio ≤160, LinkedIn headline ≤220, About
+    ≤2600 (only ~300 chars show before "see more" — front-loaded below),
+    LinkedIn post ≤3000 (kept to 900–1300).</p>
+  </div>
+</section>
+
+<section id="positioning">
+  <p class="hallmark">Part 1</p>
+  <h2>Positioning systems, evaluated</h2>
+  <p class="lede">Eight considered. The goal stated for this pack: Assad →
+  software engineer / builder → building TimelyCapsule, not Assad → personal
+  brand → marketing TimelyCapsule.</p>
+
+  <div class="system">
+    <p><span class="letter">A</span><span class="phrase">"Founder, TimelyCapsule"</span></p>
+    <div class="verdict-row">
+      <span class="chip pos">credible</span>
+      <span class="chip neg">very generic</span>
+      <span class="chip pos">obvious TC link</span>
+      <span class="chip neg">poor brand fit</span>
+    </div>
+    <p>The exact energy being avoided — indistinguishable from a thousand
+    other headlines. TimelyCapsule's own voice is dry and specific; this is a
+    title card, not a voice.</p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">B</span><span class="phrase">"Building TimelyCapsule"</span></p>
+    <div class="verdict-row">
+      <span class="chip">medium credible</span>
+      <span class="chip neg">moderately generic</span>
+      <span class="chip pos">strong TC link</span>
+      <span class="chip">decent fit</span>
+    </div>
+    <p>Active and humble, but alone doesn't establish <i>what Assad does</i>.
+    "Building @X" is itself a common bio pattern now — better than "Founder,"
+    not distinctive.</p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">C</span><span class="phrase">"Software engineer building TimelyCapsule"</span></p>
+    <div class="verdict-row">
+      <span class="chip pos">most credible</span>
+      <span class="chip">structure is common</span>
+      <span class="chip pos">clear TC link</span>
+      <span class="chip pos">good fit</span>
+    </div>
+    <p>Leads with craft, not authority — closest of the eight to the existing
+    real GitHub bio ("Software Engineer."). <b>Backup recommendation.</b></p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">D</span><span class="phrase">"Founder / Builder, TimelyCapsule"</span></p>
+    <div class="verdict-row"><span class="chip neg">hedges between two framings</span><span class="chip neg">itself a cliché shape now</span></div>
+    <p>Not recommended.</p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">E</span><span class="phrase">"TimelyCapsule — letters that arrive later"</span></p>
+    <div class="verdict-row">
+      <span class="chip">n/a credibility</span>
+      <span class="chip pos">distinctive</span>
+      <span class="chip neg">TC-only, no Assad</span>
+      <span class="chip neg">wrong direction of relationship</span>
+    </div>
+    <p>Doesn't say what Assad <i>does</i> — a company tagline worn as a
+    personal headline. This is the "personal brand <i>is</i> the product"
+    failure mode explicitly being avoided. Good as a line inside an About
+    section; not as the identity itself.</p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">F</span><span class="phrase">"Software engineer. Currently: TimelyCapsule."</span></p>
+    <div class="verdict-row">
+      <span class="chip pos">credible</span>
+      <span class="chip pos">not generic</span>
+      <span class="chip pos">clear TC link</span>
+      <span class="chip pos">best brand fit</span>
+    </div>
+    <p>Borrows the brand's own "shipping manifest" register (<code>07 §VIII</code>:
+    "plain, exact, unhurried") without quoting it — distinctive because it
+    sounds like a fact being stated. <b>Primary recommendation.</b></p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">G</span><span class="phrase">"Engineer. Time, mostly."</span></p>
+    <div class="verdict-row"><span class="chip neg">too vague</span><span class="chip neg">fails "obvious enough to find"</span></div>
+    <p>Clever without being useful — a stranger has no route to TimelyCapsule
+    from this alone.</p>
+  </div>
+
+  <div class="system">
+    <p><span class="letter">H</span><span class="phrase">"Building things that wait. Currently: TimelyCapsule."</span></p>
+    <div class="verdict-row"><span class="chip">thematically tight</span><span class="chip neg">takes a beat to parse cold</span></div>
+    <p>Strong as an About-section opening line, once TimelyCapsule has
+    already been named once beneath it. Not strong enough alone.</p>
+  </div>
+
+  <div class="rec">
+    <div class="tag">Primary</div>
+    <div class="val">"Software engineer. Currently: TimelyCapsule."</div>
+    <div class="sub">Backup: C — "Software engineer building TimelyCapsule"
+    — the safer, fuller-sentence choice where F's two fragments read too
+    clipped (LinkedIn's About opening line, for instance).</div>
+  </div>
+</section>
+
+<section id="profiles">
+  <p class="hallmark">Part 2</p>
+  <h2>The four personal profiles</h2>
+  <p class="lede">Grounded in what's actually there today: GitHub bio
+  "Software Engineer.", <code>company</code> field already "TimelyCapsule",
+  location "Kaduna, Nigeria" — all pulled live, not assumed. Real LinkedIn
+  URL confirmed from the existing profile README: <code>linkedin.com/in/assadisah/</code>.</p>
+
+  <h3><span class="n">2.1</span>LinkedIn</h3>
+  <div class="field-row"><span class="k">Name</span><span class="v">Assad Isah — unchanged</span></div>
+  <div class="field-row"><span class="k">Location</span><span class="v">Kaduna, Nigeria — already real</span></div>
+  <div class="field-row"><span class="k">Banner</span><span class="v">linkedin/personal-banner.png — §6</span></div>
+  <div class="copy"><span class="len">44 / 220 chars — Headline</span>Software engineer. Currently: TimelyCapsule.</div>
+
+  <p style="margin-top:22px"><b>New Experience entry</b> — Title:
+  <i>Founder</i> (accurate as structured metadata, not the public identity —
+  LinkedIn requires a role title here). Company: TimelyCapsule. Start date:
+  <b>needs your input, not invented</b>. Employment type: your call.</p>
+  <div class="copy"><span class="len">≈870 / 2000 chars — Experience description</span>Built and maintain TimelyCapsule end to end — product, backend, encryption, and the writing.
+
+A letter is written, sealed on the device that wrote it, and delivered on a date the writer chooses — a month out, or fifty years. Contents are encrypted before they ever leave the browser; there's no version of the system where I can read what someone sealed.
+
+Recent work: a real reply flow (a recipient can write back, sealed the same way the original letter was), enclosures including voice notes, and a "one reading only" mode that actually destroys the record after it's opened — verified against a test suite, not just a checkbox in a settings screen.
+
+timelycapsule.com</div>
+  <p style="font-size:14px;color:var(--muted)">Skills to add: End-to-End Encryption, Product Development, TypeScript, System Design.</p>
+
+  <h3><span class="n">2.2</span>X</h3>
+  <div class="field-row"><span class="k">Display name</span><span class="v">Assad Isah — plain, no company suffix</span></div>
+  <div class="field-row"><span class="k">Handle</span><span class="v">@assadisah proposed — availability not verified</span></div>
+  <div class="field-row"><span class="k">Link</span><span class="v">timelycapsule.com</span></div>
+  <div class="copy"><span class="len">125 / 160 chars — Bio</span>Software engineer. Spent long enough on encryption and scheduling logic that I started a company about it — timelycapsule.com</div>
+
+  <h3><span class="n">2.3</span>Instagram</h3>
+  <div class="field-row"><span class="k">Link</span><span class="v">timelycapsule.com</span></div>
+  <div class="copy"><span class="len">61 / 150 chars — Bio</span>Software engineer.
+Building TimelyCapsule — timelycapsule.com</div>
+  <p style="font-size:14px;color:var(--muted)">Deliberately the plainest of
+  the four — a name and a short line, no pitch, matching what Instagram
+  actually expects.</p>
+
+  <h3><span class="n">2.4</span>GitHub</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Field</th><th>Current</th><th>Recommended</th></tr>
+    <tr><td>Bio</td><td class="mono">Software Engineer.</td><td class="mono">Software engineer. Building TimelyCapsule.</td></tr>
+    <tr><td>Company</td><td class="mono">TimelyCapsule</td><td>unchanged — already correct</td></tr>
+    <tr><td>Website</td><td class="mono">assadisa.name.ng</td><td>unchanged — add timelycapsule.com as a Social account instead</td></tr>
+    <tr><td>Social accounts</td><td>none linked</td><td>add timelycapsule.com</td></tr>
+  </table></div>
+
+  <p style="margin-top:20px"><b>Profile README</b>
+  (<code>nottherealalanturing/nottherealalanturing</code>) — the current one
+  is the generic emoji-wave / skill-badge / GitHub-stats-widget template,
+  last touched 2024, zero TimelyCapsule mention. Full replacement:</p>
+  <div class="copy" style="font-family:var(--font-mono)">### Assad Isah
+
+Software engineer. Currently building TimelyCapsule, among other things —
+letters that stay sealed until a date you choose, encrypted before they
+ever leave the device that wrote them.
+
+**Recently:** a real reply flow, voice-note enclosures, and a mode that
+destroys a record the moment it's been read once — not archived, not
+soft-deleted, gone.
+
+→ [timelycapsule.com](https://timelycapsule.com)
+
+---
+
+[LinkedIn](https://www.linkedin.com/in/assadisah/) · Kaduna, Nigeria</div>
+
+  <p><b>The <code>timelycapsule</code> repo itself is private</b> — it can't
+  be pinned as evidence of the work. Your call, neither implemented here:
+  make it fully public, extract one genuinely public-appropriate piece (the
+  crypto module, say) into its own repo, or leave it as-is — the README
+  above works without a visible repo either way.</p>
+  <p style="font-size:14px;color:var(--muted)">Also flagged, not fixed: the
+  private repo's own GitHub description — <i>"TimelyCapsule is a digital
+  time capsule app designed to help you preserve life's most meaningful
+  moments..."</i> — is generic SaaS copy that contradicts every rule in
+  Part 0. Worth replacing if the repo ever becomes visible to anyone.</p>
+</section>
+
+<section id="company">
+  <p class="hallmark">Part 3</p>
+  <h2>LinkedIn company page</h2>
+  <div class="field-row"><span class="k">Page name</span><span class="v">TimelyCapsule</span></div>
+  <div class="field-row"><span class="k">Website</span><span class="v">timelycapsule.com</span></div>
+  <div class="field-row"><span class="k">Industry</span><span class="v">Software Development</span></div>
+  <div class="field-row"><span class="k">Company size</span><span class="v">1–10 employees</span></div>
+  <div class="field-row"><span class="k">Company type</span><span class="v">Privately Held</span></div>
+  <div class="field-row"><span class="k">Specialties</span><span class="v">End-to-end encryption, scheduled delivery, digital preservation, personal archiving, zero-access architecture</span></div>
+  <div class="field-row"><span class="k">Profile image</span><span class="v">brand/social/avatar-paper-1024.png — existing</span></div>
+  <div class="field-row"><span class="k">CTA button</span><span class="v">"Visit website" — never "Contact us" / "Sign up"</span></div>
+  <div class="copy"><span class="len">42 chars — Tagline</span>Letters, sealed until the date you choose.</div>
+  <div class="copy"><span class="len">≈700 / 2600 chars — About</span>TimelyCapsule keeps a letter sealed until the date its writer chose — a month out, or decades.
+
+Contents are encrypted on the device that wrote them before anything reaches a server. There is no admin view, support tool, or recovery path that shows what a sealed capsule contains — the key never leaves the writer's hands.
+
+A recipient needs nothing to open one: no account, no app, just a link, built to still work on an old phone browser. They can write back, too — sealed the same way the original letter was.
+
+Some letters aren't meant to last. Marked "one reading only," a record is destroyed the moment it has been read — no backup, no copy, anywhere.
+
+Free to start. Encryption and delivery are never behind a paywall.
+
+timelycapsule.com</div>
+  <p style="font-size:14px;color:var(--muted)">No funding, traction, customer or press claims — none exist to state.</p>
+</section>
+
+<section id="posts">
+  <p class="hallmark">Part 4</p>
+  <h2>Nine LinkedIn company posts</h2>
+  <p class="lede">Six pair with an existing real-UI asset; three are
+  text-only — LinkedIn handles pure text natively, and not every post needs
+  a prop. Suggested order is the numbering below. Cadence: 1–2/week, slower
+  than a personal or product social account — matches the brand's own
+  "unhurried" register.</p>
+
+  <div class="post">
+    <div class="post-head"><span class="num">01 · Why this exists</span><span class="img">x/post-mark.png</span></div>
+    <div class="post-body">Most software wants you back tomorrow. A notification, a streak, a reason to open the app again before you forget it exists.
+
+TimelyCapsule is built to be forgotten. You write something, choose a date — a month out, or 2041 — and from that point the product's only job is to do absolutely nothing until that date arrives. No nudge. No "come back and see." The waiting itself doesn't need you.
+
+That's a strange thing to optimize a product for. It also seems like the only honest way to build something that promises to hold a letter for ten years.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">02 · What I actually care about</span><span class="img">screenshots/06-survival.png</span></div>
+    <div class="post-body">The part I actually care about: I can't read your letters.
+
+Every capsule is encrypted on the device that writes it, before any of it reaches a server. What arrives at TimelyCapsule's database is ciphertext — no plaintext copy exists anywhere else, not in a log, not in a backup, not in a support tool.
+
+Practically: there's no "reset your password and we'll help recover your data" flow the way most products have one. Lose your key, and the content is unrecoverable — including by me. Not a caveat. The actual design.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">03 · Nothing is happening</span><span class="img">instagram/12-waiting.png</span></div>
+    <div class="post-body">What "nothing is happening" actually looks like.
+
+This is a real screenshot of a letter, three years into a ten-year wait. No progress bar animating toward a goal, no "you're 30% of the way there" — just two numbers, travelled and remaining, and a date.
+
+The test I hold this screen to: if a capsule sitting untouched for three years reads as empty instead of kept, the design has failed.
+
+Most software that shows you "nothing is happening" is broken. This one is working exactly as intended.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">04 · The refusals</span><span class="img">instagram/07-refusals.png</span></div>
+    <div class="post-body">Refusing the growth-team playbook, on purpose.
+
+There's a well-understood toolkit for making people open an app more often: streaks, badges, "on this day" memories, progress bars, push notifications timed for re-engagement.
+
+None of it is in TimelyCapsule, and none of it is going to be. A sealed letter isn't content to be surfaced back to you — it's something you asked to be left alone until a specific date. Nudging you before then would be a small, quiet betrayal of the one promise the product makes.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">05 · What belongs inside</span><span class="img">instagram/11-sealing.png</span></div>
+    <div class="post-body">What belongs inside a letter, besides words.
+
+A letter in TimelyCapsule can carry more than text: a photo, the coordinates of where it was written, or a voice note — recorded, played back, and only enclosed once you've actually decided to keep it. Nothing attaches automatically the moment you stop recording; you hear it back first.
+
+The voice note is the one I think about most. A photo preserves what something looked like. A voice note preserves how someone actually sounded saying a thing — cadence, the pause, the parts a transcript would flatten out. A different, harder kind of keeping.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">06 · Not the last word</span><span class="img">instagram/14-replies.png</span></div>
+    <div class="post-body">The letter doesn't have to be the last word.
+
+I didn't plan to build a reply feature. But every early conversation about this product hit the same question: what if they want to write back?
+
+A capsule's recipient can now reply — encrypted the identical way the original letter was, so the answer is exactly as unreadable to me as the letter that prompted it. Not a message thread. No read receipt, no typing indicator, no notification with a content preview. A second letter, answering the first, on its own schedule.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">07 · Built to destroy something</span><span class="img">instagram/15-one-reading-only.png</span></div>
+    <div class="post-body">A feature whose entire job is to destroy something.
+
+Most products treat "delete" as an edge case. TimelyCapsule has a mode called "one reading only" where destruction is the entire point: the moment it's opened and read, the record is gone. Not archived. Not soft-deleted with a recovery window. Gone — no copy anywhere, including in any backup.
+
+Longer than I'd like to admit went into making sure that fires only after a confirmed read — not a page load, a prefetch, or a link-preview crawler. That needed a dedicated test suite before I trusted it enough to ship.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">08 · A bug about a bug</span><span class="img">text only</span></div>
+    <div class="post-body">A bug that only existed because the fix for a different bug was too good.
+
+Shipped a fix recently so a logged-in user's dark-mode preference would stick properly on the marketing pages. Verified it worked. Moved on.
+
+Two days later: every hard refresh of a logged-in page was bouncing real, authenticated users straight back to the login screen — a session with valid tokens sitting right there, ignored.
+
+The cause: a loading-state variable that used to safely default to "false" (not loading) now needed a third state — "haven't checked yet" — and defaulting it to false meant the route guard concluded "not loading, no user, redirect" before the code that reads the tokens ever ran. False and unknown had been silently treated as the same value.
+
+Fixed by giving it three real states instead of two. A very small diff for how long it took to notice.</div>
+  </div>
+
+  <div class="post">
+    <div class="post-head"><span class="num">09 · Honest status</span><span class="img">screenshots/05-hero.png</span></div>
+    <div class="post-body">Where this actually is, honestly.
+
+TimelyCapsule is live at timelycapsule.com. Anyone can write a letter and seal it right now, with or without an account — a guest capsule needs neither, just a link to hand to whoever it's for.
+
+It's one person building it. No funding round to announce, no growth numbers worth quoting yet, nothing to disrupt. Just a product that does one specific thing — hold a letter until a date you choose — and refuses to do much else.</div>
+  </div>
+</section>
+
+<section id="assets">
+  <p class="hallmark">Part 5</p>
+  <h2>Visual assets — reuse audit</h2>
+  <p class="lede">Every image above already exists and is already approved
+  in <code>design/launch/final/</code>. Nothing was regenerated except the
+  two banners in Part 6 — everything else genuinely fits without alteration.
+  LinkedIn displays non-native aspect ratios fine in-feed; a third parallel
+  image set at LinkedIn's own preferred ratio would be redundant art for no
+  real gain.</p>
+  <div class="tbl-wrap"><table>
+    <tr><th>Asset</th><th>Reused for</th></tr>
+    <tr><td class="mono">brand/social/avatar-paper-1024.png</td><td>LinkedIn company profile image</td></tr>
+    <tr><td class="mono">x/post-mark.png</td><td>Post 01</td></tr>
+    <tr><td class="mono">screenshots/06-survival.png</td><td>Post 02</td></tr>
+    <tr><td class="mono">instagram/12-waiting.png</td><td>Post 03</td></tr>
+    <tr><td class="mono">instagram/07-refusals.png</td><td>Post 04</td></tr>
+    <tr><td class="mono">instagram/11-sealing.png</td><td>Post 05</td></tr>
+    <tr><td class="mono">instagram/14-replies.png</td><td>Post 06</td></tr>
+    <tr><td class="mono">instagram/15-one-reading-only.png</td><td>Post 07</td></tr>
+    <tr><td class="mono">screenshots/05-hero.png</td><td>Post 09</td></tr>
+  </table></div>
+</section>
+
+<section id="banners">
+  <p class="hallmark">Part 6</p>
+  <h2>Two new banners</h2>
+  <p class="lede">Real fonts, real tokens, the real mark geometry — no image
+  model, no invented UI, no stock imagery. Script:
+  <code>design/.build-linkedin.mjs</code>.</p>
+
+  <h3><span class="n">6.1</span>Company banner — 1128×191</h3>
+  <figure>
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAACNAAAAF+CAIAAADGZOJMAAAQAElEQVR4nOzdB3xU1503/CtAqAASIBBNIHrvxbiBsU117y2x48TpdfNsT57sZkt290l2N5ve3HAcxyWuccGAwTbF9N57EU1USUii817QhpdoRqNyhWnfryeT0f+cc2fmzkgff+7P55x6u/K3BwAAAAAAAFBTdQIAAAAAAACIQOAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACRCJwAAAAAAACIROAEAAAAAABAJAInAAAAAAAAIhE4AQAAAAAAEInACQAAAAAAgEgETgAAAAAAAEQicAIAAAAAACASgRMAAAAAAACR1AvgclJSUvKbx5+aMWPmypWryyrdunW7+qqhn//8Zxo2bBhwnvz8F79O0HrH7be1bt0yAKppztx5xUXFZ1datmrRo0f3AAAAAABqm8CJy8j27Tsf/fRjO3bsOru4+rQJ77775OO/ymmbE/CxC1PAXyQMnK4ceoXACWpg3rwFO3fsPLvSr38/gRMAAAAA54Il9biM/NM//2u5tOmMsP7df/pewPlw8uTJiB0uUocOHdq//8C2bTs2b968e/fugwcPBgAAAAAAFycznC4127fvzNuWd+bH5Hr1BgzoH3zs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" alt="TimelyCapsule LinkedIn company banner: the real lockup mark on paper ground, with the tagline 'sealed until the date you choose' in mono type at bottom right.">
+    <figcaption>design/launch/linkedin/company-banner.png — the real lockup
+    (brand/lockup-horizontal.svg), the same "sealed until the date you
+    choose" line the X header already carries.</figcaption>
+  </figure>
+
+  <h3><span class="n">6.2</span>Personal banner — three directions</h3>
+  <p class="tight"><b>A · Minimal mark + "Building TimelyCapsule."</b> Safe,
+  legible — but a small company ad sitting on a personal profile.</p>
+  <p class="tight"><b>B · A restrained Meridian composition + a small
+  reference.</b> The mark's own idea, stretched wide: a marker approaching a
+  notch already reserved for it. Reads as "considered design" to a
+  stranger, and "that's the same system" to anyone who's seen the product.</p>
+  <p><b>C · Personal/developer-oriented.</b> Establishes craft, loses the
+  TimelyCapsule connection entirely — fails "obvious enough to find."</p>
+  <div class="rec">
+    <div class="tag">Chosen</div>
+    <div class="val">B — the Meridian, stretched</div>
+    <div class="sub">1584×396. The line starts at x:620 specifically so
+    nothing meaningful sits under LinkedIn's profile-photo overlap (up to
+    568×264px, bottom-left, on mobile) — never relying on "it's just a line
+    under there."</div>
+  </div>
+  <figure>
+    <img src="data:image/png;base64,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P/7E0+G9l5OTfcIJx556yhfi4uICAGBPJSAFAAAAAADAjikt21y0TZs2bbKzszMz0uPjP4N1S8rKNt9xx9/vuff+ysrKeruOPWa0gBS7ycKFi66+5rt1m2+99U5Ods7hh48MAIA9lYAUAAAAAAAA27d58+a335r4ymuvv/XWW0VF62N3xcfH9++/z+ijR40ePapfv32CT8s113xn4qTJAXy6nnzq6QY14wSkAGBPJiAFAAAAAADAdrzx5lu/+MVvVqzIb3RvdXX17Nlzw9ctf7t99Oijvv/973bv1jXYzcb/e0LL01EFBQXLlq2o28zJyerVq1cAOyW81bdbAwDsUQSkAAAAAAAAaM6NN/364YcfbWHjV155/e23J/3g+985++wzg93p0UefiN1s0yalXbu2dZuJiQmxeydMeOm3v/tj3eZpp57y85//NICdcsjBQyZPfq9eTQAA7MEEpAAAAAAAAGjSX/56a8vTUbW2bNny8xt/ualk09cuuiDYbRYtWhK7+aVzzv7ud68JoFVVVFTU1NQE29aRTEz8+KfVU0895fY77qqqqqprdsYZpwYAwB5MQAoAAAAAAIDGTZ8x84477mp0V1JSUocOHTZu3FhRUdFog3/96+HTTzs1MzMj2A1KS8vWrl0bwO6xYcOG3/7uT6+//sb69Rtqa4Yeeshdd91WW+7aNfeRh/75xFPjCgpW52TnnHDCsYMHDwoAgD2YgBQAAAAAAACN+8c/7qtXk5WVecEFX/nCySfm5OTExcWFNWsLi956663HH3t66rRpdc26d+t2x51/203pqFBpWVn9qm0n05TqmMl+YLt+89s/jhv3bDMN+vXv9z/Xfi8AAD4n4gMAAAAAAABooLS09OWXX42tadu27Z233/K1iy7o2LFj3P8HknKys0479ZR7773zaxedX1vTu/de99xzR4/u3YI9xsxZswNosVdeeS0AACLEDFIAAAAAAAA0YvnyFTU1NbE1o0cf1a9/v0Ybx8fHf/vbV/ft2/ehhx+9+eY/ZGdlBi1QUlIyf/6C/JWrQklJyV27hHL79eubmNhqv2FVVlbOnDlr4qR3gz1b4drCefMWrFm7Zm1hYWJCYvdQty7dundLTU0Ndr+CgoLFS5auXLly9eq1GenpXbddiT59esU1Oy/XjiouLl64YGH+qoK6y921a27v3r3atGkT7KyV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rl1z61V27ty5X79+8+bNa9h+ZGMBqcFDBtWbPevRR594/PGnDjzggL379l62dPn8BfPXrduQnZV14QVf+f0fb65rNmnS5PAVDu+uBKSOOfboE44/rt6wv/jiy+GrmV7PPz/+G9/4WvYn575qRjhK3/n2VTfe9OvYyrlz5373e//TTK8ZM2ZOmz694aKErWLUUUfefvvf6zZramqWbLOdXqOOvOqKS/v17xd8RlprJMPv0Y03XHfOuefHzj5VVLS+3pHrCRs8//yEyy67JACAzzNL7AEAAAAAANCIwYMH3X3XrTsxc0yPHj3+/Offt2lsVbuzzj7zjDNODVomISHhxz/+34EDBwS77JJvfr1Nm5Qd6tK9W9dGP3vsanqxjjxiZMPKtm3bDhp0QMP6MSccP/TQQ+pVVldXT5027fHHn5r83vvr1m1dZPDL531p1NFHxse3/i96P/rRtQccsH/L23fo0OGO229peTqq1tlnf7Hll7vWDTf8ZDelo0L777/vwIH9gx302mtvnHnWl1966ZXgs9NaI9mvf7+f/vR/dyhxeMbpp1x66cUBAHzOCUgBAAAAAADQuAEDBjz+2AOXXPL1licqzjnnrEcfub+pJE1cXNz1P/vJd799dVho/jhpaWm33nLzF888LWgNPbp3+9GPrm3bdscyUoeNHNaw8ojGglDb6hsJTg0demhSUlLD+vDj/+z6n+Tk5ARNGz36qAvOP69Xr14/+uG1QWvLzMy4+67bTjzxhJY0PuKIwx566J/9++9wtKj2cv/g+99pScarT59ed999+6mnfCHYnf51/z1XXXlZSsqO3Qmh62+4ac2aNcFnpBVH8vTTTr399r+mp6dv9zgdOnT46U9++LOf/WS731YA2PNZYg8AAAAAAIAmpaSkXHXlZWeccdrzz/97/PgJ8+cvaLRZTk7OMcccfcopJx3YgnmJLrzo/JGHjXjwoUeee+75srItDQ919llnnHXWGc3nh3bUaaeecuihh955513z5s5fvGRpw6UDGxoxcni9hfBSU1OHDB7UaONBgw5o3759vcOOGDEsaEKP7t2eGffYX2+57cEHH6muro7dlZWV+aVzzrr44q/V5tLOPvvMtm3bTnjhpfff/6CkpCRoJW3atPn1r24Kh+Xhhx999bU36p3DtgYphx028rTTvjDqqCODXfDVr3555MgR4V8Z98xzDc8/Li5uyJBBY8cef8bppyUnJwe7WfjnBg0+sFevXnPnzt2hjuvXb/jnPx/8zneuDj47rTWSQw895OmnH3viiacee+zx/PxVDRv07r3X8ccf96UvnZ2TnRUAQCTEFazODwAAAAAAAKAFli1btnx5/to1a9cUrt2yeUv2Nrm5nQcO7L8TK8EVFxfPm7cgP3/lylWrkhMTu3TrEho4oH+jsy5FVVHR+kWLFi1esnR1QUFOTk73bt0OOnjwTkxxtCsK1xYu+OijVaGVBckpSTlZOR075Rx44IHt2rUNWk9padm8uXPzVxWEf6eyojI7J6djx+zwcnfs2DH4VEydOu1/f3jd8uXLw/Khhx78ja9f1LBNTU1N8abi1QVr/j3hxRkzZsbuOuywEbfd+pdgD9BaI1ldXT1nzrzw6xd+AYs3bszKygyP1KvXXnvv3TsAgGgRkAIAAAAAAAAirqCg4NTTzq6deCkpKenVV/7d/DJzNTU1V1/z3ddee6OuplOnTi+/9HwAAHwO7XCQHwAAAAAAAODz5cEHH6lblq5Pnz7Np6OCbSvWjR59VL2aAAD4fBKQAgAAAAAAACJu4UeL6srLly+vqKjYbpcFCz6K3ezRo1sAAHw+CUgBAAAAAAAAEdcmpU1duaSk5H/+9yeFReuaalxeXv74E08/8MDDsZXDhw0NAIDPp7iC1fkBAAAAAAAAQHTd/6+Hfv3r38XWJCYmDhkyqGPHnIz09ITExLCmuqpq48bidevXT506fdOmTbGNU1NTX5jwTIcOHQIA4HNIQAoAAAAAAACIuC1btpz5xS8vWbIk2HFt27a9+c+/Gz58WAAAfD5ZYg8AAAAAAACIuJSUlHvv/fvw4Tu8TN6QIYPuvut26SgA+FwzgxQAAAAAAADw32L6jJlPPTVu6tTpixYtrqysbLRNSkpK//799t9v4NixJwwePCgAAD7nBKQAAAAAAACA/zoVFRXLlq0o3lRcVlpaVrY5PiE+tV1qWlq7tNS03C65iYmJAQAQFQJSAAAAAAAAAABAZMUHAAAAAAAAAAAAESUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJGVGAAAAAAAAECzSktLl69YsbZwTVZmVpcuXdI7pDfVsrKyct36dWGhY07HhnsLCwura6rD7snJyU11jJWQkJiRnh4f39z/579sc9mmTZvqVbZJSWnfvkPQrOLijZu3bGmmQbu27VJTU5v6c+FHaDgOawvX1tTU1Pvs1dXVhUWFQctkZGQkJSbVqywsKqqururQPj0lJbklB1m/fl1FZWVyUnJ6epNXKvwU4WdJiE/IysoKWkN4k5SUlsTWxMXFhUOUlJTUfMdm7oqNxRu3bNnS6IUIxzkc7eaPnJmRmZjYyO+hxcXFm7dsbtu2XVqDwzZjU0lJWVlp3WY4dJmZmeFnbL7XTp/nTtxpDW3YsGHZsmWbSjZlZ+d07doltd0OfN6WKC7etHlLWUtaNvwUW7aUbyze0EyX+Lj47OzsepUVFRXrN6wPtn7H27Zvn1Zvb+29FD43sjIzGx6wdm/QtEZvwtDmzZuLNxUnJiRlZmYELVBeXr5h49aPlpGe0dT9X3djdGjfISUlpalDtfzZW0/dh83Jzmn+Lt3pZ2+d8EZdVbCqaF1R+KXv0a1bp06dExISgu2d245+5YMdvxC1Gv03IlZSYmJGRmYARJ2AFAAAAAAAAE0Kf66+7/77lyxdXFcT/mQ+YtjwsWPGpiQ38qN++JP/7//0h7Dw65t+1fDH9b/cdkvJpk0Xf+3ifvvsU29XUVHRb//4u4YHTExM7Nyp84ljxvbbp1/QmKlTpz7x9JMN61NSUnr36n3KyV9oKkQy7tlnpk6fFjRt9KjRY08YU6/ywykfPjXu6bCQmpb242t/WC/X8oc//6miovxXN/4yNh+wqWTTb37/26Blrrny6u7dutervO3O29avX3/h+RfuN3DflhxkxsyZ4557Jjk5+X++d2379u0bNqisrPzL3/5atK5o1BFHnXTiSUFrePf9d58fP75eZVxcXFZm1tFHjRp66NCmUhp/ufUvJSWll3z94n361r8rxj3zzLQZ0xq9EJs3b97uqH73W9/N7dy5Yf1z45//YMoHRx5+5BdOOjlosTfefP3V11+LrQlHuGuXrvsO3HfUkUc19el2+jx34k6Llb8y/95/3rcts/KxpKTk0UeNOnrU0c2HV3bIhJcmvDv53Za03HfAwIsuuCi2Zv6C+ffef28zXdJSU6/78XX1KlfkL7/ltlvDQudOnb737e/F7iosXPur3/0mLISDGQ5pwwP+9bZbmg/KeH/FSQAAEABJREFUNPpoCk2fOePRxx/t1rXbt666JmiBmprgtjtuDx+eRx1x1MlNfL8mv//eY088Fj5Fr/3eDxoNSO3oszdWcfGmX//+NzXheQTB1Vdc3aN792Ya7/Szd9sf2vjCSy+998F7VVVVdZVJiUldu3Y78/QzuuTmNtpr577ywY5fiFpN/RtRZ6+eva687PIAiDoBKQAAAAAAABq3evXqv9/z93Xr1qenp+/dZ++OOTmFhYXhr9dvT3ynsKjoovMvbOH8IjukT+/ecXEfH7asrCx/Zf6K/BV33v33U04+5YjDDm+qV0pKSmyuaN26dUXriubMnbNw4cJLL/lmzx49m+qYkZGRnZXd6K7mp1Yq2bRpZt7MwQcODrYnIT4hHL3Ymurq6kWLF4WFnj16JCUl1/sgwS4bOWLkxHcnrVm75oWXXjzz9DMaNnhn0jvh+KSmpR0z+pigVbVt27Zrl6615fLyLSvy8wuLCh978vGly5eddcYXg9aTkJAwfNiwus0lS5atXJWfk53Tt+9/hrpdu7ZBawsHLbfT1jBTRWXFqlWrFi9ZvPW1dPGXzzm30djKrp9ny++0OgsWLrjnn/du2bIl/M727t0nMz1j5aqVM2bNnPDSC+s3bvji6WcGraRjdk69e7uwcO36DRvqRqlOboOsTGZmRuzIzJw5c1NJSZ/efTp1+jjRmJLcJmhawerVi5cs6rVX77qad9+bHLRAl9wu7dq1a3RXa90wKSnJY8eMefjRR96e+Hb4ZWw4nVV5efmEF18IC6OPHt1ohHEXn715c/Jq01GhWbNnNR+QqrOjz97wU9x5993h/ZyUmDRoyKBOOR0rq6qWLF28dOmy8P2W22756pe/0r9f/2DPUO/fiFiNxiiB6BGQAgAAAAAAoHEPP/5I+At9n959wt/j27T5OKwQ/qJ/y+23zpk7J/ypvpnE0k67+GsXx06Ws37D+pdfeWXS5En/fuHfBx5wQFMrTOV2zr304m/G1oS/7j/59FOLlyx+8uknr77i6qYm+Dlo8JCxJ4wNdlDbtm3LysomvftuS2Irqamp9c6tvLz8R9f9OCyce865Odk5QWtLSEg46cST7rnvnsnvTw6vUadOnWL3hmf+8quvhIUxxx5fd1lbS4/uPS7+2jdi/9bEdyeNnzB+8nuTDxp80N59+gStJDk5+czT/hP0ee7551auyu/Ro0ds5e6wT5+9zzv3vNpyTU3N3HlzH3j4wby8vMcef6yuvhXPc4futFpVVVUPPPTgli1bBg8e/KUvnlM3X9SixYvuvOvv705+d9/+A/bdd7+gNRx15FHhK7Ym/ICvvfl6v777fPmcc5vv261rt9hBWLFixaaSkoOGHDTs0KFBy0x89926gFT4qd/74P2W9Dr5xJOamRKptRw85OC333ln+Yrl4YOr4VC88eYbxcUbszIzjzi88UfoLj5782bPCt+HHjo0/N6FN+eY404IWmBHn73hYyS8mdPS0q66/KrYEFh4LR574rH3P/zg2eef7dOnT8M1Qz8TDf+NAP7btH6oHwAAAAAAgAhYkb986dKlSUnJF55/QWyMpmNOxy9uizUsWbIk2P0y0jPGHH9C+LN9eXn53HnzWt6xa5euRx81KiwsX7GiaN26oFUNGTQkLTV14UcLV69ZHeyR9hu4b9++faurq5/793P1dr3y6iulpaW5ublDW5xE2Wlt27Y96ogja6MV8xfOD6IlLi5uQP8B3/zGxcG2xb/Wb1gftLaduNPy5uQVbyrOzMr68tnnxq6m17tX72OPOTY856Urlgefc926ds3KzJwxc3p4J9fWzMqbtWnTpv332z/YM4TjfMrJXwgLU6ZOCR9BsbuKi4tffeO1sHDi2BMbDQ/t4rM3fFTOXzA/vPQnjhkbdl+5amVRUVGw47b77F28ZHH4fvSRo+pNkRX+6XPOOueMU0+/7JLL9pB0FEAgIAUAAAAAAECj3pk0KXw/aMiQtm3qLzu13777fvvqb33ly+cFn4rU1NTevbbOE7N27Zod6jig/4CkpMSd6LhdCYkJhxx8SFiYNPndYE91yolfiIuLy5s9+6NFi+oq161b/9bEt7ftPXl3rJDYUEJCQv/+/bf96VaOqe0hunXtHt5p1dXVEydNDFrbTtxpk97d2nLYoUMbzpp22IiR1373By2cT2hPlpiYPGzo8IqKyg+mfFhbE45PeKeNHD4i2GOET60DDzgwLDw7/hMhxRdffqm8vLzXXr0GHTCo0Y67+OxdsGB+ODK9evVObZdaO1fWrNl5wU5p/tlbsC20l5XZ+FKkI4aPaGopQ4DPhIAUAAAAAAAAjViybXaQvnvv3XBXXFxc1y5dg09R7UQ4lVVVO9RrWwBo689hVZWVQWsbPnRY+P7Bhx9UVFQEe6QuXbrUzhH1/L+fr6v894vjKysrBw7cd5/dv8pYnY0bN4bvfXq32vp6e5r9Bm5dsW7BwgXBbrCjd1rtvD59GxvtlJSU7OzsIBIOPfjQ8LEw+b2tabDCwsL5C+bvv+/+7du3D/YkJ405MTExceHCBXPnza2tWb1m9bvbzvmUk09pqtcuPntr41AD+21NJQ7Ylk3c6YBU8P/P3qqq6oa70lLTwvfZc3f+4ACfJgEpAAAAAAAAGrFxY3H4Xrs42mervLx80eKtcyDlZOfsUMewV0VFeVjIzukYtLbs7Jx9+u5TWlo6fcb0YE91wrEnpKSkLFm6ZNasWcG2pbs+nDIlISHhCyeeFHxaioqKatMh+w4YGERURsbWr8mGDRuD3WCH7rQt5VvC70tY6NAhI4i09u3TDtj/gFUFBYsXL578/uSwZvjw4cEeJisr64jDDg8L4yeMr6mpCQvPTxhfXV198JCDe3Tv3lSvXXn2hn9l1pzZYWHgtq/bgH4DwvfFixeVlZUFO67u2dsxp5Fn7z7bIlzTps9YuXJlALDHSwwAAAAAAADgk8Lfxcs2b/1BPS0tLfhMVVVVvT3xnS1btiQmJg7oP6DlHTdv3vzGm2+EhdzOnRv9db9WaWlZYeHaRnd1SE9PSkwKmjZi+PD5C+ZPfPfdgw86ONgjtW+fdszo0c+PHz/+hfEDBw58bvzWqaRGDB/RcTckxmqVlpbOmz+/tlxRXr5g0cK8vLy2bdueetIpe9rsPq2oQ4cO4fvG4o01NTUNF7bbdS2/04qLi2sLae1Tg6gbMWz41GlT33rn7Y8WfdSpU6e+ffZeVbBqu702bNzQxFc+bndMr3XM0ce898H7K/Lzp06fmpmRMWvWrKSk5LFjxjTVfhefvUuXLinZtCkzKysckGDrE6B9927dl69YPmfu3CGDB+/QoeqevfHx8X36NDIh2ehRo6dMm1JSUvrnW27u369fv336devSLTc3t02bNsGep7KyoqlHfbt2qeEzKgCiTkAKAAAAAACA+upiFvFxn/aCJE+Oeyo+/uOIyeayzXPnz6ud++TY0cdmZWY21auwqPDxpx6v21y/bv38hQvCH/iTEpNOOfnUbWvtNW7S5Enhq9FdV11+Vc8ePYKm7Ttg3/btOyxZunjlqlVdcnODPdLhIw+fNOndgtWrH3z0ofkLFqS2a3fc6GOD3Wb5iuV33n1nbE1CQsLFX7t47z6RXV8v+Hgxx62T9xRvKu7QvkPQ2lp+p9VOPhR8Ft/cT1+f3n1yO3eeNmNaWD561NEt7PXIY482Wp+cnHTT9TcFrS0lJWXM8WMee+KxCS+8kJraLqw5+qijmpkdahefvbPyti54t29MlnTAgAHhtzJv9qztBqSaevYecdgRnTp2ati+ffv211zxrQcefmDxksV5s2eHr2DbIoC9e/Xaf78Dhg8b1nzA9FO2Ij//V7/7TaO7Thp74qgjRwVA1AlIAQAAAAAAUF9c/GeWrpj83uTYzfDn9m5du406atTgAwc102vTpk2T3n03tib8bb5P394nn3hy1y5dm+mYkZ6emZnV6K42KSlBsxISEoYeeujLr7w86d1Jp596WrBHCsfhpBNP+ue//jl16tRw87hjj2vXrl2w22RmZQ35/ytVU1OTv3LlRx99dPvfbx966NATjj0+wpNI1dpNsaSW32nVNdX1aioqK356/XWxNbmdO19z5TVBJAwfNvypcU8nJycd0uJZ3HJzc9u2aWS6oKTE3fXT+dBDDn37nXdWrsovLCoMHzhHHXFUM4138dk7a87WgFTsZHsD+w946eWX5sybW1VVFd5IzfSt9+wNpSSnjDlhzGEjRjbVJTMz44pLLy8sXDsrL2/Z8mWrVheEPlq0KHx98OH7F3zlwrBBsGdISUlp6t+C9PTPfiVZ4FMgIAUAAAAAAEB9Hf4/yFJVXbUj/YL4Zn/dj6up2domobk2F3/t4rBBTXXNg488VFy88YxTTx8+bHiwPbmdO596ytbgSPHGjQ88/GBcXNw1V13TuVOn7XY8aMhBY08YG+ysYYcMe+XVVz6c+uGJY05MSUkO9kgH7n9A7169Fy1e1Kljx+FDtz+Yu6Jjdk698SwvL3/62XHvTn53zZrVl11yWcMu8XFNhjZqgq03TPOpjj1BVVVlsO08U1N318J2LbzT2qd9/M2trPw4DRMfF9+ta/fayvLyLStXrays2rEv9Z4s/P4+N3784AMPbPkSaV848eR++/QLPkXh4+gLJ518x113hOWxx49NTm7uQbHTz97Q2sK1q1evTkxM7JLbpaS0pLYyKys7HJyysrKFH33Ub599mul+/le+Gh//8XctMSEhJzs7MzMrvgWBrezsnCOPOLK2XFpaOmPmjPETxq/Iz3/y6Se/duFFDdt/Jl/53M65l3/zsgD4LyYgBQAAAAAAQH3hT+ypqe1KSko3Fhc3urhSU9q0aVNbqKysbJgDqE1mND8zU5/evRO3TeUy9oQTHnns0RdffmnIkCEpyduZzCklpU3fPnvXlufNn/f+hx88/+/nLjr/omA3y8zMGNBvwOy5s6dOnzrs0KHBnmqvHj0XLV7UrVv3Tz9sFN4GY44bM/m9yR8tWrRy5couXbrUaxDeM8WbiqsaS+1UbgsepSTvocmzOus3bAzfO3RoHxcXF+weLbzT0tI+TmiVlJbU5qjCK37lZZfXVi5bvvzmW24OIqRtm7ZDBg/e3bG/XbdXz561hZ579Wy+5U4/e0OzZs0Ktj17b/xVI2sF5s2e1XxAamD/gYm7PI1Wu3bthg0dVl1d/cTTT4a3a2FRUXZW/Sn6IvCVBz6Por/0LAAAAAAAADuhQ/utqw5tXL9hh3qlJH8ckKqorGi4N/zlPti21FHQAoccdEj3bt02Fm98+eWXgx0x5oQxSUnJebNnz5k3N9j9hg8bFr6/O3lSQBPat0+rTcsVFhY23Ft7PzR+w1RsvWHqUnd7rPXr1wVbvzK7dzWxltxpqe1SazNwmzYVN9xbXV0dRM4Jxx3fo3v3IEJ27tkbytu2vl5GRkbnzrmxr8xtEaVZs/OCT8ugAwfV3oGE4/4AABAASURBVIdr1q5puDcCX3ng80hACgAAAAAAgEbUrkI1e+7shruqqqqmz5je6PwfKSnJtb+Lb9hQ/9f9TZs21Qak2rZp0WJY29alOiUsvPH2m43+yt6U9A7po0eNCgvjnhlX+xd3qwH9B2Skpy9bvnz5ihUBjampqam9W9o1tgJd27ZbwxDrG4uDbNiwfluDlq6e9lmZMnVq+L7ffgOD3amFd9pePfcKts2j1nBX0brCIHI6tO8QRMvOPXtLSkoWLV4cFi75+sXf+9Z3Yl9XXXpl+Dhdv379ivzWfEZVbdPorvA7W7taX6NzQUXgKw98HglIAQAAAAAA0IgR26armTFr5vptv1jHeu/99//5wP133v33Rjv26tU7fF+0eFG9+sXbfrzv1KlTWlpa0DJ9evc+8IADw9/gxz37TLAjjjz8yIyMjDVr17z5zpvBbhYfHz/s0K1jNckkUk1Ykb8ivIhxcXFdcnMb7u3Tq0+w9faof8OUlJQUrF4d9urdq1ewB8ubM3vJ0iXJyUlDD9m9ayy28E47+KCDw/cPp3zYMLySl/fpzSHETtu5Z+/suXNqamqys3M65nSst6t9+7Tu3XsEW1fZa7UbYFNJyR133XnXPXdt3ry54d6lS5dUVJSHhS65XRru/bx/5YHPKQEpAAAAAAAAGhH+0D6gX/+qqqo7/n5n0bp1dfXzF8x/5vlxYaGpOMgB++0Xvr/08kur16yuq9ywccO48c+Ghf333T/YESeNOTExMXHO3Dk79NN+cnLyiWPGbjuNlzcWbwx2s0MPPTQ+Pv79D96vzQRQp7h443sfvPfgww+G5eFDhzc6Mcz++2+9JWbMmjltxrS6yvDGe/jRR8JCzx57td9TpwjasGHDm2+/dd/994XloYcOS22XGuxmLbnTBh14YFJS8pq1ax965KHYNfXemTTxo0WLAvZ4O/fsnZU3K3wfOGBAo8fcd1v9rNZLyBUVFRUUrJq/YMHfbr915apVsbtWFRQ8/NijwdY51fZrdLG8z+9XHvhcSwwAAAAAAACgMeecdc4/7vvH0mXLfvuH33bp0rVjTk5hYeGSpUvCXcOGDjtoyJBGew0eNPjdye+tXJX/x5v/1CU3t2PHToWFRStXrSgvr8jMyho+dHiwI7Kyso48/IhXXnt13LPP7LPPPkmJSS3sOGTQkLffmbhk6eLnxj937tnnNtXsrXfefv+DDxrddfhhhx991KigBdI7pO87YODMbQGF3eeRxx5JTGjk173U1NTvXPPtYM/w0aKPfv6LG2vLNdsCUrXlbl27jj1hTKNdcjvnhvfSh1Om/OvBB1548YWuXbqWlpauWLmipKQ0OTnpuGOOabTXlvIt/7jv3rrNwsK1wbYEyW1/v6Ou8uwzz8rKzAyaMPHdSVOnTW1012XfvDQnO6fRXbNmz6r9gJVVleF51lYeecSRJ489Kdg95xmrJXdaSnLKV8877777/zl1+rQFHy3s07tPm5SUZctXrF275rRTT3v08UeDPcOixYsmvPRi3ebq1VuX0Xzjzden/P9FadumzQVfOT9obf966IFGv0eh8879cjhcTXVcVbCq7t6uZ+yYsYdsm7irtezos7eisqJ2UcXw9mj0gAMHDJzw4gsr8les37A+Iz0j2GU9e/S4/NLL7/rHXStXrfzDn/+Qmtpur557paWmri0sCq9sTU1NRnr6Wad/sdG+O/eVr7NzF2L5iuVN9erevdtF518UAFEnIAUAAAAAAEDj0tLSvvmNbz759JNz5s5Ztiz8sX5pWNmuXbvjjz1uxLARTfVKbZd6xaWXPfTow3PnzVu2fHn4CiuTEpP26dv33LO/3L59S9fXqzN61Oj33n+/sKjwjTffPObo0S3veMrJJ//lb38Nf4YfMWx4r716N9qmfJtGdzW6dFRThg8bvrsDUnVxnHqqa6qDPUZlZWXslF2JiYldu3QZ0H/A0UcdHZab6vWls76UmZk16d2Jq9esCV9hTVxcXOdOnc7+4tk9e/RstEt1VfXChQvqVW7a6j+VTV3ZWhUV5U3NwxQevOlelRUVWz9gQkJC1y5du3frOrD/vrUz4uym86ynJXfawP4DL/zqBeOee2b16tXTZ0wPazIzMy746vntdv8cVy1XUlLacGTqboBQWupuOdumvkfB1ru3qpmOVVVVTU1HV1HeylPH7eizd8HCBeFdlJKS0lTAq1vXbunp6Rs2bMibnTdy+MigNXTq2OmKy66Y8OIL06ZPC69m3uzZtfXJycmHjzx81FFHtW3Ttqm+O/GVr7NzF6KZXiUlWQHwXyCuYHV+AAAAAAAAAM0qWreucO2arKys8Fft+Pj4lnSpqakp2qowIzMzOyu7hb34b1ZcXFywZnXbNimdOnZOSmrpbGE0paS0JD8/Py2tfaeOHRMSEgI+h3bi2fspq6ioCE9y48aNCQnx4Xmmd0iPi4trYV9feeBTIyAFAAAAAAAAAABElpw+AAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARJaAFAAAAAAAAAAAEFkCUgAAAAAAAAAAQGQJSAEAAAAAAAAAAJElIAUAAAAAAAAAAESWgBQAAAAAAAAAABBZAlIAAAAAAAAAAEBkCUgBAAAAAAAAAACRJSAFAAAAAAAAAABEloAUAAAAAAAAAAAQWQJSAAAAAAAAAABAZAlIAQAAAAAAAAAAkSUgBQAAAAAAAAAARFZiAAAAAAD8l6moqPjggw/ffOudGTNmrlm9trCwMKzMzs7u2CnnwAMPOOKIww4aMjgpKSkAAAAA+PyLK1idHwAAAAAA/x0qKyufePyp2+64a82aNc0069ix42WXXnz66ackJvr/WAIAAACfbwJSAAAAAPBfobq6+t8TXrzlltuXLl3awi577bXXVVddevxxx8bFxQUAAAAAn08CUgAAAADwX2H8vyf89Kc3bN68ZYd6tW2b8qtf/mL06KMCAAAAgM+n+AAAAAAAiLoXX3z52mt/vKPpqFBZ2ZZvfft74/89IQAAAAD4fDKDFAAAAABE3Ly588776kU7kY6q06ZNyn333jVw4IAAAAAA4PPGDFIAAAAAEGVVVVU/+J8f7Uo6KhR2/+GPrgsPFQAAAAB83ghIAQAAAECUPf7YkwsXLgp22YIFC8NDBQAAAACfNwJSAAAAABBZJSUlt9x6W9BKbrn19k2bNgUAAAAAnysCUgAAAAAQWS++9HJR0fqglRQVrXvp5VcCAAAAgM8VASkAAAAAiKz33vswaFXTp88MAAAAAD5XEgMAAAAAIKLy8/ODVrVo0eIAAAAA4HMlrmB1K/9PJAAAANCMAw48JADg01IT1MQFcUHrqakJ4lrzeMAeZ8b094Oo8N88AQBoKEr/jZeWs8QeAAAAAERXTdDaWv+IAAAAALuVgBQAAAAAAAAAABBZiQEAAAAAEFWtvxyeBfaA/2Pv/lXzLMMAjL+vJDSdQ3TM9uVbbES6SK2JX0jVTXTTRRBr9RyEUludCtpFUayK7gVPobiqNB5DoYk5gmQwRyD++RzeK7/f+PDczxFc3A8AAMDEjE8OHw8AAAAAQNFbb79zcPD7sDyXLz//7f2vBgAAAIDp8MUeAAAAAGTN57Nhqba2lvwgAAAAwP9NIAUAAAAAWYuXd4eleu3VawMAAADApAikAAAAACDrypUX5vOtYUlms9n29qUBAAAAYFIEUgAAAACQNY7jjfffG5bkww+uDwAAAABTI5ACAAAAgLLFYmcpS6Rms9ne3u4AAAAAMDUCKQAAAAAoG8fx41sfra1dGP6Ds/FP79wcAAAAACZIIAUAAAAAcfP5/Pbtm8O/NY7jJ3duzbZmAwAAAMAECaQAAAAAoO+Va/uff3b34sV/vEdqbe3CvXt39/f3BgAAAIBpEkgBAAAAwLmwWOx8/903m5ubf3/k7PKPP9zf3XlpAAAAAJis8cnh4wEAAAAAOB9OT08fPPjpiy+/Pjo6+otrGxsbN66/+8abr6+srAwAAAAAUyaQAgAAAIBz5+Tk5Jdff3v48OdHjw6ODv84Pj4+O1xfX3/6mY3nti9dvfri9vazq6urAwAAAMD0CaQAAAAAAAAAAICspwYAAAAAAAAAAIAogRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAABZM7krAAAPp0lEQVQAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyBJIAQAAAAAAAAAAWQIpAAAAAAAAAAAgSyAFAAAAAAAAAABkCaQAAAAAAAAAAIAsgRQAAAAAAAAAAJAlkAIAAAAAAAAAALIEUgAAAAAAAAAAQJZACgAAAAAAAAAAyPoTAAD//zvjbeIAAAAGSURBVAMArpYGhSnAETMAAAAASUVORK5CYII=" alt="Assad Isah's personal LinkedIn banner: a long horizontal line with a small gap and a marker approaching it, positioned right of centre, with 'Assad Isah' in small type top-left and 'Software engineer / Currently building TimelyCapsule' beside the marker.">
+    <figcaption>design/launch/linkedin/personal-banner.png</figcaption>
+  </figure>
+</section>
+
+<section id="personal-posts">
+  <p class="hallmark">Part 7 — rewritten this pass</p>
+  <h2>Personal posts — a real mix, not a TC feed</h2>
+  <p class="lede">First person throughout. <b>26 posts in the pool now
+  (10 LinkedIn, 16 X), only 13 of them touching TimelyCapsule at all</b> — 9
+  explicit, 4 adjacent, 13 genuinely unrelated. The 30-day calendar (Part 9)
+  uses about half the pool and holds the rest in reserve.</p>
+
+  <h3><span class="n">7.1</span>LinkedIn — ten</h3>
+  <div class="post"><div class="post-head"><span class="num"><span class="chip tc">TC</span> L1 · What most of the actual work is</span></div>
+    <div class="post-body">Somewhere around the third rewrite of the encryption flow, I realized the interesting problem was never "how do I build a time capsule app." It was "how do I build something where the correct answer to almost every feature request is no."
+
+No read receipts. No "seen by." No preview of what's inside before it opens. No way for me — the person who runs the servers — to see what anyone wrote. Every one of those is a feature I chose not to build, on purpose, more than once.
+
+That's most of what I actually do most days now — not adding things, holding a line on what doesn't get added. Stranger kind of engineering work than I expected. I like it more than I thought I would.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip tc">TC</span> L2 · Shipping replies</span></div>
+    <div class="post-body">Shipped replies to TimelyCapsule this week — a capsule's recipient can now write back, sealed the same way the original letter was.
+
+The interesting part wasn't the crypto (mostly reused work I'd already done). It was resisting the urge to make it feel like every other reply feature I've built before: no read receipt, no typing indicator, no notification with a content preview. It just says someone replied. You still have to go open it to find out what they said — same as the letter that started it.
+
+Staying consistent with a product's own principles is more work than building the feature.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip tc">TC</span> L3 · Testing a delete button</span></div>
+    <div class="post-body">Wrote a whole test suite this week for a feature whose only job is to delete something.
+
+TimelyCapsule has a "one reading only" mode — read it once, and the record is destroyed, no copy anywhere. The hard part wasn't the deletion logic. It was making sure it could never fire by accident: not on a page load, not on a link-preview bot crawling the URL before a real person opens it, not on a browser prefetch.
+
+Confirmed-read only, verified against an actual test suite — not eyeballed once and shipped. Destructive features earn a different level of paranoia than the rest of the codebase.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip none">non-TC</span> L4 · The dependency I never audited</span></div>
+    <div class="post-body">Spent an embarrassing amount of time this week convinced a race condition was in my own code. It was in a library I'd imported for one utility function two years ago and never looked at again past the README.
+
+"I only need one function from this" is exactly the reasoning that gets you here. Auditing dependencies you only "need one function from" is one of those lessons that doesn't stay learned — I'll be back here again in six months, differently annoyed.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip none">non-TC</span> L5 · Building alone</span></div>
+    <div class="post-body">Nobody warns you that building alone means you're also QA, support, and the person who has to explain to yourself why a decision from four months ago made sense at the time.
+
+Started keeping a written log of decisions as I make them — not for anyone else, just so future-me has something better to work from than "I'm sure I had a reason." Small habit. Has already saved me from re-litigating two decisions I'd already made correctly once.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip adj">adjacent</span> L6 · Making a decade feel true</span></div>
+    <div class="post-body">A decade is 3,653 days. Written down like that it barely registers — small enough that a calendar app could show you a countdown without embarrassing itself.
+
+Most of what I've actually worked on this year has been trying to make that distance feel true inside an interface, instead of just numerically correct. Two numbers — travelled, remaining — turned out to do more of that work than any animation would have.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip none">non-TC</span> L7 · Tests that lie</span></div>
+    <div class="post-body">The tests I trust least are the ones I wrote in a hurry to make CI green, then never looked at again. Found three of those this week, all subtly wrong in the same direction — asserting the mock's behavior instead of the real one's.
+
+None of them were catching anything. All three had been green for months. A passing test suite is a claim, not a proof, and I'd stopped checking which one I actually had.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip none">non-TC</span> L8 · The four-word code review</span></div>
+    <div class="post-body">The best code review comment I got this year was four words: "why does this exist."
+
+Not unkind. Just correct. I didn't have a good answer, so I deleted forty lines instead of defending them. Most of the code I'm least proud of has survived exactly because nobody asked that question at the right moment.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip tc">TC</span> L9 · A bug that only existed because a fix was too good</span></div>
+    <div class="post-body">Shipped a fix recently so a logged-in user's dark-mode preference would stick properly on the marketing pages. Verified it worked. Moved on.
+
+Two days later: every hard refresh of a logged-in page was bouncing real, authenticated users straight back to the login screen — a session with valid tokens sitting right there, ignored.
+
+The cause: a loading-state variable that used to safely default to "false" (not loading) now needed a third state — "haven't checked yet" — and defaulting it to false meant the route guard concluded "not loading, no user, redirect" before the code that reads the tokens ever ran. False and unknown had been silently treated as the same value.
+
+Fixed by giving it three real states instead of two. A very small diff for how long it took to notice.</div></div>
+
+  <div class="post"><div class="post-head"><span class="num"><span class="chip none">non-TC</span> L10 · The Windows 95 site</span></div>
+    <div class="post-body">My personal site is themed like Windows 95. It has taken noticeably longer to maintain than it has any right to, for a decision that gains me nothing measurable — nobody has ever hired me because of it, as far as I know.
+
+I have no plans to make it sensible. Some projects are for the portfolio. That one's just for me.</div></div>
+
+  <h3><span class="n">7.2</span>X — sixteen, tagged, character-verified</h3>
+  <div class="copy"><span class="len"><span class="chip tc">TC</span> X1 · 188 / 280 chars</span>Built a feature this week whose entire job is deleting something permanently. Wrote more tests for it than for anything that adds a feature. Destruction earns a different kind of paranoia.</div>
+  <div class="copy"><span class="len"><span class="chip adj">adjacent</span> X2 · 137 / 280 chars</span>The hardest part of building TimelyCapsule isn't the encryption. It's saying no to read receipts every single time someone suggests them.</div>
+  <div class="copy"><span class="len"><span class="chip adj">adjacent</span> X3 · 196 / 280 chars</span>Ten years is 3,653 days. I've been trying to make an interface feel that distance instead of just displaying the number correctly. Turns out two counters do more work than an animation ever would.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X4 · 182 / 280 chars</span>Spent the day fixing a bug where "haven't checked yet" and "definitely false" were being treated as the same value. They were not the same value. They have never been the same value.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X6 · 112 / 280 chars</span>Every few years I relearn that "I'll just write this part in bash, it's simple" is a trap dressed as a shortcut.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X7 · 108 / 280 chars</span>Every codebase has one file everyone is afraid to touch. Mine has two now. I made the second one on purpose.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X8 · 138 / 280 chars</span>My personal site is Windows-95 themed. It costs me real maintenance hours for zero measurable benefit. No regrets, mostly, on a good week.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X9 · 119 / 280 chars</span>Two kinds of bugs: the ones you find, and the ones a user finds three weeks after you stopped thinking about that file.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X10 · 178 / 280 chars</span>Naming things is still the hard part. Today's variable went through "flag," "pending," "unknownYet," and "null" before I remembered null already means something in this codebase.</div>
+  <div class="copy"><span class="len"><span class="chip tc">TC</span> X11 · 148 / 280 chars</span>Wrote a test suite this week for a feature whose only job is destroying something on purpose. Different kind of paranoia than adding a feature does.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X12 · 145 / 280 chars</span>Refactored something today purely because the old version annoyed me every time I opened the file. No ticket. No user impact. Good enough reason.</div>
+  <div class="copy"><span class="len"><span class="chip adj">adjacent</span> X13 · 142 / 280 chars</span>A letter that can't be read for ten years is a strange thing to spend a Tuesday on. Also the only thing I want to spend Tuesdays on right now.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X14 · 117 / 280 chars</span>Today's yak-shave: wanted to fix a typo, ended up updating three dependencies and losing forty minutes to a lockfile.</div>
+  <div class="copy"><span class="len"><span class="chip tc">TC</span> X15 · 174 / 280 chars</span>Replies shipped. A capsule's recipient can now write back, sealed the same way the letter was. No read receipt, no typing indicator — same restraint as everything else in it.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X16 · 136 / 280 chars</span>The most honest status update most weeks: nothing broke, nothing shipped, I just understood the codebase slightly better than yesterday.</div>
+  <div class="copy"><span class="len"><span class="chip none">non-TC</span> X17 · 141 / 280 chars</span>Mobile client is coming along. Mostly this means re-learning which of my assumptions about "the web version already handles this" were wrong.</div>
+  <p style="font-size:14px;color:var(--muted);margin-top:10px">X5 from the
+  original pool retired — its "started a company about it" framing
+  duplicated the dedicated reveal post (Part 8 below) too closely.</p>
+</section>
+
+<section id="pillars">
+  <p class="hallmark">Part 8 — new this pass</p>
+  <h2>Content pillars</h2>
+  <p class="lede">Two separate systems. TimelyCapsule's is unchanged from
+  the working set `COPY.md` already proved; Assad's is rebuilt so roughly
+  half the pillars can never touch TimelyCapsule at all.</p>
+
+  <h3><span class="n">A</span>TimelyCapsule — 7 pillars</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Pillar</th><th>Type</th><th>Platform</th><th>Frequency</th><th>Visual?</th></tr>
+    <tr><td>Product moments</td><td>Screenshot + short copy</td><td>IG, X</td><td>Weekly</td><td>Always</td></tr>
+    <tr><td>Privacy/encryption</td><td>Explainer</td><td>LinkedIn, X</td><td>Biweekly</td><td>Sometimes</td></tr>
+    <tr><td>Philosophy of waiting</td><td>Thesis/opinion</td><td>LinkedIn, IG</td><td>Biweekly</td><td>Sometimes</td></tr>
+    <tr><td>Correspondence (Replies)</td><td>Feature explainer</td><td>All three</td><td>Monthly</td><td>Always</td></tr>
+    <tr><td>Custody/destruction</td><td>Trust/feature</td><td>All three</td><td>Monthly</td><td>Sometimes</td></tr>
+    <tr><td>Design decisions</td><td>Craft explainer</td><td>LinkedIn, X</td><td>Monthly</td><td>Usually</td></tr>
+    <tr><td>Honest status</td><td>Grounding</td><td>LinkedIn</td><td>Monthly</td><td>Sometimes</td></tr>
+  </table></div>
+
+  <h3><span class="n">B</span>Assad — 8 pillars, roughly half TC-free by design</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Pillar</th><th>TC involved?</th><th>Platform</th><th>Frequency</th></tr>
+    <tr><td>Software engineering craft</td><td>Rarely</td><td>LinkedIn, X</td><td>Weekly-ish</td></tr>
+    <tr><td>Things I'm building</td><td>Sometimes</td><td>LinkedIn, X</td><td>Biweekly</td></tr>
+    <tr><td>Technical lessons / postmortems</td><td>Sometimes</td><td>LinkedIn</td><td>Monthly</td></tr>
+    <tr><td>Interesting implementation problems</td><td>Sometimes</td><td>X</td><td>Biweekly</td></tr>
+    <tr><td>Product/design opinions</td><td>Sometimes</td><td>LinkedIn</td><td>Monthly</td></tr>
+    <tr><td>TimelyCapsule — explicit</td><td>Yes, deliberately occasional</td><td>Both</td><td>Monthly</td></tr>
+    <tr><td>Solo-building life</td><td>No</td><td>LinkedIn, X</td><td>Monthly</td></tr>
+    <tr><td>Developer culture, dry observations</td><td>No</td><td>X</td><td>Weekly-ish</td></tr>
+  </table></div>
+  <p style="font-size:14px;color:var(--muted)">"Developer culture, dry
+  observations" is the pillar doing the most work here — it's the one with
+  the least gravitational pull back toward the product, which is exactly
+  what keeps the account from reading as a TimelyCapsule fan page.</p>
+</section>
+
+<section id="calendar">
+  <p class="hallmark">Part 9 — the posting map</p>
+  <h2>The 30-day calendar</h2>
+  <p class="lede">Starts <b>Monday, 2026-08-31</b> (today is Saturday —
+  the weekend is setup time). Runs through <b>Tuesday, 2026-09-29</b>.
+  <b>No launch date is invented anywhere</b> — every post concerns the
+  product's current, live state. Legend: <span class="mono">TC-LI/TC-X/TC-IG</span>
+  TimelyCapsule · <span class="mono">A-LI/A-X/A-IG</span> Assad.</p>
+
+  <h3><span class="n">Wk1</span>Aug 31 – Sep 6</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Date</th><th>Time</th><th>Acct</th><th>Post</th><th>Asset</th></tr>
+    <tr><td class="mono">Aug 31</td><td>—</td><td>all</td><td><b>Profile setup day — no posts.</b></td><td>—</td></tr>
+    <tr><td class="mono">Aug 31</td><td>10:00</td><td>TC-LI</td><td>Post 1 · Why this exists</td><td class="mono">x/post-mark.png</td></tr>
+    <tr><td class="mono">Sep 1</td><td>09:00</td><td>TC-X</td><td>"The mark"</td><td class="mono">x/post-mark.png</td></tr>
+    <tr><td class="mono">Sep 2</td><td>12:00</td><td>TC-IG</td><td>"The mark"</td><td class="mono">instagram/01-the-mark.png</td></tr>
+    <tr><td class="mono">Sep 2</td><td>15:00</td><td>A-X</td><td>X4 — non-TC on its face</td><td>—</td></tr>
+    <tr><td class="mono">Sep 3</td><td>09:00</td><td>A-LI</td><td><b>"What I've been working on" — v.A</b></td><td>—</td></tr>
+    <tr><td class="mono">Sep 3</td><td>14:00</td><td>TC-X</td><td>"The Dual Clock"</td><td class="mono">x/post-dualclock.png</td></tr>
+    <tr><td class="mono">Sep 4</td><td>10:00</td><td>A-X</td><td><b>"What I've been working on" — v.B</b></td><td>—</td></tr>
+    <tr><td class="mono">Sep 5</td><td>12:00</td><td>TC-IG</td><td>"The Dual Clock"</td><td class="mono">instagram/03-dual-clock.png</td></tr>
+    <tr><td class="mono">Sep 6</td><td>—</td><td>all</td><td>No post.</td><td>—</td></tr>
+  </table></div>
+
+  <h3><span class="n">Wk2</span>Sep 7 – 13</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Date</th><th>Time</th><th>Acct</th><th>Post</th><th>Asset</th></tr>
+    <tr><td class="mono">Sep 7</td><td>10:00</td><td>TC-LI</td><td>Post 2 · What I actually care about</td><td class="mono">screenshots/06-survival.png</td></tr>
+    <tr><td class="mono">Sep 8</td><td>09:00</td><td>TC-X</td><td>"Ten years"</td><td class="mono">x/post-decade.png</td></tr>
+    <tr><td class="mono">Sep 9</td><td>12:00</td><td>TC-IG</td><td>"A decade"</td><td class="mono">instagram/04-a-decade.png</td></tr>
+    <tr><td class="mono">Sep 9</td><td>15:00</td><td>A-LI</td><td>L4 — dependency I never audited</td><td>—</td></tr>
+    <tr><td class="mono">Sep 10</td><td>09:00</td><td>A-X</td><td>X6 — the bash trap</td><td>—</td></tr>
+    <tr><td class="mono">Sep 11</td><td>10:00</td><td>TC-X</td><td>"The composer"</td><td class="mono">x/post-composer.png</td></tr>
+    <tr><td class="mono">Sep 11</td><td>15:00</td><td>A-LI</td><td>L5 — building alone</td><td>—</td></tr>
+    <tr><td class="mono">Sep 11</td><td>16:00</td><td>A-X</td><td>X1 — one-reading-only test suite</td><td>—</td></tr>
+    <tr><td class="mono">Sep 12</td><td>12:00</td><td>TC-IG</td><td>"The composer"</td><td class="mono">instagram/10-composer.png</td></tr>
+    <tr><td class="mono">Sep 13</td><td>11:00</td><td>A-X</td><td>X7 — the second untouchable file</td><td>—</td></tr>
+  </table></div>
+
+  <h3><span class="n">Wk3</span>Sep 14 – 20</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Date</th><th>Time</th><th>Acct</th><th>Post</th><th>Asset</th></tr>
+    <tr><td class="mono">Sep 14</td><td>10:00</td><td>TC-LI</td><td>Post 3 · Nothing is happening</td><td class="mono">instagram/12-waiting.png</td></tr>
+    <tr><td class="mono">Sep 15</td><td>09:00</td><td>TC-X</td><td>"Before it seals"</td><td class="mono">x/post-sealing.png</td></tr>
+    <tr><td class="mono">Sep 16</td><td>12:00</td><td>TC-IG</td><td>"Before it seals"</td><td class="mono">instagram/11-sealing.png</td></tr>
+    <tr><td class="mono">Sep 16</td><td>15:00</td><td>A-LI</td><td>L9 — the bug about a bug</td><td>—</td></tr>
+    <tr><td class="mono">Sep 17</td><td>09:00</td><td>A-X</td><td>X8 — the Windows-95 site</td><td>—</td></tr>
+    <tr><td class="mono">Sep 18</td><td>10:00</td><td>TC-X</td><td>"A Tuesday, mid-custody"</td><td class="mono">x/post-waiting.png</td></tr>
+    <tr><td class="mono">Sep 18</td><td>16:00</td><td>A-X</td><td>X2 — read receipts</td><td>—</td></tr>
+    <tr><td class="mono">Sep 19</td><td>12:00</td><td>TC-IG</td><td>"A Tuesday, mid-custody"</td><td class="mono">instagram/12-waiting.png</td></tr>
+    <tr><td class="mono">Sep 20</td><td>11:00</td><td>A-X</td><td>X9 — two kinds of bugs</td><td>—</td></tr>
+  </table></div>
+
+  <h3><span class="n">Wk4</span>Sep 21 – 27</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Date</th><th>Time</th><th>Acct</th><th>Post</th><th>Asset</th></tr>
+    <tr><td class="mono">Sep 21</td><td>10:00</td><td>TC-LI</td><td>Post 4 · Refusing the growth-team playbook</td><td class="mono">instagram/07-refusals.png</td></tr>
+    <tr><td class="mono">Sep 22</td><td>09:00</td><td>TC-X</td><td>"On the day"</td><td class="mono">x/post-reveal.png</td></tr>
+    <tr><td class="mono">Sep 23</td><td>12:00</td><td>TC-IG</td><td>"On the day"</td><td class="mono">instagram/13-reveal.png</td></tr>
+    <tr><td class="mono">Sep 23</td><td>15:00</td><td>A-LI</td><td>L7 — tests that lie</td><td>—</td></tr>
+    <tr><td class="mono">Sep 24</td><td>09:00</td><td>A-X</td><td>X10 — naming things</td><td>—</td></tr>
+    <tr><td class="mono">Sep 25</td><td>10:00</td><td>TC-X</td><td>"Not the last word"</td><td class="mono">x/post-replies.png</td></tr>
+    <tr><td class="mono">Sep 25</td><td>16:00</td><td>A-X</td><td>X15 — replies shipped</td><td>—</td></tr>
+    <tr><td class="mono">Sep 26</td><td>12:00</td><td>TC-IG</td><td>"Not the last word"</td><td class="mono">instagram/14-replies.png</td></tr>
+    <tr><td class="mono">Sep 26</td><td>14:00</td><td><b>A-IG</b></td><td>The one Assad IG post — adapted reveal, image-led</td><td class="mono">screenshots/03-composer.png</td></tr>
+    <tr><td class="mono">Sep 27</td><td>11:00</td><td>A-X</td><td>X12 — refactored because it annoyed me</td><td>—</td></tr>
+  </table></div>
+
+  <h3><span class="n">29–30</span>Sep 28 – 29</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Date</th><th>Time</th><th>Acct</th><th>Post</th><th>Asset</th></tr>
+    <tr><td class="mono">Sep 28</td><td>10:00</td><td>TC-LI</td><td>Post 5 · What belongs inside a letter</td><td class="mono">instagram/11-sealing.png</td></tr>
+    <tr><td class="mono">Sep 29</td><td>09:00</td><td>TC-X</td><td>"One reading only"</td><td class="mono">x/post-one-reading.png</td></tr>
+  </table></div>
+
+  <div class="rec">
+    <div class="tag">Totals over 30 days</div>
+    <div class="val" style="font-size:16px">TC-LI 5 · TC-X 9 · TC-IG 8 · A-LI 5 · A-X 11 · A-IG 1</div>
+    <div class="sub">No account posts daily. No two TC accounts post the
+    same content the same day. Assad's post days never line up with
+    TimelyCapsule's for the same subject — the one exception is the reveal
+    itself (Week 1), the one moment meant to visibly connect the two.
+    Beyond day 30: TC-LI Posts 6–9, TC-IG/X "kept" and "refusals," L6/L8/L10,
+    X3/X11/X13/X14/X16/X17 — a further 3–4 weeks banked without writing
+    anything new.</div>
+  </div>
+</section>
+
+<section id="cross-account">
+  <p class="hallmark">Part 10</p>
+  <h2>Cross-account mapping + the repurposing matrix</h2>
+  <p class="lede">Each row is one underlying idea; the columns show how it
+  surfaces differently per account, staggered rather than synchronized.</p>
+  <div class="tbl-wrap"><table>
+    <tr><th>Moment</th><th>TC-X</th><th>TC-IG</th><th>TC-LI</th><th>A-LI / A-X</th></tr>
+    <tr><td>The reveal</td><td>—</td><td>—</td><td>Post 1, Aug 31</td><td>Reveal posts, Sep 3–4</td></tr>
+    <tr><td>Encryption</td><td>—</td><td>—</td><td>Post 2, Sep 7</td><td>X2, Sep 18 — different angle</td></tr>
+    <tr><td>The wait</td><td>Sep 18</td><td>Sep 19</td><td>Post 3, Sep 14</td><td>—</td></tr>
+    <tr><td>Refusals</td><td>—</td><td>—</td><td>Post 4, Sep 21</td><td>—</td></tr>
+    <tr><td>Enclosures</td><td>—</td><td>—</td><td>Post 5, Sep 28</td><td>—</td></tr>
+    <tr><td>Replies</td><td>Sep 25</td><td>Sep 26</td><td>—</td><td>X15, Sep 25 — same day, first-person "shipped" vs. TC's third-person framing</td></tr>
+    <tr><td>One reading only</td><td>Sep 29</td><td><i>beyond day 30</i></td><td>—</td><td>X1/X11, Sep 11 — <b>two weeks before</b> TC's own post, the builder's side arriving first</td></tr>
+  </table></div>
+
+  <h3 style="margin-top:30px">Repurposing matrix</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Original</th><th>TC-X</th><th>TC-IG</th><th>TC-LI</th><th>Assad</th></tr>
+    <tr><td>The mark</td><td>Original</td><td>Adapted</td><td>—</td><td>No reuse</td></tr>
+    <tr><td>The Dual Clock</td><td>Original</td><td>Adapted</td><td>—</td><td>No reuse</td></tr>
+    <tr><td>A decade</td><td>Original</td><td>Adapted</td><td>—</td><td>Commentary (L6/X3, reserve)</td></tr>
+    <tr><td>Before it seals</td><td>Original</td><td>Adapted</td><td>Adapted (Post 5)</td><td>No reuse</td></tr>
+    <tr><td>Mid-custody</td><td>Original</td><td>Adapted</td><td>Adapted (Post 3)</td><td>No reuse</td></tr>
+    <tr><td>On the day</td><td>Original</td><td>Adapted</td><td>—</td><td>No reuse</td></tr>
+    <tr><td>Not the last word</td><td>Original</td><td>Adapted</td><td>—</td><td>Commentary (X15)</td></tr>
+    <tr><td>One reading only</td><td>Original</td><td>Adapted</td><td>—</td><td>Commentary (X1/X11, L3 reserve)</td></tr>
+  </table></div>
+  <p style="font-size:14px;color:var(--muted)">No identical copy is ever
+  posted twice. Every reuse is either an <b>adaptation</b> (same fact,
+  rewritten for the platform) or a <b>personal commentary</b> (Assad's own
+  angle, never the marketing copy itself).</p>
+</section>
+
+<section id="instagram">
+  <p class="hallmark">Part 11</p>
+  <h2>Instagram — feed, stories, highlights</h2>
+  <p class="lede"><b>TimelyCapsule:</b> active, visual, product-forward —
+  the 8 feed posts already in the calendar above, using the existing
+  approved `COPY.md` captions. Highlight covers (`kept`, `geometry`,
+  `register`, `clock`, `record`, `rules`) stay as-is, abstract and
+  evergreen. Story cadence: one story per feed post, day-of, reposting that
+  post's image — not every day gets a story, and no new highlight is added
+  yet (worth one once "replies" or "one reading only" has 2–3 posts of
+  material to anchor it, not before).</p>
+  <div class="rec">
+    <div class="tag">Assad's personal Instagram</div>
+    <div class="val" style="font-size:17px">Keep it light. Don't force a cadence.</div>
+    <div class="sub">One post in the whole 30 days (Sep 26, adapted reveal).
+    Instagram is where a personal account most resembles a public diary —
+    flooding it with product content is exactly how it starts reading as a
+    second company account. No highlights strategy: one post doesn't
+    warrant one.</div>
+  </div>
+</section>
+
+<section id="dashboard">
+  <p class="hallmark">Part 12 — the dashboard</p>
+  <h2>Publishing dashboard</h2>
+
+  <h3><span class="n">1</span>Consistency matrix</h3>
+  <div class="tbl-wrap"><table>
+    <tr><th>Platform</th><th>Name</th><th>Headline / bio</th><th>TC reference</th><th>Link</th><th>Visual</th></tr>
+    <tr><td>LinkedIn (personal)</td><td>Assad Isah</td><td class="mono">Software engineer. Currently: TimelyCapsule.</td><td>Headline + Experience</td><td class="mono">timelycapsule.com</td><td class="mono">personal-banner.png</td></tr>
+    <tr><td>X (personal)</td><td>Assad Isah</td><td class="mono">bio, §2.2</td><td>In bio</td><td class="mono">timelycapsule.com</td><td>unchanged</td></tr>
+    <tr><td>Instagram (personal)</td><td>Assad Isah</td><td class="mono">bio, §2.3</td><td>In bio</td><td class="mono">timelycapsule.com</td><td>unchanged</td></tr>
+    <tr><td>GitHub (personal)</td><td>Assad Isah</td><td class="mono">bio, §2.4</td><td>Bio + company + README</td><td>social account</td><td>unchanged</td></tr>
+    <tr><td>LinkedIn (company)</td><td>TimelyCapsule</td><td class="mono">tagline, §3</td><td>Is the page</td><td class="mono">timelycapsule.com</td><td class="mono">avatar-paper + company-banner.png</td></tr>
+  </table></div>
+
+  <h3><span class="n">2</span>What to upload</h3>
+  <div class="copy">LinkedIn personal banner   → design/launch/linkedin/personal-banner.png
+LinkedIn company banner    → design/launch/linkedin/company-banner.png
+LinkedIn company logo      → design/brand/social/avatar-paper-1024.png
+GitHub README replacement  → PERSONAL-PRESENCE.md §2.4 (paste into
+                              nottherealalanturing/nottherealalanturing)
+All post images            → §9/§10 above — already sit in
+                              design/launch/final/ and design/launch/linkedin/</div>
+
+  <h3><span class="n">3</span>Still needs a human decision</h3>
+  <ol class="steps">
+    <li><span class="num">1</span><span>LinkedIn Experience entry's real start date — not invented.</span></li>
+    <li><span class="num">2</span><span>Confirm <code>@assadisah</code> is actually available on X before claiming it.</span></li>
+    <li><span class="num">3</span><span>Whether the <code>timelycapsule</code> GitHub repo stays private, goes public, or a subset gets extracted.</span></li>
+    <li><span class="num">4</span><span>The posting times above are reasonable defaults — adjust to Assad's real audience's active hours, which this repo has no way to know.</span></li>
+  </ol>
+
+  <h3><span class="n">4</span>Cannot be verified from the repository</h3>
+  <ul>
+    <li>Real engagement/audience data for any platform — nothing here is instrumented.</li>
+    <li>X handle availability.</li>
+    <li>Anything about LinkedIn's own company-page creation flow beyond what Part 3 specifies.</li>
+  </ul>
+
+  <p style="font-size:14px;color:var(--muted);margin-top:20px">Nothing in
+  this pass changed the product, the brand identity, <code>COPY.md</code>,
+  or any frozen asset. Full source:
+  <code>design/launch/personal/CONTENT-CALENDAR.md</code>.</p>
+</section>
+
+</div>
+<footer><div class="wrap">design/launch/personal/PERSONAL-PRESENCE.md · design/launch/personal/CONTENT-CALENDAR.md — full source · design/.build-linkedin.mjs — banner generator</div></footer>
