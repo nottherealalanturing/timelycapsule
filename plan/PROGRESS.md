@@ -4,6 +4,58 @@
 
 ## Current status
 
+### E1.4.2 — Recipients, re-scoping audit (2026-08-29) — COMPLETE, no code changed (satisfied by E1.4.1)
+
+Per this session's explicit instruction: before starting the next E1.4 ticket, re-scope `E1.4.2` against
+what `E1.4.1` (PR #61, commit `9e1aa2e`, not yet merged) actually shipped, using the repository as source
+of truth rather than assuming the old backlog entry still applies.
+
+**Original `E1.4.2` scope** (`STAGE-E-MOBILE-V1-EXECUTION-BACKLOG.md` `E4.2`, restated in the readiness
+audit's ticket map, `plan/STAGE-E-MOBILE-V1-E1.4-READINESS-AUDIT.md` line 118): "Native recipient
+add/remove, reusing existing API contracts unchanged." Acceptance criteria: matches web's existing
+recipient-limit/plan-limit enforcement, server-side, no client reimplementation. Verification: "real
+recipient add against a real capsule."
+
+**Comparison, checked against actual code, not assumed:**
+
+| Original `E1.4.2` requirement | Already implemented? | Where | Remaining work |
+|---|---|---|---|
+| Native "Someone else" / "Myself" choice | Yes | `address.tsx`'s `WhoBeat`/`Choice`, exact copy from `AddresseeBeat.tsx` | None |
+| Native recipient add (email or phone) | Yes | `WhoBeat`'s input + `isEmail()` split, `recipientsApi.create` | None |
+| Native recipient remove | Yes | Chip's `×` button, `recipientsApi.delete` | None |
+| Reuses existing API contracts unchanged | Yes | `CreateRecipientRequestSchema`/`RecipientSchema` untouched; only new call sites added to `api-client.ts` | None |
+| Duplicate-recipient rejection | Yes, server-enforced | `recipients/service.ts`'s `findExistingRecipient` (email case-insensitive, phone digit-normalized) — mobile does no client-side dedup, matching "no client reimplementation" | None |
+| Per-capsule plan limit (`recipientsPerCapsule`) | Yes, server-enforced | `entitlements.ts`'s `assertWithinRecipientLimit`, throws `quota_exceeded` | None — mobile surfaces it via the same generic `addRecipient` catch web itself uses (see below) |
+| Account velocity limit (5/day, <7-day-old accounts) | Yes, server-enforced | `recipients/service.ts`'s `assertWithinVelocityLimit`, throws `velocity_limit_exceeded` | None |
+| Verification: real recipient add against a real capsule | Yes, done | E1.4.1's own on-device pass: `amara@example.com` added to a real draft, persisted across navigation | None |
+| Contact-autocomplete | Deferred, disclosed | Not required by `E4.2`'s own acceptance criteria (only in the design doc's fuller description of web's UI) | Genuinely out of scope — mobile has no contact book at all (Mobile V1 scope) |
+| Recipient edit (`PatchRecipientRequestSchema`) | N/A | Confirmed: `apps/web`'s own `recipientsApi.patch` is defined but called from zero `.tsx` components — dead API surface on web itself, no UI to port | Not part of `E4.2`; no web behavior exists to match |
+
+**One discrepancy found, not a gap:** mobile's `addRecipient` special-cases the `recipient_already_added`
+error code with a friendlier message ("That recipient is already added.") than web's own, which uses one
+generic message ("That recipient could not be added.") for every failure including duplicates and both
+limits (confirmed by reading `apps/web/src/components/composer/Composer.tsx`'s `addRecipient`, line
+93–102). This makes mobile *more* helpful than web in one case, not less — noted for awareness, not
+treated as a defect or as `E1.4.2` scope; no code changed as a result.
+
+**E1.4.2 STATUS: COMPLETE.** Every acceptance criterion the original ticket named is already satisfied,
+verified against actual client and server code (not assumed), with real on-device verification already
+performed as part of `E1.4.1`. No remaining `E1.4.2` work exists. No functionality moves to another
+ticket — recipient *metadata* (email/phone/displayName) is fully handled here; recipient *key material*
+(capsule-key wrapping for delivery) is correctly untouched, since that is `E1.4.3`'s job once a capsule
+key exists at all — Address is pre-content and pre-key by design.
+
+**Git discipline:** no application code changed, so no new branch/PR was opened (would be a pointless
+empty diff). This entry is committed as a new commit on the existing `e1.4.1-address` branch (PR #61 is
+still open, unmerged) rather than against `origin/main` directly — `origin/main` does not yet contain
+`E1.4.1`'s files this audit is about, and opening a second branch from `origin/main` today would either
+duplicate `E1.4.1`'s unmerged `PROGRESS.md` changes or conflict with them once #61 merges. Once #61
+merges, this entry's content is already exactly where it needs to be.
+
+**Exact next ticket:** `E1.4.3` — Compose movement + capsule-key generation + content encryption, per the
+readiness audit's own dependency graph (§17) and recommended order (§20 step 4) — the highest-risk ticket,
+not started, per this session's explicit "do not start E1.4.3" instruction.
+
 ### E1.4.1 — Address movement (mobile) (2026-08-29) — DONE, committed, PR open
 
 Reproduces `apps/web/src/components/composer/v2/AddressMovement.tsx`'s product semantics (address the
