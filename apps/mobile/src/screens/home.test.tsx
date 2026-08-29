@@ -6,6 +6,7 @@ import { act } from 'react';
 import { Pressable, Text } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { space } from '../lib/tokens';
 import type { CapsulesState } from '../lib/use-capsules';
 
 /**
@@ -57,6 +58,10 @@ vi.mock('react-native', () => {
 
 const push = vi.fn();
 vi.mock('expo-router', () => ({ useRouter: () => ({ push }) }));
+
+vi.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 40, bottom: 0, left: 0, right: 0 }),
+}));
 
 let mockState: CapsulesState = { status: 'loading' };
 const retry = vi.fn();
@@ -147,7 +152,12 @@ describe('HomeTab', () => {
     const instance = renderScreen();
     expect(texts(instance)).toContain("We couldn't load your capsules.");
 
-    const retryButton = instance.root.findByType(Pressable);
+    // Two Pressables now exist (the header's "New" button plus the retry
+    // control); ErrorState's is the one carrying an accessibilityRole of
+    // "button" with no accessibilityLabel of "New capsule".
+    const retryButton = instance.root
+      .findAllByType(Pressable)
+      .find((node) => node.props.accessibilityLabel !== 'New capsule')!;
     act(() => {
       retryButton.props.onPress();
     });
@@ -231,19 +241,61 @@ describe('HomeTab', () => {
     expect(texts(instance)).not.toContain('Loading more…');
   });
 
-  it('pressing a row navigates to /(app)/capsule/<id> with the correct capsule id', () => {
+  it('pressing a row for a non-draft capsule navigates to /(app)/capsule/<id>', () => {
     mockState = {
       status: 'ready',
-      items: [capsuleFixture({ id: '99999999-9999-9999-9999-999999999999' })],
+      items: [capsuleFixture({ id: '99999999-9999-9999-9999-999999999999', state: 'sealed' })],
       nextCursor: null,
       nextPageError: false,
     };
     const instance = renderScreen();
-    const row = instance.root.findByType(Pressable);
+    const rows = instance.root.findAllByType(Pressable);
+    const row = rows[rows.length - 1]!; // the last Pressable is the capsule row; the first is the "New" button
     act(() => {
       row.props.onPress();
     });
     expect(push).toHaveBeenCalledWith('/(app)/capsule/99999999-9999-9999-9999-999999999999');
+  });
+
+  it('pressing a draft row navigates to Address (E1.4.1) instead of the read-only detail screen', () => {
+    mockState = {
+      status: 'ready',
+      items: [capsuleFixture({ id: '88888888-8888-8888-8888-888888888888', state: 'draft' })],
+      nextCursor: null,
+      nextPageError: false,
+    };
+    const instance = renderScreen();
+    const rows = instance.root.findAllByType(Pressable);
+    const row = rows[rows.length - 1]!;
+    act(() => {
+      row.props.onPress();
+    });
+    expect(push).toHaveBeenCalledWith('/(app)/compose/88888888-8888-8888-8888-888888888888/address');
+  });
+
+  it('the "New" button navigates to the create-capsule entry route', () => {
+    mockState = { status: 'ready', items: [], nextCursor: null, nextPageError: false };
+    const instance = renderScreen();
+    const newButton = instance.root.findByProps({ accessibilityLabel: 'New capsule' });
+    act(() => {
+      newButton.props.onPress();
+    });
+    expect(push).toHaveBeenCalledWith('/(app)/compose/new');
+  });
+
+  it('pads the header below the status bar using the real safe-area inset, so the "New" button is not swallowed by the system status bar for touch or TalkBack activation', () => {
+    // Confirmed as a real on-device defect, not a theoretical one: without
+    // this padding, the tabs layout renders with `headerShown: false` and
+    // no safe-area wrapper of its own, so a tap on the real "New" button
+    // landed under the system status bar and never reached the app —
+    // the same class of defect E1.3.8/E1.3.10 already found and fixed for
+    // the capsule-detail screen's back button.
+    mockState = { status: 'ready', items: [], nextCursor: null, nextPageError: false };
+    const instance = renderScreen();
+    const header = instance.root.findByProps({ accessibilityLabel: 'New capsule' }).parent!;
+    const style = [header.props.style].flat();
+    const paddingTop = style.map((s) => s?.paddingTop).find((v) => v !== undefined);
+    expect(paddingTop).toBe(40 + space[6]);
   });
 
   it('never imports the decrypt utility or any crypto primitive — the list endpoint carries no ciphertext to decrypt', () => {

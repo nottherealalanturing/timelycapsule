@@ -4,6 +4,197 @@
 
 ## Current status
 
+### E1.4.2 — Recipients, re-scoping audit (2026-08-29) — COMPLETE, no code changed (satisfied by E1.4.1)
+
+Per this session's explicit instruction: before starting the next E1.4 ticket, re-scope `E1.4.2` against
+what `E1.4.1` (PR #61, commit `9e1aa2e`, not yet merged) actually shipped, using the repository as source
+of truth rather than assuming the old backlog entry still applies.
+
+**Original `E1.4.2` scope** (`STAGE-E-MOBILE-V1-EXECUTION-BACKLOG.md` `E4.2`, restated in the readiness
+audit's ticket map, `plan/STAGE-E-MOBILE-V1-E1.4-READINESS-AUDIT.md` line 118): "Native recipient
+add/remove, reusing existing API contracts unchanged." Acceptance criteria: matches web's existing
+recipient-limit/plan-limit enforcement, server-side, no client reimplementation. Verification: "real
+recipient add against a real capsule."
+
+**Comparison, checked against actual code, not assumed:**
+
+| Original `E1.4.2` requirement | Already implemented? | Where | Remaining work |
+|---|---|---|---|
+| Native "Someone else" / "Myself" choice | Yes | `address.tsx`'s `WhoBeat`/`Choice`, exact copy from `AddresseeBeat.tsx` | None |
+| Native recipient add (email or phone) | Yes | `WhoBeat`'s input + `isEmail()` split, `recipientsApi.create` | None |
+| Native recipient remove | Yes | Chip's `×` button, `recipientsApi.delete` | None |
+| Reuses existing API contracts unchanged | Yes | `CreateRecipientRequestSchema`/`RecipientSchema` untouched; only new call sites added to `api-client.ts` | None |
+| Duplicate-recipient rejection | Yes, server-enforced | `recipients/service.ts`'s `findExistingRecipient` (email case-insensitive, phone digit-normalized) — mobile does no client-side dedup, matching "no client reimplementation" | None |
+| Per-capsule plan limit (`recipientsPerCapsule`) | Yes, server-enforced | `entitlements.ts`'s `assertWithinRecipientLimit`, throws `quota_exceeded` | None — mobile surfaces it via the same generic `addRecipient` catch web itself uses (see below) |
+| Account velocity limit (5/day, <7-day-old accounts) | Yes, server-enforced | `recipients/service.ts`'s `assertWithinVelocityLimit`, throws `velocity_limit_exceeded` | None |
+| Verification: real recipient add against a real capsule | Yes, done | E1.4.1's own on-device pass: `amara@example.com` added to a real draft, persisted across navigation | None |
+| Contact-autocomplete | Deferred, disclosed | Not required by `E4.2`'s own acceptance criteria (only in the design doc's fuller description of web's UI) | Genuinely out of scope — mobile has no contact book at all (Mobile V1 scope) |
+| Recipient edit (`PatchRecipientRequestSchema`) | N/A | Confirmed: `apps/web`'s own `recipientsApi.patch` is defined but called from zero `.tsx` components — dead API surface on web itself, no UI to port | Not part of `E4.2`; no web behavior exists to match |
+
+**One discrepancy found, not a gap:** mobile's `addRecipient` special-cases the `recipient_already_added`
+error code with a friendlier message ("That recipient is already added.") than web's own, which uses one
+generic message ("That recipient could not be added.") for every failure including duplicates and both
+limits (confirmed by reading `apps/web/src/components/composer/Composer.tsx`'s `addRecipient`, line
+93–102). This makes mobile *more* helpful than web in one case, not less — noted for awareness, not
+treated as a defect or as `E1.4.2` scope; no code changed as a result.
+
+**E1.4.2 STATUS: COMPLETE.** Every acceptance criterion the original ticket named is already satisfied,
+verified against actual client and server code (not assumed), with real on-device verification already
+performed as part of `E1.4.1`. No remaining `E1.4.2` work exists. No functionality moves to another
+ticket — recipient *metadata* (email/phone/displayName) is fully handled here; recipient *key material*
+(capsule-key wrapping for delivery) is correctly untouched, since that is `E1.4.3`'s job once a capsule
+key exists at all — Address is pre-content and pre-key by design.
+
+**Git discipline:** no application code changed, so no new branch/PR was opened (would be a pointless
+empty diff). This entry is committed as a new commit on the existing `e1.4.1-address` branch (PR #61 is
+still open, unmerged) rather than against `origin/main` directly — `origin/main` does not yet contain
+`E1.4.1`'s files this audit is about, and opening a second branch from `origin/main` today would either
+duplicate `E1.4.1`'s unmerged `PROGRESS.md` changes or conflict with them once #61 merges. Once #61
+merges, this entry's content is already exactly where it needs to be.
+
+**Exact next ticket:** `E1.4.3` — Compose movement + capsule-key generation + content encryption, per the
+readiness audit's own dependency graph (§17) and recommended order (§20 step 4) — the highest-risk ticket,
+not started, per this session's explicit "do not start E1.4.3" instruction.
+
+### E1.4.1 — Address movement (mobile) (2026-08-29) — DONE, committed, PR open
+
+Reproduces `apps/web/src/components/composer/v2/AddressMovement.tsx`'s product semantics (address the
+reader first, then the arithmetic on their future age — `design/21-CAPSULE-CREATION-V2.md §III`) as a
+mobile-native screen, not a pixel copy of web's log-scale line. Two beats in order — "Who is this for?"
+(exact copy from `AddresseeBeat.tsx`, confirmed as the source of truth over §III's paraphrase) then "When
+does it open?" (a vertical, tappable `HorizonChoice` list plus a native date/time picker), the second
+gated behind the first exactly like web's `answeredWho`.
+
+**Shared logic ported into `packages/core`** (new `horizons.ts`, full verbatim port; new `zoned-time.ts`,
+a deliberate subset — `wallClockIn`/`instantFrom`/`deviceZone`), since this is genuine product logic (the
+"moments over lengths" decision), not a per-platform rendering choice, and `@tc/core` was already a
+declared dependency of both `apps/web` and `apps/mobile` that neither actually used yet. Web's own copy
+is untouched. `apps/mobile/src/lib/schedule-validity.ts` (new) mirrors web's min-lead/max-horizon
+messages and the API's `assertUnlockAtWithinBounds`, with the 50-year ceiling hardcoded (mobile has no
+guest mode, so there is only ever one horizon to enforce, unlike web's `capabilities.maxHorizonMs`).
+
+**Disclosed, deliberate narrowing vs. web** (not silently dropped): no contact book on mobile, so a
+recipient's birthday is never known here — milestone horizons ("when Amara turns 10") only ever appear
+for a self-capsule, from `useAuth().user?.birthday`; no zone picker / `recipient_local` unlock mode — this
+screen only ever writes `unlockAt` in the device's own current zone; no "Continue to Compose" action,
+since Compose doesn't exist yet — back always returns to Home, and every change is already saved via an
+immediate `PATCH`, so there is nothing to flush.
+
+**New/changed files:** `apps/mobile/app/(app)/compose/new.tsx` (creates a bare `{type:'personal'}` draft,
+`router.replace`s into Address — mirrors web's two-phase creation), `apps/mobile/app/(app)/compose/[id]/
+address.tsx` (the screen itself), `apps/mobile/src/lib/use-capsule-draft.ts` (screen-local fetch +
+`patch`/`addRecipient`/`removeRecipient`, immediate-PATCH-per-change, no debounce — unlike Compose's
+future letter-body autosave, every Address field change is discrete and infrequent), `apps/mobile/src/lib/
+schedule-validity.ts`, `packages/core/src/{horizons,zoned-time}.ts`. `apps/mobile/src/lib/api-client.ts`
+gained `capsulesApi.create`/`.patch` and a new `recipientsApi.{create,delete}`. `apps/mobile/app/(app)/
+(tabs)/home.tsx` gained a "New" entry point and routes draft-state rows to Address instead of the
+read-only detail screen (which just says "Nothing was written yet." for a draft — the wrong destination
+for the owner to continue from). One new dependency: `@react-native-community/datetimepicker@9.1.0`
+(the readiness audit's own finding — no date/time picker existed on mobile at all), installed via `expo
+install`, auto-added to `app.json`'s plugins.
+
+**A real on-device defect found and fixed, not just theorized:** the new "New" button on Home is the
+first *interactive* control ever placed in that screen's top-of-screen header — the tabs layout renders
+with `headerShown: false` and no safe-area wrapper of its own, so on the real Android emulator a tap on
+"New" at its original position landed under the system status bar and never reached the app. Same class
+of defect E1.3.8/E1.3.10 already found and fixed for the capsule-detail screen's back button; fixed here
+the same way (`useSafeAreaInsets()` + `insets.top` padding), with a regression test asserting the exact
+padding value.
+
+**Manual verification, real Android emulator (Pixel 7, API 36), not simulated:** signed up a disposable
+account via the local web app (mobile has no signup screen — matches Decision 2, authenticated-first,
+signup deferred) since the seed script's users carry no password; logged into that account on-device;
+created two real drafts via "New"; for the second, added a real recipient (`amara@example.com`, immediate
+`POST`), toggled Someone-else/Myself back and forth (immediate `PATCH`, section correctly appears/
+disappears), removed a recipient (immediate `DELETE`, chip disappears), picked "The next New Year" and
+then "When the decade turns" from the Horizon list (reading + `PATCH` both correct, previous selection's
+highlight clears), used the native date picker (calendar dialog, pre-filled with the current selection)
+and the native time picker (clock dial → switched to text-input mode → set 4:30 AM) — both combine
+correctly with the untouched half of the previous value, exactly like web's `commit`/`commitWall`. Backed
+out to Home (both drafts listed, "Draft" label, today's date) and back into the second draft: every field
+— recipient chip, Someone-else selection, the full Jan 15 2030 · 4:30 AM schedule — reloaded exactly as
+left, proving the "no local cache needed, the server is already the cache" architecture decision live,
+not just in a mocked test. TalkBack-equivalent verification done via `uiautomator dump`'s `content-desc`
+tree (same data TalkBack reads) rather than the TalkBack service itself, following E1.3.11's established
+technique — every interactive element's accessible label confirmed correct on the real rendered tree.
+Did not verify iOS. The disposable test account/capsules remain in the local dev database (a normal,
+harmless dev-environment leftover, not cleaned up).
+
+**Tests:** 3 new/expanded `packages/core` files (29 tests, all passing — `horizons.test.ts`,
+`zoned-time.test.ts`, `countdown.test.ts` unchanged), `schedule-validity.test.ts` (7), `use-capsule-
+draft.test.tsx` (9), `compose-new.test.tsx` (5), `compose-address.test.tsx` (31), `api-client.test.ts`
+(+4 for the new endpoints), `home.test.tsx` (+3: draft routing, the "New" button, the safe-area
+regression). Full mobile suite: 28 files, 313 tests, all passing. Typecheck and lint clean across
+`apps/mobile` and `packages/core`.
+
+**Security review:** grepped every new/changed E1.4.1 file for `console.*`, `masterKey`/`capsuleKey`/
+`useMasterKey`/`@tc/crypto`, and `SecureStore`/`AsyncStorage`/`token-store` — no matches. This screen is
+pre-content (Address, not Compose/Seal): no capsule-key generation, no encryption, nothing to leak.
+
+**Exact next ticket:** `E1.4.2` (Recipients) per the readiness audit's own ticket map — not started, per
+this session's explicit "stop after opening the PR" instruction. **Recorded, not silently reconciled:**
+the backlog lists Address and Recipients as separate tickets, but web's actual `AddressMovement.tsx`
+bundles recipient add/remove into the same movement/component (`AddresseeBeat.tsx`) — there is no
+separate "Recipients" surface on web to port. This ticket's own instruction ("recipient add/remove is IN
+scope for E1.4.1 because web's own AddressMovement is not separable from it") already anticipated this;
+whoever picks up `E1.4.2` should re-scope it against what actually shipped here rather than duplicate it.
+
+### E1.4 — Capsule creation/sealing, readiness audit (2026-08-29) — AUDIT ONLY, no code changed
+
+Read-only audit, per this session's explicit instruction to establish the implementation blueprint
+before writing any E1.4 code. Full report: `plan/STAGE-E-MOBILE-V1-E1.4-READINESS-AUDIT.md`.
+
+**Verdict: READY — no blocker.** The master Stage E blueprint's one hard blocker (Argon2id/RN) was
+already resolved in E1.2; this audit confirms E1.3.12 also closed a second, previously-undocumented gap
+(RN has no `crypto.getRandomValues` either) — every crypto primitive E1.4 needs is now `[VERIFIED]`
+working on-device. What's missing is real application work, not crypto: `apps/mobile/src/lib/
+api-client.ts` is 100% read-only for the capsule domain today (by its own header comment, explicitly
+deferring create/patch/seal to "the creation ticket"), `capsule-crypto.ts` is 100% decrypt-direction, and
+no compose/media-picker infrastructure exists yet in `apps/mobile` at all.
+
+**Real findings, not silently reconciled:** (1) two ticket-numbering schemes for this work exist in the
+plan docs and disagree — `STAGE-E-MOBILE-V1-EXECUTION-BACKLOG.md`'s own internal scheme labels this
+phase `E4.1`–`E4.10`, while the scheme actually used in this repo's real history (and already used by the
+prior session's own E1.3-final-readiness-audit) is `E1.4`; no document records the renumbering decision.
+(2) the master blueprint's §6.1 claim "there is no local persistence layer on web at all today for
+drafts" is contradicted by direct code reading — web's `use-capsule-draft.ts` maintains a real (plaintext)
+`localStorage` draft cache; mobile's own Decision-4 requirement is to do the same thing *encrypted*, not
+to introduce local drafts as a wholly new concept. (3) the master blueprint's own crypto-primitive table
+(§7.1) predicted AES-GCM would need `react-native-quick-crypto` and that RN natively provides
+`crypto.getRandomValues` — both wrong; what actually shipped (`aes.native.ts` via `@noble/ciphers`,
+`random.native.ts` via `react-native-libsodium`) is better than either guess. (4) a genuine open technical
+question for E1.4's first crypto-writing code: web's `contentDocEnc` wire format is standard base64
+(`btoa`, confirmed by reading `apps/web/src/lib/capsule-crypto.ts`), while mobile's only encoder
+(`toBase64Url`) produces base64url — very likely interoperable via Node's tolerant `Buffer.from(x,
+'base64')`, but never empirically proven for this exact field; flagged as a small, cheap prerequisite for
+the phase-closing cross-platform verification ticket, not a blocker.
+
+**Ticket map produced** (13 sub-tickets, E1.4.1–E1.4.11, content sourced from `EXECUTION-BACKLOG.md`'s
+own `E4.1`–`E4.10` breakdown): Address → Recipients → Compose+capsule-key-generation+encryption (highest
+risk, do first, do not split across engineers) → local encrypted drafts → media source sheet → voice
+recorder → media encrypt+upload (second-highest risk) → Review/Seal → cross-platform verification gate →
+error/validation pass → accessibility pass. Full dependency graph, parallelization plan, and per-ticket
+reuse/risk notes are in the audit doc's §3/§17/§18.
+
+**Prerequisites identified (none are blockers):** four new Expo dependencies with zero architectural risk
+(`expo-image-picker`, `expo-camera`, `expo-av`/`expo-audio`, `expo-document-picker`) plus `expo-sqlite`
+for local drafts — none installed today, confirmed by reading `package.json`/`app.json` directly (also
+zero camera/mic/photo-library permission strings declared anywhere yet); a decision on the letter's
+actual content shape for mobile (recommended: the minimal TipTap-compatible paragraph-doc shape
+mobile's own decrypt path already parses, not a new rich-text editor dependency); mobile's own
+`Idempotency-Key` generation for create/seal, since `POST /capsules` and `PATCH /capsules/:id` have zero
+idempotency protection server-side today (confirmed by reading `middleware/idempotency.ts`'s actual
+wiring — seal itself is safe by rejection, not by no-op, but create genuinely is not).
+
+**Files created:** `plan/STAGE-E-MOBILE-V1-E1.4-READINESS-AUDIT.md` (new). **No application code, backend
+code, crypto implementation, or mobile UI was changed.** **Deliberately excluded/untouched:** the
+concurrently-in-progress personal/LinkedIn presence-pack work (`design/launch/personal/*` — actively
+being edited by a separate process during this very session, confirmed via `git status` mid-audit) and
+both `plan/STAGE-E-MOBILE-V1-E1.3-*` documents from the prior session.
+
+**Exact next ticket:** `E1.4.1` (Address movement), per this session's explicit "stop after the audit,
+do not start implementing E1.4" instruction — not started.
+
 ### Personal + LinkedIn presence pack, part 2 — content strategy + 30-day calendar (2026-08-29) — not a numbered ticket, not committed
 
 Continues the 2026-08-28 entry below rather than replacing it. Full
