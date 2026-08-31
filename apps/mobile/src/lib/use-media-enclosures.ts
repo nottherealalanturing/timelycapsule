@@ -174,7 +174,16 @@ export function useMediaEnclosures(
 
   const removeItem = useCallback(
     (item: MediaItem) => {
-      void mediaApi.delete(item.id).then(refresh);
+      // Best-effort, matching removePending above — a network failure here
+      // must not surface as an uncaught rejection (confirmed the hard way:
+      // this crashed to a redbox on a real device with the API unreachable
+      // during E1.4.7's own device verification). The row simply stays
+      // visible until the next successful refresh; there is no separate
+      // "detach failed" UI to invent for what remains a rare edge case.
+      void mediaApi
+        .delete(item.id)
+        .then(refresh)
+        .catch(() => {});
     },
     [refresh],
   );

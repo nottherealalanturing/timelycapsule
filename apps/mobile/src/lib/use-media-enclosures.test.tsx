@@ -289,6 +289,23 @@ describe('useMediaEnclosures', () => {
       expect(deleteMediaFn).toHaveBeenCalledWith('media-1');
       expect(h.current.items).toEqual([]);
     });
+
+    it('a network failure while detaching does not throw or reject uncaught — found on a real device with the API unreachable', async () => {
+      mediaListFn.mockResolvedValue({ data: [mediaItemFixture()] });
+      deleteMediaFn.mockRejectedValueOnce(new Error('network down'));
+      const h = await render();
+      expect(h.current.items).toHaveLength(1);
+
+      // No `await expect(...).rejects` here on purpose: removeItem's return
+      // type is void — the point of this test is that calling it never
+      // produces an unhandled rejection, not that it returns a promise.
+      await h.act(() => {
+        h.current.removeItem(mediaItemFixture());
+      });
+      // The item is still there (the delete never succeeded) — that's the
+      // honest state, not a crash.
+      expect(h.current.items).toHaveLength(1);
+    });
   });
 
   describe('security', () => {
