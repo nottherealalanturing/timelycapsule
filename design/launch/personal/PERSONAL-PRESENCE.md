@@ -309,11 +309,13 @@ none are implied.
 
 ---
 
-## 4 · LinkedIn company posts (9)
+## 4 · LinkedIn company posts (8)
 
-Six of nine pair with an existing real-UI asset (§5); three are text-only,
-which LinkedIn handles natively and which keeps the set from feeling like
-every post needs a prop.
+All eight pair with an existing real-UI asset (§5). The pack originally had
+one text-only post here too (an engineering postmortem) — it turned out to
+be written in first person, which is the wrong voice for this account, and
+identical to a post already correctly living on Assad's personal LinkedIn.
+Removed from here; see the correction note below.
 
 ### Post 1 · Why this exists
 **Image:** `x/post-mark.png` (reuse, 1600×900)
@@ -389,21 +391,7 @@ Most products treat "delete" as an edge case. TimelyCapsule has a mode called "o
 Longer than I'd like to admit went into making sure that fires only after a confirmed read — not a page load, a prefetch, or a link-preview crawler. That needed a dedicated test suite before I trusted it enough to ship.
 ```
 
-### Post 8 · A bug that only existed because a fix was too good
-**Image:** none — text only, on purpose
-```
-A bug that only existed because the fix for a different bug was too good
-
-Shipped a fix recently so a logged-in user's dark-mode preference would stick properly on the marketing pages. Verified it worked. Moved on.
-
-Two days later: every hard refresh of a logged-in page was bouncing real, authenticated users straight back to the login screen — a session with valid tokens sitting right there, ignored.
-
-The cause: a loading-state variable that used to safely default to "false" (not loading) now needed a third state — "haven't checked yet" — and defaulting it to false meant the route guard concluded "not loading, no user, redirect" before the code that reads the tokens ever ran. False and unknown had been silently treated as the same value.
-
-Fixed by giving it three real states instead of two. A very small diff for how long it took to notice.
-```
-
-### Post 9 · Where this actually is, honestly
+### Post 8 · Where this actually is, honestly
 **Image:** `screenshots/05-hero.png` (reuse, 1600×900)
 ```
 Where this actually is, honestly
@@ -413,10 +401,17 @@ TimelyCapsule is live at timelycapsule.com. Anyone can write a letter and seal i
 It's one person building it. No funding round to announce, no growth numbers worth quoting yet, nothing to disrupt. Just a product that does one specific thing — hold a letter until a date you choose — and refuses to do much else.
 ```
 
-**Suggested order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 (thesis and trust
+> **Correction (2026-08-29):** this pack originally had a 9th company post
+> ("A bug that only existed because a fix was too good") that was written
+> in first person ("I shipped a fix…") — the wrong voice for this account,
+> and word-for-word the same story as Assad's personal post L9 in
+> `CONTENT-CALENDAR.md` §3.1. Removed from here entirely rather than
+> reworded, since it already exists correctly, in the right voice, on the
+> right account. The company account now has 8 posts, not 9.
+
+**Suggested order:** 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 (thesis and trust
 first, then the actual product journey in the order a writer experiences
-it, then the engineering-lesson post as a mid-late change of register, then
-the honest-status close). Cadence: 1–2/week — company pages don't reward
+it, then the honest-status close). Cadence: 1–2/week — company pages don't reward
 the 3/week cadence a personal or product social account does; slower is
 fine and matches the brand's own "unhurried" register.
 
@@ -438,7 +433,7 @@ Nothing was regenerated for this pass except the two LinkedIn banners
 | `design/launch/final/instagram/11-sealing.png` | LinkedIn Post 5 |
 | `design/launch/final/instagram/14-replies.png` | LinkedIn Post 6 |
 | `design/launch/final/instagram/15-one-reading-only.png` | LinkedIn Post 7 |
-| `design/launch/final/screenshots/05-hero.png` | LinkedIn Post 9 |
+| `design/launch/final/screenshots/05-hero.png` | LinkedIn Post 8 |
 
 No new post graphics were created. LinkedIn displays non-native aspect
 ratios (1080×1350, 1600×900) perfectly acceptably in-feed; producing a
