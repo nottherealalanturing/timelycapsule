@@ -1,9 +1,10 @@
 import type { Capsule, Recipient } from '@tc/contracts';
 import { generateMasterKey } from '@tc/crypto';
 import { act } from 'react';
-import { Pressable, Text, TextInput } from 'react-native';
+import { Modal, Pressable, Text, TextInput } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MediaSourceSheet } from '../components/media-source-sheet';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -12,6 +13,7 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   ScrollView: 'ScrollView',
   KeyboardAvoidingView: 'KeyboardAvoidingView',
+  Modal: 'Modal',
   Platform: { OS: 'android' },
   StyleSheet: { create: (styles: unknown) => styles },
 }));
@@ -74,6 +76,26 @@ vi.mock('../lib/local-draft-store', () => ({
   loadLocalDraft: (...args: unknown[]) => loadLocalDraftFn(...args),
   deleteLocalDraft: (...args: unknown[]) => deleteLocalDraftFn(...args),
 }));
+
+// expo-image-picker/expo-document-picker are native modules with no JS-only
+// fallback (confirmed directly, same reason every other native Expo module
+// in this codebase gets mocked) — stubbed as inert so media-source.ts's
+// real module can load (its `pickForSource` is itself overridden below, so
+// these two are never actually called; only `formatMediaSize`, a pure
+// function, needs the real module).
+vi.mock('expo-image-picker', () => ({}));
+vi.mock('expo-document-picker', () => ({}));
+
+// Same boundary reasoning as local-draft-store above — this file's tests
+// are about the screen's own wiring (opens the sheet, routes a selection to
+// pickForSource, handles each result), not about media-source.ts's real
+// picker calls, which have their own dedicated test file
+// (media-source.test.ts).
+const pickForSourceFn = vi.fn();
+vi.mock('../lib/media-source', async () => {
+  const actual = await vi.importActual<typeof import('../lib/media-source')>('../lib/media-source');
+  return { ...actual, pickForSource: (...args: unknown[]) => pickForSourceFn(...args) };
+});
 
 const ComposeScreen = (await import('../../app/(app)/compose/[id]/compose')).default;
 
@@ -201,6 +223,7 @@ beforeEach(() => {
   saveLocalDraftFn.mockReset().mockResolvedValue(undefined);
   loadLocalDraftFn.mockReset().mockResolvedValue({ status: 'none' });
   deleteLocalDraftFn.mockReset().mockResolvedValue(undefined);
+  pickForSourceFn.mockReset();
 });
 
 afterEach(() => {
@@ -398,6 +421,173 @@ describe('ComposeScreen', () => {
       await flush(0);
       expect(patchFn).toHaveBeenCalledTimes(1); // flushed before navigating away
       expect(back).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('media enclosure (E1.4.5)', () => {
+    it('opens the source sheet from the "Enclose something" control', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      expect(instance.root.findByType(Modal).props.visible).toBe(false);
+      const enclose = instance.root.findByProps({ accessibilityLabel: 'Enclose something' });
+      act(() => enclose.props.onPress());
+      expect(instance.root.findByType(Modal).props.visible).toBe(true);
+    });
+
+    it('a picked photo appears in the pending list, with its size, and closes the sheet', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({
+        status: 'picked',
+        media: [{ uri: 'file:///photo.jpg', name: 'photo.jpg', mimeType: 'image/jpeg', sizeBytes: 2048 }],
+      });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      const sheet = instance.root.findByType(MediaSourceSheet);
+      await act(async () => {
+        sheet.props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(pickForSourceFn).toHaveBeenCalledWith('camera');
+      expect(instance.root.findByType(Modal).props.visible).toBe(false);
+      const rendered = texts(instance).join(' ');
+      expect(rendered).toContain('photo.jpg');
+      expect(rendered).toContain('2 KB');
+    });
+
+    it('picking from multiple sources accumulates entries rather than replacing the list', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn
+        .mockResolvedValueOnce({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] })
+        .mockResolvedValueOnce({ status: 'picked', media: [{ uri: 'file:///b.pdf', name: 'b.pdf', mimeType: 'application/pdf', sizeBytes: 20 }] });
+      const instance = await renderScreen();
+      await flush();
+
+      for (const source of ['camera', 'file'] as const) {
+        act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+        await act(async () => {
+          instance.root.findByType(MediaSourceSheet).props.onSelect(source);
+          await vi.advanceTimersByTimeAsync(0);
+        });
+      }
+
+      const rendered = texts(instance).join(' ');
+      expect(rendered).toContain('a.jpg');
+      expect(rendered).toContain('b.pdf');
+    });
+
+    it('removing a pending item takes it out of the list', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(texts(instance).join(' ')).toContain('a.jpg');
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Remove a.jpg' }).props.onPress());
+      expect(texts(instance).join(' ')).not.toContain('a.jpg');
+    });
+
+    it('shows a permission-denied message naming the specific source, and adds nothing to the pending list', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'permission_denied' });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('library');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(texts(instance).join(' ')).toContain('Photo library access was not granted. You can allow it in Settings.');
+    });
+
+    it('a cancelled pick leaves the pending list and any message untouched', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'cancelled' });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const rendered = texts(instance).join(' ');
+      expect(rendered).not.toContain('not granted');
+      const removeButtons = instance.root.findAllByType(Pressable).filter((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('Remove '));
+      expect(removeButtons).toEqual([]); // nothing was added to the pending list
+    });
+
+    it('picking media never touches the encrypted local draft store — media has no offline concept at all (Decision 16)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(saveLocalDraftFn).not.toHaveBeenCalled();
+    });
+
+    it('picking media does not disturb the letter already being written', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      const instance = await renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => input.props.onChangeText('A letter in progress'));
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      expect(instance.root.findByType(TextInput).props.value).toBe('A letter in progress');
+    });
+
+    it('never logs a picked file\'s name or URI', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({
+        status: 'picked',
+        media: [{ uri: 'file:///very-specific-private-path.jpg', name: 'very-specific-private-path.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }],
+      });
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const instance = await renderScreen();
+        await flush();
+        act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+        await act(async () => {
+          instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        for (const spy of [logSpy, errorSpy]) {
+          for (const call of spy.mock.calls) {
+            expect(call.map((a) => String(a)).join(' ')).not.toContain('very-specific-private-path');
+          }
+        }
+      } finally {
+        logSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
     });
   });
 
