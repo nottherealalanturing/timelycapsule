@@ -29,7 +29,15 @@
       "expo-secure-store",
       "react-native-libsodium",
       "@react-native-community/datetimepicker",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow TimelyCapsule to choose a photo or video to enclose in your capsule.",
+          "cameraPermission": "Allow TimelyCapsule to take a photo or video to enclose in your capsule.",
+          "microphonePermission": "Allow TimelyCapsule to record audio when capturing video for your capsule."
+        }
+      ]
     ]
   }
 }

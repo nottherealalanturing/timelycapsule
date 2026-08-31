@@ -4,12 +4,15 @@ import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorState } from '../../../../src/components/error-state';
 import { LoadingState } from '../../../../src/components/loading-state';
+import { MediaSourceSheet } from '../../../../src/components/media-source-sheet';
 import { envelopeToText } from '../../../../src/lib/capsule-crypto';
+import { formatMediaSize, pickForSource, type MediaSourceKind, type PickedMedia } from '../../../../src/lib/media-source';
 import { colors, fontSize, fontWeight, radius, space } from '../../../../src/lib/tokens';
 import { useCapsuleCompose, type AutosaveStatus } from '../../../../src/lib/use-capsule-compose';
 
 /**
- * Movement II — Compose (E1.4.3). Reproduces the product semantics of
+ * Movement II — Compose (E1.4.3; media source selection added E1.4.5).
+ * Reproduces the product semantics of
  * `apps/web/src/components/composer/v2/ComposeMovement.tsx` as a
  * mobile-native screen: a native multiline `TextInput` in place of TipTap
  * (no rich-text editor is installed, and the readiness audit's own §6.4
@@ -29,20 +32,65 @@ import { useCapsuleCompose, type AutosaveStatus } from '../../../../src/lib/use-
  *    has no forward action at all, the same honest dead-end Address itself
  *    was before this screen existed. Back always returns to Address.
  *
- * Deliberately not built here (out of E1.4.3's scope, disclosed): media/
- * enclosures (`E1.4.5`–`E1.4.7`), place-as-memory (no location UI anywhere
- * in this ticket), the margin writing-prompt (`MarginPrompt.tsx` — a real
- * but separable product detail, not required by "follow the shipped
- * Address flow" or by any acceptance criterion this ticket names), and any
- * local/offline draft cache (`E1.4.4`) — see `use-capsule-compose.ts`'s own
- * header comment for why an online-only debounced autosave is the correct,
- * smallest E1.4.3 persistence behavior.
+ * **Media (E1.4.5)** stops at the selection/normalization boundary — see
+ * `media-source.ts`'s own header comment. A picked file is held only in
+ * this component's own React state (`pendingMedia`), never the E1.4.4
+ * encrypted local draft (Decision 16: media needs connectivity, full stop —
+ * there is no offline media concept for a local cache to bridge) and never
+ * sent anywhere — actual encryption/upload is E1.4.7's job. This is a
+ * disclosed consequence of splitting one continuous web action
+ * (`onFiles`/`onEnclose` immediately kick off encryption+upload) across two
+ * mobile tickets: navigating away or killing the app currently loses a
+ * pending pick, unlike web's own instant-fire behavior. E1.4.7 is expected
+ * to close this gap by actually enclosing (encrypting+uploading) on pick.
+ *
+ * Deliberately not built here (out of E1.4.5's scope, disclosed): the voice
+ * recorder (`E1.4.6` — see `media-source.ts`'s header comment for why
+ * "Voice" has no sheet row yet), actual encryption/upload (`E1.4.7`),
+ * place-as-memory (no location UI anywhere in this ticket, and it is not a
+ * media kind at all — see the design doc's "Place as memory, separated from
+ * the Place Seal"), the margin writing-prompt (`MarginPrompt.tsx`), and
+ * Review/Seal (`E1.4.8`).
  */
+/** A picked-but-not-yet-enclosed file, held only in this screen's own state — see the module header comment for why. */
+interface PendingMedia extends PickedMedia {
+  id: number;
+}
+
 export default function ComposeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { state, retry, autosaveStatus, saveMessage, setText, flush } = useCapsuleCompose(id);
+
+  const [sheetVisible, setSheetVisible] = useState(false);
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
+  const [mediaMessage, setMediaMessage] = useState<string | null>(null);
+  const nextMediaId = useRef(0);
+
+  const handleSelectSource = useCallback(async (source: MediaSourceKind) => {
+    setSheetVisible(false);
+    setMediaMessage(null);
+    const result = await pickForSource(source);
+    if (result.status === 'picked') {
+      setPendingMedia((prev) => [
+        ...prev,
+        ...result.media.map((media) => ({ ...media, id: nextMediaId.current++ })),
+      ]);
+    } else if (result.status === 'permission_denied') {
+      // Only 'camera' and 'library' ever actually produce this status —
+      // pickFile() needs no runtime permission (see media-source.ts) — but
+      // the message stays exhaustive over MediaSourceKind rather than
+      // assuming that never changes.
+      const deniedLabel = source === 'camera' ? 'Camera' : source === 'library' ? 'Photo library' : 'File';
+      setMediaMessage(`${deniedLabel} access was not granted. You can allow it in Settings.`);
+    }
+    // 'cancelled': the user backed out of the native picker — nothing to do.
+  }, []);
+
+  const removePendingMedia = useCallback((mediaId: number) => {
+    setPendingMedia((prev) => prev.filter((m) => m.id !== mediaId));
+  }, []);
 
   // The screen's own typing buffer, decoupled from `state.envelope` (which
   // round-trips through JSON on every save) — seeded once from whatever was
@@ -120,10 +168,67 @@ export default function ComposeScreen() {
               accessibilityLabel="Letter"
             />
 
+            <PendingMediaSection
+              pending={pendingMedia}
+              message={mediaMessage}
+              onEnclose={() => setSheetVisible(true)}
+              onRemove={removePendingMedia}
+            />
+
             <AutosaveIndicator status={autosaveStatus} message={saveMessage} />
           </ScrollView>
         </KeyboardAvoidingView>
       ) : null}
+
+      <MediaSourceSheet visible={sheetVisible} onSelect={(source) => void handleSelectSource(source)} onDismiss={() => setSheetVisible(false)} />
+    </View>
+  );
+}
+
+/**
+ * "Enclosed" (E1.4.5) — the mobile-native shape of web's own `Enclosures`
+ * section (see `compose.tsx`'s own header comment for the full boundary
+ * this stops at). Ordered Hallmark → letter → enclosures, matching
+ * `ComposeMovement.tsx`'s own layout exactly.
+ */
+function PendingMediaSection({
+  pending,
+  message,
+  onEnclose,
+  onRemove,
+}: {
+  pending: PendingMedia[];
+  message: string | null;
+  onEnclose: () => void;
+  onRemove: (id: number) => void;
+}) {
+  return (
+    <View style={styles.enclosures}>
+      {pending.length > 0 ? (
+        <View style={styles.enclosureList}>
+          {pending.map((media) => (
+            <View key={media.id} style={styles.enclosureRow}>
+              <Text style={styles.enclosureName} numberOfLines={1}>
+                {media.name}
+              </Text>
+              <Text style={styles.enclosureSize}>{formatMediaSize(media.sizeBytes)}</Text>
+              <Pressable onPress={() => onRemove(media.id)} accessibilityRole="button" accessibilityLabel={`Remove ${media.name}`}>
+                <Text style={styles.enclosureRemove}>Remove</Text>
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {message ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          {message}
+        </Text>
+      ) : null}
+
+      <Pressable onPress={onEnclose} accessibilityRole="button" accessibilityLabel="Enclose something" style={styles.encloseButton}>
+        <Text style={styles.encloseButtonLabel}>+ Enclose something</Text>
+      </Pressable>
     </View>
   );
 }
@@ -195,4 +300,21 @@ const styles = StyleSheet.create({
   },
   statusText: { fontSize: fontSize.caption, color: colors.muted },
   errorText: { fontSize: fontSize.body, color: colors.danger },
+  enclosures: { gap: space[2] },
+  enclosureList: { gap: space[2] },
+  enclosureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space[2],
+    borderWidth: 1,
+    borderColor: colors.rule,
+    borderRadius: radius.input,
+    paddingVertical: space[2],
+    paddingHorizontal: space[3],
+  },
+  enclosureName: { flex: 1, fontSize: fontSize.body, color: colors.ink },
+  enclosureSize: { fontSize: fontSize.caption, color: colors.muted, fontVariant: ['tabular-nums'] },
+  enclosureRemove: { fontSize: fontSize.caption, color: colors.muted },
+  encloseButton: { alignSelf: 'flex-start', paddingVertical: space[2] },
+  encloseButtonLabel: { fontSize: fontSize.body, fontWeight: fontWeight.medium, color: colors.brass },
 });

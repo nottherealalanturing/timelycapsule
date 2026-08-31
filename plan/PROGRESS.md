@@ -4,6 +4,82 @@
 
 ## Current status
 
+### E1.4.5 — Media source selection sheet (2026-08-31) — DONE, committed, PR open
+
+Branched `e1.4.5-media-sheet` from fresh `origin/main` (PR #63 for E1.4.4 confirmed merged as `204fc65`).
+Implemented per the readiness audit's §8 ("Media / enclosure status") and a direct read of the real web
+implementation, not the older `EXECUTION-BACKLOG.md` text alone.
+
+**Web parity finding (the one that shaped this whole ticket):** `apps/web/src/components/composer/v2/
+Enclosures.tsx`'s live "Enclose something" menu has exactly **two** kinds — "A photograph, video, or file"
+(one `<input type="file" multiple>`) and "A voice recording" (`VoiceRecorder`). Place-as-memory is a third,
+unrelated "enclosure" (text/location in the letter envelope, no object storage) and is out of scope
+entirely. Mobile has no single OS picker spanning camera capture + existing photo/video + arbitrary file —
+those are three genuinely different native affordances — so the first web kind is adapted into three mobile
+source rows (Camera, Photo & Video Library, File), while "Voice" deliberately has **no row yet**: the
+recorder is `E1.4.6`'s job, and the product's own established rule ("unavailable kinds are omitted, not
+shown disabled" — `Enclosures.tsx`'s own header comment) applies directly rather than shipping a broken row.
+
+**Dependencies added:** `expo-image-picker` (`~57.0.14`) and `expo-document-picker` (`~57.0.1`) — installed
+via `npx expo install`. Deliberately **not** `expo-camera` (the backlog's own guess) — `expo-image-picker`'s
+`launchCameraAsync` already opens the native camera app and returns a result; a live in-app camera preview
+component is unnecessary for "take a photo or video." `app.json` gained an `expo-image-picker` config-plugin
+entry with product-toned permission copy (`photosPermission`/`cameraPermission`/`microphonePermission` —
+the last needed for video capture's audio track, not a voice-recording feature).
+
+**Permissions:** just-in-time only (Decision 18) — `requestCameraPermissionsAsync`/
+`requestMediaLibraryPermissionsAsync` fire only at the moment "Camera"/"Photo & Video Library" is tapped,
+never earlier. The document picker needs no runtime permission at all (Android SAF / iOS
+`UIDocumentPicker` are both system UI). **Verified on-device**, not merely inferred: a real Android runtime
+permission dialog appeared at the exact moment "Camera" was tapped, not before.
+
+**Selection/result contract:** `media-source.ts`'s `MediaSourceKind = 'camera' | 'library' | 'file'` (no
+`'voice'` value at all yet — deliberately, see above) and `PickedMedia {uri, name, mimeType, sizeBytes,
+width?, height?, durationMs?}`, chosen to map directly onto `CreateMediaTicketRequest`/`CompleteMediaRequest`
+(`packages/contracts/src/media.ts`) — no `kind` field, since the server derives that itself from `mimeType`
+(`apps/api/src/modules/media/mime.ts`'s `mimeToKind`). The document picker's native MIME filter mirrors that
+same server allow-list (UX only — a pick can't fail deep in E1.4.7's future upload with "unsupported media
+type" — the server remains authoritative).
+
+**Compose integration:** an "Enclose something" trigger (matching web's own copy) opens the sheet; a picked
+result is normalized and held in a new `pendingMedia` array in the screen's own React state, rendered as a
+name+size+Remove row. **Stops at the selection/normalization boundary** — never encrypted, never uploaded,
+never touches the server, and never enters the E1.4.4 encrypted local draft (Decision 16: media has no
+offline concept at all — there is nothing for a local cache to bridge). This is a disclosed consequence of
+splitting one continuous web action (`onFiles`/`onEnclose` fire the full encrypt+upload pipeline
+immediately) across two mobile tickets: a pending pick is lost on navigate-away/kill until `E1.4.7` actually
+encloses on pick.
+
+**Testing:** 438 → 464 mobile tests (34 files): `media-source.test.ts` (19 tests: permission-gating,
+normalization incl. missing-field fallbacks, dispatch, `formatMediaSize`, no logging),
+`media-source-sheet.test.tsx` (9 tests: exact 3 rows in deterministic order, no "Voice" row, select/dismiss/
+cancel/back-gesture, accessibility), 9 new integration tests in `compose-compose.test.tsx` (opens sheet,
+picked media appears with size, accumulates across multiple picks, Remove works, permission-denied message
+names the source, cancelled pick is a no-op, never touches `local-draft-store`, never disturbs the letter,
+never logs a filename/URI). `tsc --noEmit` clean, `eslint` clean, full suite stable.
+
+**Android verification (genuinely performed, not inferred):** real Pixel_7 emulator, rebuilt native (both
+new packages are native modules). All three sources exercised for real: **Camera** — real JIT permission
+dialog, real camera app, real capture, correct normalization (62 KB). **Photo & Video Library** — Android's
+modern Photo Picker (no permission dialog on this OS version, confirmed correct per-platform behavior, not
+a missing feature), real selection, correct normalization (32 KB). **File** — system document picker,
+correctly MIME-filtered to image types, real selection, correct normalization. Remove verified for each.
+Letter content confirmed intact throughout. Pulled the raw local-drafts SQLite file and `grep`ed it, and
+checked `ReactNativeJS` logcat output, for every picked file's name/UUID/URI — **none found anywhere**.
+
+**Known issues/deferred, disclosed:** the voice recorder (`E1.4.6`), actual encryption/upload (`E1.4.7`),
+place-as-memory (not a media kind), the margin writing-prompt, Review/Seal (`E1.4.8`). iOS not tested.
+
+**Files changed:** `apps/mobile/src/lib/media-source.ts` (new), `apps/mobile/src/components/
+media-source-sheet.tsx` (new), `apps/mobile/app/(app)/compose/[id]/compose.tsx` (integration),
+`apps/mobile/app.json`, `apps/mobile/package.json`, `pnpm-lock.yaml`, plus the corresponding test files.
+
+**Branch:** `e1.4.5-media-sheet` (from fresh `origin/main`). **Commit:** `4c3e75f`. **PR:** opened against
+`main`, not merged.
+
+**Exact next ticket:** `E1.4.6` — voice recorder (Idle→Recording→Preparing→Ready→Enclosed lifecycle), per
+the readiness audit's ticket map. Not started, per this session's explicit "STOP after E1.4.5" instruction.
+
 ### E1.4.4 — Local encrypted draft persistence (2026-08-31) — DONE, committed, PR open
 
 Branched `e1.4.4-local-drafts` from `e1.4.3-compose` (PR #62 for E1.4.3 not yet merged into `main` at
