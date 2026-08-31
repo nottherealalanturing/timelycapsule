@@ -37,6 +37,13 @@
           "cameraPermission": "Allow TimelyCapsule to take a photo or video to enclose in your capsule.",
           "microphonePermission": "Allow TimelyCapsule to record audio when capturing video for your capsule."
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow TimelyCapsule to record a voice note to enclose in your capsule.",
+          "enableBackgroundPlayback": false
+        }
       ]
     ]
   }

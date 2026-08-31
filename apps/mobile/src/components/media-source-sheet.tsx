@@ -3,18 +3,19 @@ import type { MediaSourceKind } from '../lib/media-source';
 import { colors, fontSize, fontWeight, radius, space } from '../lib/tokens';
 
 /**
- * The native-mobile "Enclose something" menu (E1.4.5) — see `media-source.ts`'s
- * own header comment for why these three rows, and why "A voice recording"
- * (web's second enclosure kind) has no row here yet. A bottom sheet
- * (`Modal` + `transparent` + `slide`) rather than web's dropdown menu — the
- * native mobile-menu idiom for the same "pick one of a short list of
- * actions" interaction, per this ticket's own "adapt natively" instruction.
+ * The native-mobile "Enclose something" menu (E1.4.5; "Voice" added E1.4.6)
+ * — see `media-source.ts`'s own header comment for why the first three rows
+ * are a native adaptation of one web kind. A bottom sheet (`Modal` +
+ * `transparent` + `slide`) rather than web's dropdown menu — the native
+ * mobile-menu idiom for the same "pick one of a short list of actions"
+ * interaction, per this ticket's own "adapt natively" instruction.
  *
- * Deliberately presentational only: this component never calls a picker or
- * requests a permission itself — `onSelect` hands the chosen source back to
- * the caller (`compose.tsx`), which owns the actual `media-source.ts` calls.
- * That keeps this component trivially testable (render, tap, assert) without
- * mocking native modules just to prove the menu itself works.
+ * Deliberately presentational only: this component never calls a picker,
+ * requests a permission, or opens the recorder itself — `onSelect` hands the
+ * chosen source back to the caller (`compose.tsx`), which owns both the
+ * `media-source.ts` calls and mounting `VoiceRecorder`. That keeps this
+ * component trivially testable (render, tap, assert) without mocking native
+ * modules just to prove the menu itself works.
  */
 export interface MediaSourceOption {
   source: MediaSourceKind;
@@ -26,6 +27,7 @@ const OPTIONS: MediaSourceOption[] = [
   { source: 'camera', label: 'Camera', detail: 'Take a new photo or video' },
   { source: 'library', label: 'Photo & Video Library', detail: 'Choose an existing one' },
   { source: 'file', label: 'File', detail: 'Choose a document' },
+  { source: 'voice', label: 'Voice', detail: 'Record a voice note' },
 ];
 
 export interface MediaSourceSheetProps {

@@ -5,6 +5,7 @@ import { Modal, Pressable, Text, TextInput } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MediaSourceSheet } from '../components/media-source-sheet';
+import { VoiceRecorder } from '../components/voice-recorder';
 
 vi.mock('react-native', () => ({
   View: 'View',
@@ -85,6 +86,7 @@ vi.mock('../lib/local-draft-store', () => ({
 // function, needs the real module).
 vi.mock('expo-image-picker', () => ({}));
 vi.mock('expo-document-picker', () => ({}));
+vi.mock('expo-audio', () => ({}));
 
 // Same boundary reasoning as local-draft-store above — this file's tests
 // are about the screen's own wiring (opens the sheet, routes a selection to
@@ -96,6 +98,16 @@ vi.mock('../lib/media-source', async () => {
   const actual = await vi.importActual<typeof import('../lib/media-source')>('../lib/media-source');
   return { ...actual, pickForSource: (...args: unknown[]) => pickForSourceFn(...args) };
 });
+
+// VoiceRecorder is mocked at the module boundary, same reasoning — this
+// file's tests are about the screen's own wiring (opening it, handling its
+// onAccept/onCancel), not about its real expo-audio recording/playback
+// lifecycle, which has its own dedicated test file (voice-recorder.test.tsx).
+// A trivial stub, driven the same way MediaSourceSheet already is —
+// findByType(VoiceRecorder) locates it and its props are called directly.
+vi.mock('../components/voice-recorder', () => ({
+  VoiceRecorder: () => null,
+}));
 
 const ComposeScreen = (await import('../../app/(app)/compose/[id]/compose')).default;
 
@@ -579,6 +591,134 @@ describe('ComposeScreen', () => {
           instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
           await vi.advanceTimersByTimeAsync(0);
         });
+        for (const spy of [logSpy, errorSpy]) {
+          for (const call of spy.mock.calls) {
+            expect(call.map((a) => String(a)).join(' ')).not.toContain('very-specific-private-path');
+          }
+        }
+      } finally {
+        logSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('voice recorder (E1.4.6)', () => {
+    it('selecting "Voice" from the sheet opens the recorder instead of calling a picker', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+
+      expect(pickForSourceFn).not.toHaveBeenCalled();
+      expect(instance.root.findByType(MediaSourceSheet).props.visible).toBe(false); // the media-source sheet itself closes
+      expect(instance.root.findAllByType(VoiceRecorder)).toHaveLength(1); // and the recorder mounts in its place
+    });
+
+    it('is not mounted until Voice is actually chosen', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      expect(instance.root.findAllByType(VoiceRecorder)).toHaveLength(0);
+    });
+
+    it('an accepted recording is added to the pending list, exactly like a picked file', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+
+      const { normalizeVoiceRecording } = await import('../lib/media-source');
+      const media = normalizeVoiceRecording('file:///voice-take.m4a', 4200);
+      act(() => instance.root.findByType(VoiceRecorder).props.onAccept(media));
+
+      const rendered = texts(instance).join(' ');
+      expect(rendered).toContain(media.name);
+    });
+
+    it('accepting a recording unmounts the recorder (its onCancel is not separately required to close it)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+
+      const { normalizeVoiceRecording } = await import('../lib/media-source');
+      act(() => instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///x.m4a', 1000)));
+
+      // compose.tsx's own onAccept prop (passed to VoiceRecorder) only adds
+      // to pendingMedia — voice-recorder.tsx itself is what calls onCancel()
+      // right after onAccept() to close itself (matching web's own
+      // `onAccept(take.file); onCancel();"), so the mocked stub here (which
+      // never calls onCancel on its own) is expected to still be mounted;
+      // this proves compose.tsx doesn't *also* try to unmount it itself.
+      expect(instance.root.findAllByType(VoiceRecorder)).toHaveLength(1);
+    });
+
+    it('cancelling closes the recorder without adding anything to the pending list', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      expect(instance.root.findAllByType(VoiceRecorder)).toHaveLength(1);
+
+      act(() => instance.root.findByType(VoiceRecorder).props.onCancel());
+
+      expect(instance.root.findAllByType(VoiceRecorder)).toHaveLength(0);
+      const removeButtons = instance.root.findAllByType(Pressable).filter((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('Remove '));
+      expect(removeButtons).toEqual([]);
+    });
+
+    it('an accepted recording never touches the encrypted local draft store', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      const { normalizeVoiceRecording } = await import('../lib/media-source');
+      act(() => instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///x.m4a', 1000)));
+
+      expect(saveLocalDraftFn).not.toHaveBeenCalled();
+    });
+
+    it('recording does not disturb the letter already being written', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => input.props.onChangeText('A letter in progress'));
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      const { normalizeVoiceRecording } = await import('../lib/media-source');
+      act(() => instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///x.m4a', 1000)));
+
+      expect(instance.root.findByType(TextInput).props.value).toBe('A letter in progress');
+    });
+
+    it('never logs a recorded file\'s URI', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        const instance = await renderScreen();
+        await flush();
+        act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+        act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+        const { normalizeVoiceRecording } = await import('../lib/media-source');
+        act(() =>
+          instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///very-specific-private-path.m4a', 1000)),
+        );
         for (const spy of [logSpy, errorSpy]) {
           for (const call of spy.mock.calls) {
             expect(call.map((a) => String(a)).join(' ')).not.toContain('very-specific-private-path');

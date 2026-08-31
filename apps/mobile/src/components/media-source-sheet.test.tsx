@@ -42,15 +42,15 @@ describe('MediaSourceSheet', () => {
     expect(hidden.root.findByType(Modal).props.visible).toBe(false);
   });
 
-  it('renders exactly the three currently-supported sources, in deterministic order', () => {
+  it('renders exactly the four currently-supported sources, in deterministic order', () => {
     const instance = render();
     const items = instance.root.findAllByProps({ accessibilityRole: 'menuitem' });
-    expect(items.map((n) => n.props.accessibilityLabel)).toEqual(['Camera', 'Photo & Video Library', 'File']);
+    expect(items.map((n) => n.props.accessibilityLabel)).toEqual(['Camera', 'Photo & Video Library', 'File', 'Voice']);
   });
 
-  it('does not render a "Voice" row — the recorder does not exist yet (E1.4.6)', () => {
+  it('renders a "Voice" row now that the recorder exists (E1.4.6)', () => {
     const instance = render();
-    expect(texts(instance).join(' ')).not.toMatch(/voice/i);
+    expect(texts(instance).join(' ')).toMatch(/voice/i);
   });
 
   it('shows each option\'s descriptive detail line, matching its label', () => {
@@ -59,6 +59,7 @@ describe('MediaSourceSheet', () => {
     expect(joined).toContain('Take a new photo or video');
     expect(joined).toContain('Choose an existing one');
     expect(joined).toContain('Choose a document');
+    expect(joined).toContain('Record a voice note');
   });
 
   it('calls onSelect with the correct source when a row is tapped', () => {
@@ -69,6 +70,15 @@ describe('MediaSourceSheet', () => {
     });
     expect(onSelect).toHaveBeenCalledWith('camera');
     expect(onSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls onSelect with "voice" when the Voice row is tapped', () => {
+    const instance = render();
+    const voice = instance.root.findAllByProps({ accessibilityRole: 'menuitem' }).find((n) => n.props.accessibilityLabel === 'Voice')!;
+    act(() => {
+      voice.props.onPress();
+    });
+    expect(onSelect).toHaveBeenCalledWith('voice');
   });
 
   it('calls onDismiss when Cancel is pressed', () => {
@@ -101,7 +111,7 @@ describe('MediaSourceSheet', () => {
   it('every option row and the cancel row carry an accessible role and label', () => {
     const instance = render();
     const items = instance.root.findAllByProps({ accessibilityRole: 'menuitem' });
-    expect(items).toHaveLength(3);
+    expect(items).toHaveLength(4);
     for (const item of items) expect(typeof item.props.accessibilityLabel).toBe('string');
 
     const menu = instance.root.findByProps({ accessibilityRole: 'menu' });

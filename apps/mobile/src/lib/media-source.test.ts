@@ -24,7 +24,7 @@ vi.mock('expo-document-picker', () => ({
   getDocumentAsync: (...args: unknown[]) => getDocumentAsync(...args),
 }));
 
-const { pickFromCamera, pickFromLibrary, pickFile, pickForSource, formatMediaSize } = await import('./media-source');
+const { pickFromCamera, pickFromLibrary, pickFile, pickForSource, formatMediaSize, normalizeVoiceRecording } = await import('./media-source');
 
 describe('media-source.ts', () => {
   beforeEach(() => {
@@ -204,6 +204,25 @@ describe('media-source.ts', () => {
     });
   });
 
+  describe('normalizeVoiceRecording (E1.4.6)', () => {
+    it('produces a PickedMedia shape with an audio/mp4 MIME type — the real wire type for the .m4a container both platforms record to', () => {
+      const media = normalizeVoiceRecording('file:///voice-take.m4a', 4200);
+      expect(media.uri).toBe('file:///voice-take.m4a');
+      expect(media.mimeType).toBe('audio/mp4');
+      expect(media.durationMs).toBe(4200);
+    });
+
+    it('has no size — expo-audio does not report it, and this is deliberately not guessed', () => {
+      const media = normalizeVoiceRecording('file:///voice-take.m4a', 1000);
+      expect(media.sizeBytes).toBeNull();
+    });
+
+    it('gives every recording a distinct, non-empty name', () => {
+      const a = normalizeVoiceRecording('file:///a.m4a', 1000);
+      expect(a.name.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('security', () => {
     it('never logs a file URI, name, or any picked media field', async () => {
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
@@ -215,6 +234,19 @@ describe('media-source.ts', () => {
           assets: [{ uri: 'file:///private/a-very-specific-path.jpg', type: 'image', fileName: 'a-very-specific-path.jpg' }],
         });
         await pickFromCamera();
+        expect(logSpy).not.toHaveBeenCalled();
+        expect(errorSpy).not.toHaveBeenCalled();
+      } finally {
+        logSpy.mockRestore();
+        errorSpy.mockRestore();
+      }
+    });
+
+    it('normalizeVoiceRecording never logs the recorded file URI', () => {
+      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      try {
+        normalizeVoiceRecording('file:///a-very-specific-private-path.m4a', 1000);
         expect(logSpy).not.toHaveBeenCalled();
         expect(errorSpy).not.toHaveBeenCalled();
       } finally {

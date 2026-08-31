@@ -4,6 +4,105 @@
 
 ## Current status
 
+### E1.4.6 — Voice Recorder (2026-08-31) — DONE, committed, PR open
+
+Branched `e1.4.6-voice-recorder` from fresh `origin/main` (PR #64 for E1.4.5 confirmed merged as `712f755`).
+Implemented per the readiness audit's §8 and a direct, full read of the real web implementation
+(`apps/web/src/components/composer/v2/VoiceRecorder.tsx`) as the authoritative behavioral reference — not
+reinvented from the older backlog text.
+
+**Web parity:** ported the stage machine and its stated design principle verbatim — *"Recording, as
+something you decide to keep... Nothing here becomes part of the letter until the writer says so."*
+`RecorderStage = 'idle' | 'recording' | 'preparing' | 'ready'`; the exact error copy ("No microphone
+available, or permission was refused."); the same accept/discard/record-again decision point at the end of
+every take. This is a *behavioral* port, not a code port — web's `MediaRecorder`/`getUserMedia` have no RN
+equivalent.
+
+**Native package:** `expo-audio` (`~57.0.4`) — confirmed the current, correct Expo SDK 57 audio package
+(Expo split audio/video out of `expo-av` starting SDK 52+, and the older planning docs' guess of `expo-av`
+is stale). `app.json` gained an `expo-audio` config-plugin entry with product-toned microphone-permission
+copy and **`enableBackgroundPlayback: false`** — the plugin defaults that to `true`, which would otherwise
+request unnecessary Android (`FOREGROUND_SERVICE*`) and iOS (`UIBackgroundModes: audio`) capabilities for
+what is a foreground-only voice note. Deliberately **not** adding `expo-file-system` merely to report a
+recorded file's size — `sizeBytes: null` is honest and already permitted by E1.4.5's own `PickedMedia` type.
+
+**Permissions:** JIT only (Decision 18) — `requestRecordingPermissionsAsync()` fires only when "Start
+recording" is tapped, never merely by opening the recorder. **Verified on-device**: no permission dialog
+appeared on open; the real Android mic-permission dialog appeared at the exact moment Start was tapped, and
+persisted correctly (no re-prompt) across subsequent recordings in the same session.
+
+**Result contract:** `media-source.ts` gained `normalizeVoiceRecording(uri, durationMs): PickedMedia`,
+producing `{uri, name: 'Voice recording <ISO>.m4a', mimeType: 'audio/mp4', sizeBytes: null, durationMs}`.
+`audio/mp4` is the real wire MIME type for `RecordingPresets.HIGH_QUALITY`'s `.m4a` container on both
+platforms (confirmed by reading `RecordingConstants.js`, not guessed) and is already in the server's
+`MIME_TO_KIND` allow-list (`apps/api/src/modules/media/mime.ts`) — avoiding a format mismatch that would
+otherwise surface only in E1.4.7's future upload. `MediaSourceKind` gained `'voice'`; `pickForSource`'s
+parameter narrowed to `Exclude<MediaSourceKind, 'voice'>` since voice is a multi-step interactive UI
+(record→preview→decide), not a one-shot async picker call.
+
+**Compose integration:** `VoiceRecorder` is a fourth `pendingMedia` source, mounted conditionally by
+`compose.tsx` (`{voiceRecorderOpen ? <VoiceRecorder .../> : null}`) rather than an always-mounted
+`Modal visible={bool}` like `MediaSourceSheet` — `useAudioRecorder`/`useAudioPlayer` create real native
+objects the instant their hooks run, and JIT discipline means those shouldn't exist until Voice is actually
+chosen, and must be released the moment the recorder closes for any reason. Stops at exactly the same
+`onAccept(media: PickedMedia)` boundary as the other three sources — **E1.4.7 boundary maintained**: no
+encryption, no upload, no media ticket. **Decision 16 maintained**: voice recordings never touch
+`local-draft-store.ts` — verified both by dedicated tests and by grepping the real on-device SQLite file.
+
+**A genuine bug found only by real-device testing, not by the mocked test suite:** `expo-audio`'s own
+`useAudioRecorderState(recorder, interval)` runs a plain `setInterval` polling `recorder.getStatus()` for
+as long as whatever component calls it stays mounted — its effect depends only on `recorder.id`, so a later
+call with a different `interval` value cannot pause or reset it. Tapping "Play" in the ready stage releases
+the underlying native `AudioRecorder` object (Android reclaiming the input stream for the output session),
+and the still-running poll then throws `ERR_USING_RELEASED_SHARED_OBJECT`, uncaught, crashing the screen.
+Fixed by extracting a `RecordingElapsed` child component that owns the `useAudioRecorderState` call and is
+mounted only while `stage === 'recording'` — its polling interval is torn down for good the moment the
+stage changes, well before playback can ever release the recorder. Added defensively: the unmount cleanup's
+`recorder.isRecording` read and `.stop()`/`player.remove()` calls are also live native calls on the same
+kind of shared object, so they're now wrapped in `try/catch` (an already-released object has nothing left
+to clean up). Two regression tests pin both fixes directly (`voice-recorder.test.tsx`).
+
+**Testing:** 464 → 475 mobile tests (36 files): `media-source.test.ts` gained 4 tests for
+`normalizeVoiceRecording`; `media-source-sheet.test.tsx` updated for the new "Voice" row (10 tests);
+`compose-compose.test.tsx` gained an 8-test `voice recorder` block (opens recorder not picker, JIT mount,
+accepted recording joins pending list, cancel adds nothing, never touches local draft store, never disturbs
+the letter, never logs a URI); new `voice-recorder.test.tsx` (24 tests: idle/permission/recording
+lifecycle, ready-stage preview+accept+discard+record-again, cleanup, accessibility, security, plus the two
+crash regressions above). `tsc --noEmit` clean, `eslint` clean (0 errors/warnings), full suite stable across
+5 consecutive runs.
+
+**Android verification (genuinely performed on a real Pixel 7 emulator, not inferred):** two native rebuilds
+were required — the first (`expo run:android`) used the pre-existing, gitignored `android/` project and
+silently omitted `RECORD_AUDIO` from the manifest, since `app.json`'s new config plugin is only synced into
+a *regenerated* native project; `npx expo prebuild --platform android` fixed this (confirmed via `grep` on
+the resulting manifest) and a second full rebuild followed. Full flow exercised for real: login → Address →
+Compose (existing draft, letter text intact throughout) → Enclose something → Voice → real JIT `RECORD_AUDIO`
+dialog on Start (not before) → real recording (multiple takes, up to ~1:38) → Stop → Ready stage → **Play**
+toggled to "Pause" mid-playback and back to "Play" on completion, with no crash (the exact scenario that
+crashed pre-fix) → Record again produced a genuine second take → Enclose this → appeared correctly in the
+pending media list with a working Remove → navigated away cleanly. Pulled the real on-device
+`tc_local_drafts.db` and grepped for `voice|audio|m4a|file:///` — nothing found. Grepped `ReactNativeJS`
+logcat for the recorded file's path/URI — nothing found; the only "AudioRecorder"-related log lines are the
+one pre-fix crash captured while diagnosing the bug above. iOS **not verified** — no simulator run this
+ticket.
+
+**Known issues/deferred, disclosed:** actual encryption/upload (`E1.4.7`), place-as-memory (not a media
+kind), the margin writing-prompt, Review/Seal (`E1.4.8`). iOS not tested.
+
+**Files changed:** `apps/mobile/src/components/voice-recorder.tsx` (new), `apps/mobile/src/components/
+voice-recorder.test.tsx` (new), `apps/mobile/src/lib/media-source.ts` (`normalizeVoiceRecording`,
+`MediaSourceKind`), `apps/mobile/src/components/media-source-sheet.tsx` (Voice row),
+`apps/mobile/app/(app)/compose/[id]/compose.tsx` (integration), `apps/mobile/app.json`,
+`apps/mobile/package.json`, `pnpm-lock.yaml`, plus the corresponding test files.
+
+**Branch:** `e1.4.6-voice-recorder` (from fresh `origin/main`). **Commit:** `209a3ad`. **PR:**
+[#65](https://github.com/nottherealalanturing/timelycapsule/pull/65), opened against `main`, not merged.
+**Base/dependency PR:** none — E1.4.5's PR #64 was already merged before this branch was cut.
+
+**Exact next ticket:** `E1.4.7` — actual media encryption/upload (closing the "picked but not yet enclosed"
+gap left open by both E1.4.5 and E1.4.6), per the readiness audit's ticket map. Not started, per this
+session's explicit "STOP after E1.4.6" instruction.
+
 ### E1.4.5 — Media source selection sheet (2026-08-31) — DONE, committed, PR open
 
 Branched `e1.4.5-media-sheet` from fresh `origin/main` (PR #63 for E1.4.4 confirmed merged as `204fc65`).
