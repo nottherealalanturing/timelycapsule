@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ErrorState } from '../../../../src/components/error-state';
 import { LoadingState } from '../../../../src/components/loading-state';
 import { MediaSourceSheet } from '../../../../src/components/media-source-sheet';
+import { VoiceRecorder } from '../../../../src/components/voice-recorder';
 import { envelopeToText } from '../../../../src/lib/capsule-crypto';
 import { formatMediaSize, pickForSource, type MediaSourceKind, type PickedMedia } from '../../../../src/lib/media-source';
 import { colors, fontSize, fontWeight, radius, space } from '../../../../src/lib/tokens';
@@ -44,13 +45,18 @@ import { useCapsuleCompose, type AutosaveStatus } from '../../../../src/lib/use-
  * pending pick, unlike web's own instant-fire behavior. E1.4.7 is expected
  * to close this gap by actually enclosing (encrypting+uploading) on pick.
  *
- * Deliberately not built here (out of E1.4.5's scope, disclosed): the voice
- * recorder (`E1.4.6` — see `media-source.ts`'s header comment for why
- * "Voice" has no sheet row yet), actual encryption/upload (`E1.4.7`),
- * place-as-memory (no location UI anywhere in this ticket, and it is not a
- * media kind at all — see the design doc's "Place as memory, separated from
- * the Place Seal"), the margin writing-prompt (`MarginPrompt.tsx`), and
- * Review/Seal (`E1.4.8`).
+ * **Voice (E1.4.6)** is a fourth `pendingMedia` source alongside the three
+ * picker-based ones, produced by `VoiceRecorder` instead of `pickForSource`
+ * — see `media-source.ts`'s header comment for why that source is handled
+ * differently, and `voice-recorder.tsx`'s own header comment for the full
+ * Idle→Recording→Preparing→Ready lifecycle. It stops at exactly the same
+ * `PickedMedia` handoff boundary as the other three.
+ *
+ * Deliberately not built here (out of E1.4.6's scope, disclosed): actual
+ * encryption/upload (`E1.4.7`), place-as-memory (no location UI anywhere in
+ * this ticket, and it is not a media kind at all — see the design doc's
+ * "Place as memory, separated from the Place Seal"), the margin
+ * writing-prompt (`MarginPrompt.tsx`), and Review/Seal (`E1.4.8`).
  */
 /** A picked-but-not-yet-enclosed file, held only in this screen's own state — see the module header comment for why. */
 interface PendingMedia extends PickedMedia {
@@ -64,29 +70,48 @@ export default function ComposeScreen() {
   const { state, retry, autosaveStatus, saveMessage, setText, flush } = useCapsuleCompose(id);
 
   const [sheetVisible, setSheetVisible] = useState(false);
+  const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
   const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [mediaMessage, setMediaMessage] = useState<string | null>(null);
   const nextMediaId = useRef(0);
 
-  const handleSelectSource = useCallback(async (source: MediaSourceKind) => {
-    setSheetVisible(false);
-    setMediaMessage(null);
-    const result = await pickForSource(source);
-    if (result.status === 'picked') {
-      setPendingMedia((prev) => [
-        ...prev,
-        ...result.media.map((media) => ({ ...media, id: nextMediaId.current++ })),
-      ]);
-    } else if (result.status === 'permission_denied') {
-      // Only 'camera' and 'library' ever actually produce this status —
-      // pickFile() needs no runtime permission (see media-source.ts) — but
-      // the message stays exhaustive over MediaSourceKind rather than
-      // assuming that never changes.
-      const deniedLabel = source === 'camera' ? 'Camera' : source === 'library' ? 'Photo library' : 'File';
-      setMediaMessage(`${deniedLabel} access was not granted. You can allow it in Settings.`);
-    }
-    // 'cancelled': the user backed out of the native picker — nothing to do.
+  const addPendingMedia = useCallback((media: PickedMedia[]) => {
+    setPendingMedia((prev) => [...prev, ...media.map((m) => ({ ...m, id: nextMediaId.current++ }))]);
   }, []);
+
+  const handleSelectSource = useCallback(
+    async (source: MediaSourceKind) => {
+      setSheetVisible(false);
+      setMediaMessage(null);
+      // Voice has no one-shot picker call to await — it opens the recorder,
+      // which reports back via its own onAccept once the writer explicitly
+      // decides to keep a take (see voice-recorder.tsx's header comment).
+      if (source === 'voice') {
+        setVoiceRecorderOpen(true);
+        return;
+      }
+      const result = await pickForSource(source);
+      if (result.status === 'picked') {
+        addPendingMedia(result.media);
+      } else if (result.status === 'permission_denied') {
+        // Only 'camera' and 'library' ever actually produce this status —
+        // pickFile() needs no runtime permission (see media-source.ts) — but
+        // the message stays exhaustive over MediaSourceKind rather than
+        // assuming that never changes.
+        const deniedLabel = source === 'camera' ? 'Camera' : source === 'library' ? 'Photo library' : 'File';
+        setMediaMessage(`${deniedLabel} access was not granted. You can allow it in Settings.`);
+      }
+      // 'cancelled': the user backed out of the native picker — nothing to do.
+    },
+    [addPendingMedia],
+  );
+
+  const handleVoiceAccept = useCallback(
+    (media: PickedMedia) => {
+      addPendingMedia([media]);
+    },
+    [addPendingMedia],
+  );
 
   const removePendingMedia = useCallback((mediaId: number) => {
     setPendingMedia((prev) => prev.filter((m) => m.id !== mediaId));
@@ -181,6 +206,10 @@ export default function ComposeScreen() {
       ) : null}
 
       <MediaSourceSheet visible={sheetVisible} onSelect={(source) => void handleSelectSource(source)} onDismiss={() => setSheetVisible(false)} />
+
+      {voiceRecorderOpen ? (
+        <VoiceRecorder onAccept={handleVoiceAccept} onCancel={() => setVoiceRecorderOpen(false)} />
+      ) : null}
     </View>
   );
 }

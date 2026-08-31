@@ -16,13 +16,17 @@ import * as ImagePicker from 'expo-image-picker';
  * those are three genuinely different native affordances. Splitting web's
  * one "photograph, video, or file" kind into three source choices (camera,
  * library, file) is therefore a mobile-native *adaptation* of that same
- * product kind, not an invented one. "A voice recording" is deliberately
- * **not** one of `MediaSourceKind`'s values yet — the recorder itself is
- * E1.4.6's job, and per this product's own established rule ("unavailable
- * kinds are omitted, not shown disabled" — `Enclosures.tsx`'s own header
- * comment, `design/21-CAPSULE-CREATION-V2.md`'s "Enclosing: one affordance,
- * three kinds"), a kind this build cannot yet act on has no row at all
- * rather than a broken one.
+ * product kind, not an invented one.
+ *
+ * `'voice'` (E1.4.6) is the fourth, real source now that the recorder exists
+ * (`../components/voice-recorder.tsx`) — but it is handled by an entirely
+ * different mechanism than the other three: those are one-shot async native
+ * pickers (`pickForSource` below), while voice is an interactive multi-step
+ * UI (record → preview → accept/discard) with no single "launch and await a
+ * result" call to make. `pickForSource` is therefore typed to exclude it —
+ * `compose.tsx` branches on `'voice'` before ever calling `pickForSource`,
+ * opening the recorder instead. See that component's own header comment for
+ * the full lifecycle.
  *
  * This file only *selects and normalizes* — it never encrypts, uploads, or
  * touches the network. That boundary is deliberate: `packages/contracts`'
@@ -35,7 +39,7 @@ import * as ImagePicker from 'expo-image-picker';
  * that contract, and no `kind` field, since the server derives that itself
  * from `mimeType` (`apps/api/src/modules/media/mime.ts`'s `mimeToKind`).
  */
-export type MediaSourceKind = 'camera' | 'library' | 'file';
+export type MediaSourceKind = 'camera' | 'library' | 'file' | 'voice';
 
 export interface PickedMedia {
   uri: string;
@@ -150,7 +154,7 @@ export async function pickFile(): Promise<PickResult> {
   return { status: 'picked', media: result.assets.map(normalizeDocumentPickerAsset) };
 }
 
-export async function pickForSource(source: MediaSourceKind): Promise<PickResult> {
+export async function pickForSource(source: Exclude<MediaSourceKind, 'voice'>): Promise<PickResult> {
   switch (source) {
     case 'camera':
       return pickFromCamera();
@@ -167,4 +171,27 @@ export function formatMediaSize(n: number | null): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/**
+ * Normalizes an accepted voice take (`voice-recorder.tsx`'s own job to
+ * produce the `uri`/`durationMs`) into the same `PickedMedia` shape the
+ * other three sources use — `compose.tsx`'s `pendingMedia` list never needs
+ * to know whether an entry came from a picker or the recorder. `.m4a`
+ * (`RecordingPresets.HIGH_QUALITY`'s container on both platforms) is
+ * `audio/mp4` on the wire — confirmed against `apps/api/src/modules/media/
+ * mime.ts`'s own allow-list, not guessed; `audio/m4a`/`audio/x-m4a` are not
+ * in that list and would fail E1.4.7's future upload. `sizeBytes` is `null`:
+ * `expo-audio` does not report it, and adding `expo-file-system` merely to
+ * stat one file is unnecessary dependency weight for a field E1.4.7 can
+ * derive itself from the same bytes it will already need to read to encrypt.
+ */
+export function normalizeVoiceRecording(uri: string, durationMs: number): PickedMedia {
+  return {
+    uri,
+    name: `Voice recording ${new Date().toISOString()}.m4a`,
+    mimeType: 'audio/mp4',
+    sizeBytes: null,
+    durationMs,
+  };
 }
