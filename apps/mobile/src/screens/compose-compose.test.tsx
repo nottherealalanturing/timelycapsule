@@ -387,10 +387,15 @@ describe('ComposeScreen', () => {
       expect(patchFn).not.toHaveBeenCalled();
 
       const backButton = instance.root.findByProps({ accessibilityLabel: 'Back' });
+      // Not a raw advanceTimersByTimeAsync(0) here — onPress triggers
+      // goBack()'s flush(), which does real encryptBytes work needing
+      // genuine wall-clock time (this file's own flush() helper's real
+      // 20ms settle exists for exactly this; a raw advance intermittently
+      // undercounts patchFn's call under loaded/CI runners).
       await act(async () => {
         backButton.props.onPress();
-        await vi.advanceTimersByTimeAsync(0);
       });
+      await flush(0);
       expect(patchFn).toHaveBeenCalledTimes(1); // flushed before navigating away
       expect(back).toHaveBeenCalledTimes(1);
     });
