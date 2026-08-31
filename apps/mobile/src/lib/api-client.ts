@@ -2,13 +2,17 @@ import {
   AuthResponseSchema,
   CapsuleListResponseSchema,
   CapsuleResponseSchema,
+  CompleteMediaRequestSchema,
   CreateCapsuleRequestSchema,
+  CreateMediaTicketRequestSchema,
+  CreateMediaTicketResponseSchema,
   CreateRecipientRequestSchema,
   CreateRecipientResponseSchema,
   LoginRequestSchema,
   LogoutRequestSchema,
   MeResponseSchema,
   MediaListResponseSchema,
+  MediaResponseSchema,
   MediaViewResponseSchema,
   NotificationsListResponseSchema,
   PatchCapsuleRequestSchema,
@@ -16,7 +20,9 @@ import {
   RecipientsListResponseSchema,
   RefreshResponseSchema,
   ReplyThreadListResponseSchema,
+  type CompleteMediaRequest,
   type CreateCapsuleRequest,
+  type CreateMediaTicketRequest,
   type CreateRecipientRequest,
   type ListCapsulesQuery,
   type LoginRequest,
@@ -94,12 +100,21 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   auth?: boolean;
+  /**
+   * Sent as `Idempotency-Key` (`apps/api/src/middleware/idempotency.ts`) —
+   * only meaningful on a POST the server actually wires the middleware to
+   * (media ticket create/complete, seal, etc.; see that route's own
+   * comment). Callers that don't pass one get no protection, matching the
+   * middleware's own "honored, not required" design.
+   */
+  idempotencyKey?: string;
   _retried?: boolean;
 }
 
 async function request<T>(path: string, schema: z.ZodType<T>, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, auth = false, _retried = false } = options;
+  const { method = 'GET', body, auth = false, idempotencyKey, _retried = false } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Platform': 'ios' };
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
   if (auth) {
     const tokens = await getTokens();
@@ -275,4 +290,36 @@ export const notificationsApi = {
  */
 export const mediaApi = {
   view: (mediaId: string) => request(`/media/${mediaId}/view`, MediaViewResponseSchema, { auth: true }),
+
+  /**
+   * The first step of E1.4.7's enclose pipeline — matches
+   * `apps/web/src/lib/api-client.ts`'s own `mediaApi.createTicket` exactly
+   * (same contract, same server route). `sizeBytes` is the **encrypted**
+   * length (readiness audit §7.1's own note) — callers must pass the
+   * ciphertext's length, never the original file's. `idempotencyKey` should
+   * be generated once per pending enclosure and reused across retries of
+   * *this* call specifically (see `media-upload.ts`'s own header comment for
+   * why): the server replays the original ticket rather than creating a
+   * duplicate if an earlier attempt actually succeeded but its response
+   * never reached the client.
+   */
+  createTicket: (capsuleId: string, input: CreateMediaTicketRequest, idempotencyKey: string) =>
+    request(`/capsules/${capsuleId}/media/tickets`, CreateMediaTicketResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CreateMediaTicketRequestSchema.parse(input),
+      idempotencyKey,
+    }),
+
+  /** Finalizes a ticket after every part has uploaded. A fresh `idempotencyKey` per call is correct here (unlike `createTicket`'s reused one) — see `media-upload.ts`'s header comment for why this call's body legitimately varies between attempts. */
+  complete: (mediaId: string, input: CompleteMediaRequest, idempotencyKey: string) =>
+    request(`/media/${mediaId}/complete`, MediaResponseSchema, {
+      method: 'POST',
+      auth: true,
+      body: CompleteMediaRequestSchema.parse(input),
+      idempotencyKey,
+    }),
+
+  /** Cleans up an abandoned/orphaned ticket row (never-finished upload) or a truly-attached item the writer removed. No idempotency middleware on this route (`apps/api/src/modules/media/routes.ts`) — matches web's own `mediaApi.delete`, unprotected the same way there. */
+  delete: (mediaId: string) => request(`/media/${mediaId}`, z.void(), { method: 'DELETE', auth: true }),
 };

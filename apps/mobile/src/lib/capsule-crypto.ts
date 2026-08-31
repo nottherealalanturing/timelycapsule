@@ -1,4 +1,4 @@
-import { decryptBytes, fromBase64Url, unwrapCapsuleKeyForOwner } from '@tc/crypto';
+import { decryptBytes, encryptBytes, fromBase64Url, unwrapCapsuleKeyForOwner } from '@tc/crypto';
 
 /**
  * Shared mobile-side capsule decryption boundary (Stage E, E1.3.7). Every
@@ -206,6 +206,27 @@ export function encodeIvCiphertext(iv: Uint8Array, ciphertext: Uint8Array): stri
   let binary = '';
   for (const byte of combined) binary += String.fromCharCode(byte);
   return btoa(binary);
+}
+
+/**
+ * The write-side counterpart for media (E1.4.7) — mirrors
+ * `apps/web/src/lib/use-capsule-draft.ts`'s `encryptForCapsule` exactly:
+ * `iv(12) || ciphertext`, raw bytes, **no base64 layer**. This is
+ * deliberately different from `encodeIvCiphertext` above: `contentDocEnc`
+ * needs base64 because it travels inside a JSON `PATCH` body, but a media
+ * blob is uploaded directly as an HTTP PUT body (`packages/contracts/src/
+ * media.ts`'s own comment: "raw encrypted bytes... not JSON-embedded, no
+ * base64 layer at all") — wrapping it in base64 here would silently corrupt
+ * every capsule's media relative to what the real backend/R2 pipeline and
+ * web's own `enclosure-media.ts` decrypt path (`bytes.slice(0,12)`/
+ * `bytes.slice(12)` on the *raw* uploaded object) actually expect.
+ */
+export async function encryptMediaForCapsule(capsuleKey: Uint8Array, bytes: Uint8Array): Promise<Uint8Array> {
+  const { iv, ciphertext } = await encryptBytes(capsuleKey, bytes);
+  const combined = new Uint8Array(iv.length + ciphertext.length);
+  combined.set(iv, 0);
+  combined.set(ciphertext, iv.length);
+  return combined;
 }
 
 export type DecryptCapsuleContentResult =
