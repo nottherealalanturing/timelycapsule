@@ -377,10 +377,15 @@ describe('useCapsuleCompose', () => {
       await flush(0);
       expect(patchFn).toHaveBeenCalledTimes(1); // the second edit does not fire its own overlapping request
 
-      await act(async () => {
-        resolveFirstPatch({ capsule: capsuleFixture({ ownerKeyWrap: 'irrelevant-for-this-assertion' }) });
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      // Resolving here unblocks the loop's second iteration, which does
+      // real crypto work (encryptBytes) before firing the follow-up PATCH —
+      // that needs genuine wall-clock time on a real thread pool, which
+      // `advanceTimersByTimeAsync(0)` alone cannot force to happen faster
+      // (the exact flakiness this file's own `flush()` helper exists to
+      // avoid — this call site was bypassing it, the actual cause of this
+      // test's intermittent failure under loaded/CI runners).
+      resolveFirstPatch({ capsule: capsuleFixture({ ownerKeyWrap: 'irrelevant-for-this-assertion' }) });
+      await flush(0);
 
       expect(patchFn).toHaveBeenCalledTimes(2); // the follow-up save fires automatically once the first clears
       const [, secondFields] = patchFn.mock.calls[1]!;
