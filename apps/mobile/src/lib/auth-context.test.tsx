@@ -29,6 +29,15 @@ vi.mock('./api-client', async () => {
   return { ...actual, authApi: { login, logout, getMe } };
 });
 
+// Mocked at the module boundary — this file's tests are about auth-context's
+// own wipe-on-logout wiring (does it call this, with which account id, at
+// which points), not about local-draft-store.ts's real SQLite/crypto
+// behavior (local-draft-store.test.ts).
+const deleteAllLocalDraftsForAccountFn = vi.fn();
+vi.mock('./local-draft-store', () => ({
+  deleteAllLocalDraftsForAccount: (...args: unknown[]) => deleteAllLocalDraftsForAccountFn(...args),
+}));
+
 const { AuthProvider, useAuth } = await import('./auth-context');
 const { MasterKeyProvider, useMasterKey } = await import('./master-key-context');
 const { getTokens } = await import('./token-store');
@@ -87,6 +96,7 @@ describe('auth-context.tsx', () => {
     login.mockReset();
     logout.mockReset();
     getMe.mockReset();
+    deleteAllLocalDraftsForAccountFn.mockReset().mockResolvedValue(undefined);
   });
 
   it('hydrates to unauthenticated when no tokens are stored', async () => {
@@ -175,5 +185,48 @@ describe('auth-context.tsx', () => {
     await h.act(() => h.current.logout());
     expect(h.current.authState).toBe('unauthenticated');
     expect(await getTokens()).toBeNull();
+  });
+
+  describe('local encrypted draft wipe (E1.4.4)', () => {
+    it('logout wipes every local draft row for the account that was signed in', async () => {
+      login.mockResolvedValue({ user, tokens: { accessToken: 'a7', refreshToken: 'r7', expiresIn: 3600 } });
+      logout.mockResolvedValue(undefined);
+      const h = await render();
+      await h.act(() => h.current.login({ email: user.email, password: 'pw' }));
+      await h.act(() => h.current.logout());
+      expect(deleteAllLocalDraftsForAccountFn).toHaveBeenCalledTimes(1);
+      expect(deleteAllLocalDraftsForAccountFn).toHaveBeenCalledWith(user.id);
+    });
+
+    it('logout still wipes local drafts even when the server-side logout call fails', async () => {
+      login.mockResolvedValue({ user, tokens: { accessToken: 'a8', refreshToken: 'r8', expiresIn: 3600 } });
+      logout.mockRejectedValue(new Error('network error'));
+      const h = await render();
+      await h.act(() => h.current.login({ email: user.email, password: 'pw' }));
+      await h.act(() => h.current.logout());
+      expect(deleteAllLocalDraftsForAccountFn).toHaveBeenCalledWith(user.id);
+    });
+
+    it('does not attempt a wipe on logout when no account was ever signed in', async () => {
+      logout.mockResolvedValue(undefined);
+      const h = await render();
+      await h.act(() => h.current.logout());
+      expect(deleteAllLocalDraftsForAccountFn).not.toHaveBeenCalled();
+    });
+
+    it('a forced sign-out from an expired/revoked session (401 on refreshUser) also wipes that account\'s local drafts', async () => {
+      secureStore.set('tc_access_token', 'a9');
+      secureStore.set('tc_refresh_token', 'r9');
+      getMe.mockResolvedValueOnce({ user });
+      const h = await render();
+      expect(h.current.authState).toBe('authenticated');
+
+      const { ApiClientError } = await import('./api-client');
+      getMe.mockRejectedValueOnce(new ApiClientError('unauthorized', 'Session expired', 401));
+      await h.act(() => h.current.refreshUser());
+
+      expect(h.current.authState).toBe('unauthenticated');
+      expect(deleteAllLocalDraftsForAccountFn).toHaveBeenCalledWith(user.id);
+    });
   });
 });

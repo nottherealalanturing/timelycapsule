@@ -53,6 +53,28 @@ vi.mock('../lib/master-key-context', () => ({
   useMasterKey: () => ({ masterKey: mockMasterKey }),
 }));
 
+// Stable object reference (not a fresh literal per call) — a fresh object
+// every render would look like a changed `user` to any effect/useCallback
+// dependency array that includes it, causing spurious extra effect runs, a
+// real bug pattern this Stage E arc has hit and fixed before.
+const mockUser = { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' };
+vi.mock('../lib/auth-context', () => ({
+  useAuth: () => ({ user: mockUser }),
+}));
+
+// Mocked at the module boundary (like ../lib/api-client above), not the raw
+// expo-sqlite/expo-secure-store it's built on — this file's own tests are
+// about the screen, not about local-draft-store.ts's real SQLite/crypto
+// behavior, which has its own dedicated test file (local-draft-store.test.ts).
+const saveLocalDraftFn = vi.fn();
+const loadLocalDraftFn = vi.fn().mockResolvedValue({ status: 'none' });
+const deleteLocalDraftFn = vi.fn();
+vi.mock('../lib/local-draft-store', () => ({
+  saveLocalDraft: (...args: unknown[]) => saveLocalDraftFn(...args),
+  loadLocalDraft: (...args: unknown[]) => loadLocalDraftFn(...args),
+  deleteLocalDraft: (...args: unknown[]) => deleteLocalDraftFn(...args),
+}));
+
 const ComposeScreen = (await import('../../app/(app)/compose/[id]/compose')).default;
 
 function texts(instance: TestRenderer.ReactTestRenderer): string[] {
@@ -176,6 +198,9 @@ beforeEach(() => {
   recipientsFn.mockReset().mockResolvedValue({ data: [] });
   mockMasterKey = generateMasterKey();
   routeId = '11111111-1111-1111-1111-111111111111';
+  saveLocalDraftFn.mockReset().mockResolvedValue(undefined);
+  loadLocalDraftFn.mockReset().mockResolvedValue({ status: 'none' });
+  deleteLocalDraftFn.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
