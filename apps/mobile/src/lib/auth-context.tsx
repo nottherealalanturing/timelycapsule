@@ -1,6 +1,7 @@
 import type { User } from '@tc/contracts';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ApiClientError, authApi } from './api-client';
+import { deleteAllLocalDraftsForAccount } from './local-draft-store';
 import { useMasterKey } from './master-key-context';
 import { clearTokens, getTokens, setTokens } from './token-store';
 
@@ -88,6 +89,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Captured before any state clears below — E1.4.4's local encrypted
+    // draft wipe is scoped per-account (readiness audit §9: "unconditional
+    // wipe of every local draft row for that account"), so it needs the
+    // account that's actually logging out, not whatever `user` becomes
+    // after this function returns.
+    const accountId = user?.id;
     try {
       await authApi.logout();
     } catch {
@@ -100,8 +107,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(null);
       clearMasterKey();
       setAuthState('unauthenticated');
+      // Best effort, same reasoning as above: a failure here must not
+      // block logout itself. The device draft-encryption key is
+      // deliberately left untouched — see local-draft-key.ts.
+      if (accountId) void deleteAllLocalDraftsForAccount(accountId).catch(() => {});
     }
-  }, [clearMasterKey]);
+  }, [clearMasterKey, user]);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -109,13 +120,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(me);
     } catch (err) {
       if (err instanceof ApiClientError && err.status === 401) {
+        // A forced sign-out (revoked/expired session) is functionally a
+        // logout the account didn't choose — same local-draft-wipe
+        // obligation as the explicit logout() path above, for the same
+        // reason (no lingering plaintext-adjacent residue for an account
+        // no longer authenticated on this device).
+        const accountId = user?.id;
         await clearTokens();
         setUser(null);
         clearMasterKey();
         setAuthState('unauthenticated');
+        if (accountId) void deleteAllLocalDraftsForAccount(accountId).catch(() => {});
       }
     }
-  }, [clearMasterKey]);
+  }, [clearMasterKey, user]);
 
   return (
     <AuthContext.Provider value={{ authState, user, login, logout, refreshUser }}>{children}</AuthContext.Provider>

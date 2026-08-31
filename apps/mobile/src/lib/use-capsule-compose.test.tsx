@@ -38,6 +38,30 @@ vi.mock('./master-key-context', () => ({
   useMasterKey: () => ({ masterKey: mockMasterKey }),
 }));
 
+// Stable object reference, not a fresh literal per call — see this
+// project's own established note on why (compose-compose.test.tsx,
+// compose-address.test.tsx): a fresh object every render looks like a
+// changed `user` to the bootstrap effect's dependency array, causing
+// spurious extra effect re-runs.
+const mockUser = { id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa' };
+vi.mock('./auth-context', () => ({
+  useAuth: () => ({ user: mockUser }),
+}));
+
+// Mocked at the module boundary — this file's tests are about the hook's
+// integration with local persistence (does it call these at the right
+// times, with the right arguments), not about local-draft-store.ts's own
+// real SQLite/crypto behavior, which has its own dedicated test file
+// (local-draft-store.test.ts).
+const saveLocalDraftFn = vi.fn();
+const loadLocalDraftFn = vi.fn().mockResolvedValue({ status: 'none' });
+const deleteLocalDraftFn = vi.fn();
+vi.mock('./local-draft-store', () => ({
+  saveLocalDraft: (...args: unknown[]) => saveLocalDraftFn(...args),
+  loadLocalDraft: (...args: unknown[]) => loadLocalDraftFn(...args),
+  deleteLocalDraft: (...args: unknown[]) => deleteLocalDraftFn(...args),
+}));
+
 const { useCapsuleCompose } = await import('./use-capsule-compose');
 const { ApiClientError } = await import('./api-client');
 
@@ -169,6 +193,9 @@ beforeEach(() => {
   patchFn.mockReset();
   recipientsFn.mockReset().mockResolvedValue({ data: [] });
   mockMasterKey = generateMasterKey();
+  saveLocalDraftFn.mockReset().mockResolvedValue(undefined);
+  loadLocalDraftFn.mockReset().mockResolvedValue({ status: 'none' });
+  deleteLocalDraftFn.mockReset().mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -350,10 +377,15 @@ describe('useCapsuleCompose', () => {
       await flush(0);
       expect(patchFn).toHaveBeenCalledTimes(1); // the second edit does not fire its own overlapping request
 
-      await act(async () => {
-        resolveFirstPatch({ capsule: capsuleFixture({ ownerKeyWrap: 'irrelevant-for-this-assertion' }) });
-        await vi.advanceTimersByTimeAsync(0);
-      });
+      // Resolving here unblocks the loop's second iteration, which does
+      // real crypto work (encryptBytes) before firing the follow-up PATCH —
+      // that needs genuine wall-clock time on a real thread pool, which
+      // `advanceTimersByTimeAsync(0)` alone cannot force to happen faster
+      // (the exact flakiness this file's own `flush()` helper exists to
+      // avoid — this call site was bypassing it, the actual cause of this
+      // test's intermittent failure under loaded/CI runners).
+      resolveFirstPatch({ capsule: capsuleFixture({ ownerKeyWrap: 'irrelevant-for-this-assertion' }) });
+      await flush(0);
 
       expect(patchFn).toHaveBeenCalledTimes(2); // the follow-up save fires automatically once the first clears
       const [, secondFields] = patchFn.mock.calls[1]!;
@@ -428,6 +460,109 @@ describe('useCapsuleCompose', () => {
       expect(h.current.autosaveStatus).toBe('saved');
       expect(h.current.saveMessage).toBeNull();
     });
+  });
+
+  describe('local encrypted draft (E1.4.4)', () => {
+    async function readyHarness() {
+      let serverCapsule = capsuleFixture({ ownerKeyWrap: null });
+      get.mockImplementation(async () => ({ capsule: serverCapsule }));
+      patchFn.mockImplementation(async (_id: string, fields: Record<string, unknown>) => {
+        serverCapsule = { ...serverCapsule, ...fields } as Capsule;
+        return { capsule: serverCapsule };
+      });
+      const h = await render();
+      patchFn.mockClear(); // clear the bootstrap ownerKeyWrap PATCH so assertions below start clean
+      return { h };
+    }
+
+    it('saves locally immediately on every edit — before the server debounce timer has even started counting', async () => {
+      const { h } = await readyHarness();
+      act(() => h.current.setText('typed a moment ago'));
+      // No time advanced at all: the server PATCH is still 3s away, but the
+      // local save is not debounced — it must have already happened.
+      expect(saveLocalDraftFn).toHaveBeenCalledTimes(1);
+      expect(saveLocalDraftFn).toHaveBeenCalledWith(
+        mockUser.id,
+        '11111111-1111-1111-1111-111111111111',
+        textToEnvelope('typed a moment ago'),
+      );
+      expect(patchFn).not.toHaveBeenCalled();
+    });
+
+    it('deletes the local draft once the server save is confirmed', async () => {
+      const { h } = await readyHarness();
+      act(() => h.current.setText('will be saved'));
+      await flush(3000);
+      expect(patchFn).toHaveBeenCalledTimes(1);
+      expect(deleteLocalDraftFn).toHaveBeenCalledWith('11111111-1111-1111-1111-111111111111');
+    });
+
+    it('does NOT delete the local draft when the server save fails — nothing is lost', async () => {
+      const { h } = await readyHarness();
+      patchFn.mockRejectedValueOnce(new Error('network down'));
+      act(() => h.current.setText('will fail to save'));
+      await flush(3000);
+      expect(h.current.autosaveStatus).toBe('error');
+      expect(deleteLocalDraftFn).not.toHaveBeenCalled();
+    });
+
+    it('a local-save failure never throws, blocks typing, or surfaces as a user-facing error — it is a silent best-effort safety net', async () => {
+      saveLocalDraftFn.mockRejectedValueOnce(new Error('disk full'));
+      const { h } = await readyHarness();
+      expect(() => act(() => h.current.setText('typed anyway'))).not.toThrow();
+      expect(h.current.state.status).toBe('ready');
+      expect(h.current.autosaveStatus).toBe('pending'); // the server debounce still scheduled normally
+      expect(h.current.saveMessage).toBeNull();
+    });
+
+    it('a local draft found on mount wins over the server\'s own content, and reconciles via a normal save', async () => {
+      const { wrapCapsuleKeyForOwner } = await import('@tc/crypto');
+      const capsuleKey = generateMasterKey();
+      const ownerKeyWrap = await wrapCapsuleKeyForOwner(capsuleKey, mockMasterKey!);
+      const serverEnvelope = textToEnvelope('what the server last confirmed');
+      const bytes = new TextEncoder().encode(JSON.stringify(serverEnvelope));
+      const { iv, ciphertext } = await encryptField(capsuleKey, bytes);
+      const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
+      get.mockResolvedValue({ capsule: capsuleFixture({ ownerKeyWrap, contentDocEnc }) });
+
+      const localEnvelope = textToEnvelope('typed offline, never confirmed by the server');
+      loadLocalDraftFn.mockResolvedValueOnce({ status: 'found', envelope: localEnvelope });
+      patchFn.mockImplementation(async (_id: string, fields: Record<string, unknown>) => ({
+        capsule: capsuleFixture({ ownerKeyWrap, contentDocEnc, ...fields }),
+      }));
+
+      const h = await render();
+      expect(h.current.state.status).toBe('ready');
+      if (h.current.state.status === 'ready') expect(h.current.state.envelope).toEqual(localEnvelope);
+
+      // The reconciling save is scheduled (not fired instantly) through the
+      // same debounced path as any other edit.
+      expect(h.current.autosaveStatus).toBe('pending');
+      await flush(3000);
+      expect(patchFn).toHaveBeenCalledTimes(1);
+      expect(deleteLocalDraftFn).toHaveBeenCalledWith('11111111-1111-1111-1111-111111111111');
+    });
+
+    it('a local-load failure on mount falls back to the server content silently — no error state, no crash', async () => {
+      const { wrapCapsuleKeyForOwner } = await import('@tc/crypto');
+      const capsuleKey = generateMasterKey();
+      const ownerKeyWrap = await wrapCapsuleKeyForOwner(capsuleKey, mockMasterKey!);
+      const serverEnvelope = textToEnvelope('server content, local lookup will fail');
+      const bytes = new TextEncoder().encode(JSON.stringify(serverEnvelope));
+      const { iv, ciphertext } = await encryptField(capsuleKey, bytes);
+      const contentDocEnc = encodeIvCiphertext(iv, ciphertext);
+      get.mockResolvedValue({ capsule: capsuleFixture({ ownerKeyWrap, contentDocEnc }) });
+      loadLocalDraftFn.mockRejectedValueOnce(new Error('SQLite unavailable'));
+
+      const h = await render();
+      expect(h.current.state.status).toBe('ready');
+      if (h.current.state.status === 'ready') expect(h.current.state.envelope).toEqual(serverEnvelope);
+    });
+
+    async function encryptField(key: Uint8Array, bytes: Uint8Array) {
+      const { encryptBytes } = await import('@tc/crypto');
+      return encryptBytes(key, bytes);
+    }
   });
 
   describe('security', () => {

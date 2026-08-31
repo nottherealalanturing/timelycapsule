@@ -4,6 +4,86 @@
 
 ## Current status
 
+### E1.4.4 — Local encrypted draft persistence (2026-08-31) — DONE, committed, PR open
+
+Branched `e1.4.4-local-drafts` from `e1.4.3-compose` (PR #62 for E1.4.3 not yet merged into `main` at
+branch time — dependency made explicit; this PR targets `e1.4.3-compose`, a stacked PR). Implemented per
+the readiness audit's §9 and the implementation blueprint's §6, both already recommending this exact
+design before this ticket started.
+
+**Storage:** `expo-sqlite` (`~57.0.2`, resolved via `npx expo install`, not previously a dependency) — one
+table, `local_drafts` (`capsule_id` PK, `account_id`, `schema_version`, `iv`, `ciphertext`, `updated_at`).
+Not multi-drafts-per-capsule — one row per capsule, many capsules per account.
+
+**Encryption key:** a **device-local draft-encryption key**, generated once via `@tc/crypto`'s existing
+`generateAesKey()`, stored in `expo-secure-store` (no `requireAuthentication` — same bar as `token-store.ts`)
+— deliberately **independent of the master key**, so a draft can be encrypted even before the day's first
+unlock. No new cryptographic primitive; same AES-256-GCM (`encryptBytes`/`decryptBytes`) as everything else.
+
+**Lifecycle:** every Compose edit (`setText`) immediately (not debounced) encrypts and upserts the local
+row — the whole point is surviving an app kill *before* the existing ~3s server-autosave debounce (E1.4.3)
+even fires. A successful server `PATCH` deletes the row. On mount, a surviving local row (meaning the prior
+edit was never server-confirmed) wins over the server's own content, and a normal debounced save reconciles
+them — the only "conflict" this single-writer product can produce. A row that fails to decrypt/parse
+(wrong/rotated device key, corrupted write, unrecognized schema version) is treated exactly like no row at
+all and deleted, never shown as ciphertext or partial content.
+
+**Account isolation:** every row is scoped by `account_id`; a row belonging to a different account is never
+returned (defense in depth) even before the explicit wipe. **Logout** (and a forced 401 sign-out via
+`refreshUser`) unconditionally wipes every local draft row for the account that was signed in, captured
+before `setUser(null)` clears it. The device draft key itself is **not** deleted on logout — it's
+device-scoped, not account-scoped.
+
+**No local/offline concept beyond text drafts** — no media, no offline sealing, no `pending_sync` state (a
+much broader vision in `plan/02-UX-DESIGN.md:215` that contradicts the readiness audit's Decisions 7/16;
+flagged, not built, per this ticket's explicit boundary). `contentDocEnc`'s wire format from E1.4.3 is
+completely untouched — local storage has its own independent encoding, never mixed with the server format.
+
+**UI:** no new "Saved locally"/"Offline" indicator — the readiness audit's own §10 states the encrypted
+local draft *is* the unsaved-change protection, invisibly; the existing autosave status text
+(`Saved`/`Unsaved changes`/`Saving…`) already communicates state correctly through a resync, confirmed
+on-device (see below). No new terminology invented.
+
+**Testing:** 401 → 441 mobile tests (30 → 32 files): new `local-draft-key.test.ts` (6 tests: generation,
+memoization, restart-survival, concurrent-caller race safety, no logging), `local-draft-store.test.ts` (24
+tests: encrypt/decrypt round-trip incl. empty/Unicode/large/multi-paragraph, IV uniqueness, 7 corruption/
+failure modes each proven not to crash or leak, multi-draft + upsert + delete lifecycle, account scoping,
+DB single-open concurrency, no logging), 6 new integration tests in `use-capsule-compose.test.tsx` (local
+save on every edit before the debounce, delete on confirmed sync, no delete on failure, local-save-failure
+resilience, local-wins-and-reconciles on mount, local-load-failure fallback), 4 new tests in
+`auth-context.test.tsx` (logout wipe, wipe survives server-logout failure, no-op with no signed-in account,
+401-forced-logout also wipes). `tsc --noEmit` clean, `eslint` clean, full suite stable.
+
+**Android verification (genuinely performed, not inferred):** real Pixel_7 emulator, rebuilt native
+(`expo-sqlite` requires a native module link). Typed new content into the existing E1.4.3 draft, force-killed
+the app (`am force-stop`) before the 3s server debounce could fire, relaunched, unlocked, reopened the
+draft — **exact typed content recovered byte-for-byte**, autosave indicator read "Unsaved changes" then
+"Saved" once the reconciling save completed. Confirmed server-side via direct `psql` query
+(`content_doc_enc` updated). **Pulled the raw on-device SQLite file (`run-as` + `cat`) and inspected it with
+a local `sqlite3` client**: the row's `iv`/`ciphertext` columns hold the expected random-looking base64url
+data; `grep`ing the raw file for the actual typed plaintext found nothing. Confirmed the local row was
+deleted after the reconciling sync (`SELECT count(*)` → 0). Repeated the type-then-kill flow, then logged
+out via Profile before the reconcile could complete — confirmed via direct SQLite inspection that the
+unsynced row was wiped (`SELECT count(*)` → 0). Corruption fail-safe behavior and multi-account isolation
+were **not** separately re-verified on-device beyond this (covered thoroughly by the 24 automated
+`local-draft-store.test.ts` tests) — noted as inferred, not device-verified, per this ticket's own
+verified-vs-inferred distinction. iOS not tested.
+
+**Dependencies added:** `expo-sqlite` (`~57.0.2`) — confirmed required (no existing storage abstraction fit
+structured per-capsule draft data); installed via `npx expo install` (project convention); `app.json`'s
+config-plugin list updated automatically by that command.
+
+**Files changed:** `apps/mobile/src/lib/local-draft-key.ts` (new), `apps/mobile/src/lib/local-draft-store.ts`
+(new), `apps/mobile/src/lib/use-capsule-compose.ts` (bootstrap merge + save/delete wiring),
+`apps/mobile/src/lib/auth-context.tsx` (logout/401 wipe), `apps/mobile/app.json`, `apps/mobile/package.json`,
+`pnpm-lock.yaml`, plus the four corresponding test files.
+
+**Branch:** `e1.4.4-local-drafts` (from `e1.4.3-compose`). **Commit:** `66ecaa1`. **PR:** opened against
+`e1.4.3-compose` (stacked on the still-open #62), not merged.
+
+**Exact next ticket:** `E1.4.5` — media source sheet (camera/library/voice/video/files), per the readiness
+audit's ticket map. Not started, per this session's explicit "STOP after E1.4.4" instruction.
+
 ### E1.4.3 — Compose movement, capsule-key generation, content encryption (2026-08-31) — DONE, committed, PR open
 
 Branched `e1.4.3-compose` from fresh `origin/main` (PR #61 confirmed merged as `98a15f0`). Implemented per
