@@ -490,10 +490,10 @@ timelycapsule.com</div>
 
 <section id="posts">
   <p class="hallmark">Part 4</p>
-  <h2>Nine LinkedIn company posts</h2>
-  <p class="lede">Six pair with an existing real-UI asset; three are
-  text-only — LinkedIn handles pure text natively, and not every post needs
-  a prop. Suggested order is the numbering below. Cadence: 1–2/week, slower
+  <h2>Eight LinkedIn company posts</h2>
+  <p class="lede">All eight pair with an existing real-UI asset — a 9th,
+  text-only post was cut from this account (see the correction note below
+  Post 7). Suggested order is the numbering below. Cadence: 1–2/week, slower
   than a personal or product social account — matches the brand's own
   "unhurried" register.</p>
 
@@ -562,21 +562,15 @@ Most products treat "delete" as an edge case. TimelyCapsule has a mode called "o
 Longer than I'd like to admit went into making sure that fires only after a confirmed read — not a page load, a prefetch, or a link-preview crawler. That needed a dedicated test suite before I trusted it enough to ship.</div>
   </div>
 
-  <div class="post">
-    <div class="post-head"><span class="num">08 · A bug about a bug</span><span class="img">text only</span></div>
-    <div class="post-body">A bug that only existed because the fix for a different bug was too good.
-
-Shipped a fix recently so a logged-in user's dark-mode preference would stick properly on the marketing pages. Verified it worked. Moved on.
-
-Two days later: every hard refresh of a logged-in page was bouncing real, authenticated users straight back to the login screen — a session with valid tokens sitting right there, ignored.
-
-The cause: a loading-state variable that used to safely default to "false" (not loading) now needed a third state — "haven't checked yet" — and defaulting it to false meant the route guard concluded "not loading, no user, redirect" before the code that reads the tokens ever ran. False and unknown had been silently treated as the same value.
-
-Fixed by giving it three real states instead of two. A very small diff for how long it took to notice.</div>
-  </div>
+  <p style="font-size:14px;color:var(--muted);max-width:66ch">
+  <b>Correction (2026-08-29):</b> this pack originally had a 9th post here
+  ("A bug that only existed because a fix was too good"), written in first
+  person — the wrong voice for this account, and word-for-word the same
+  story as Assad's personal post L9 (Part 7 below). Removed from here; it
+  belongs on the personal account, where it already correctly lives.</p>
 
   <div class="post">
-    <div class="post-head"><span class="num">09 · Honest status</span><span class="img">screenshots/05-hero.png</span></div>
+    <div class="post-head"><span class="num">08 · Honest status</span><span class="img">screenshots/05-hero.png</span></div>
     <div class="post-body">Where this actually is, honestly.
 
 TimelyCapsule is live at timelycapsule.com. Anyone can write a letter and seal it right now, with or without an account — a guest capsule needs neither, just a link to hand to whoever it's for.
@@ -856,7 +850,7 @@ I have no plans to make it sensible. Some projects are for the portfolio. That o
     same content the same day. Assad's post days never line up with
     TimelyCapsule's for the same subject — the one exception is the reveal
     itself (Week 1), the one moment meant to visibly connect the two.
-    Beyond day 30: TC-LI Posts 6–9, TC-IG/X "kept" and "refusals," L6/L8/L10,
+    Beyond day 30: TC-LI Posts 6–8, TC-IG/X "kept" and "refusals," L6/L8/L10,
     X3/X11/X13/X14/X16/X17 — a further 3–4 weeks banked without writing
     anything new.</div>
   </div>

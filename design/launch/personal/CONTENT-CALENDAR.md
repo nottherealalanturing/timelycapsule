@@ -400,7 +400,7 @@ Legend: **TC-LI** TimelyCapsule LinkedIn · **TC-X** TimelyCapsule X ·
 | Sep 28 | Mon | 10:00 | TC-LI | Post 5 · What belongs inside a letter | `instagram/11-sealing.png` |
 | Sep 29 | Tue | 09:00 | TC-X | "One reading only" | `x/post-one-reading.png` |
 
-**Beyond day 30 (not scheduled, in reserve):** TC-LI Posts 6–9, TC-IG/TC-X
+**Beyond day 30 (not scheduled, in reserve):** TC-LI Posts 6–8, TC-IG/TC-X
 "kept" and "refusals," A-LI L6/L8/L10, A-X X3/X11/X13/X14/X16/X17 — enough
 material banked for another 3–4 weeks without writing anything new,
 including L6/X3 (the decade-interface post) and X17 (the one mobile-client
