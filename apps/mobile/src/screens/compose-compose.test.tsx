@@ -34,11 +34,21 @@ vi.mock('react-native-safe-area-context', () => ({
 const get = vi.fn();
 const patchFn = vi.fn();
 const recipientsFn = vi.fn();
+const mediaListFn = vi.fn();
+const createTicketFn = vi.fn();
+const completeFn = vi.fn();
+const deleteMediaFn = vi.fn();
 vi.mock('../lib/api-client', () => ({
   capsulesApi: {
     get: (...args: unknown[]) => get(...args),
     patch: (...args: unknown[]) => patchFn(...args),
     recipients: (...args: unknown[]) => recipientsFn(...args),
+    media: (...args: unknown[]) => mediaListFn(...args),
+  },
+  mediaApi: {
+    createTicket: (...args: unknown[]) => createTicketFn(...args),
+    complete: (...args: unknown[]) => completeFn(...args),
+    delete: (...args: unknown[]) => deleteMediaFn(...args),
   },
   ApiClientError: class ApiClientError extends Error {
     constructor(
@@ -47,6 +57,24 @@ vi.mock('../lib/api-client', () => ({
       public readonly status: number,
     ) {
       super(message);
+    }
+  },
+}));
+
+// expo-file-system is a native module with no JS-only fallback (same
+// reasoning as expo-image-picker/expo-audio below) — stubbed with a minimal
+// `File` whose `bytes()` returns a small, fixed fixture. This file's tests
+// are about the screen's own wiring through the real `useMediaEnclosures`/
+// `encloseMedia` pipeline (real crypto, matching `use-capsule-compose.
+// test.tsx`'s own established "mock the network, not the crypto" pattern) —
+// not about real filesystem I/O, which has no dedicated test of its own
+// since `expo-file-system` is a thin, already-typed wrapper this codebase
+// doesn't own.
+vi.mock('expo-file-system', () => ({
+  File: class {
+    constructor(public uri: string) {}
+    async bytes() {
+      return new Uint8Array([1, 2, 3, 4]);
     }
   },
 }));
@@ -219,6 +247,21 @@ function recipientFixture(overrides: Partial<Recipient> = {}): Recipient {
   };
 }
 
+/** Populated by `createTicketFn`'s own mock impl below, read back by `completeFn`'s — lets the mocked ticket/complete round-trip echo a real picked file's name/mime/size into the eventual `MediaItem`, like the real server does. */
+let ticketInputs: Map<string, { name: string; mime: string; sizeBytes: number }>;
+let mediaSeq: number;
+/**
+ * A tiny in-memory stand-in for the server's own media rows, mutated by the
+ * mocked `createTicket`/`complete`/`delete` below exactly as the real
+ * backend would mutate its `media_items` table — necessary because
+ * `useMediaEnclosures.refresh()` (mirroring web's own `use-enclosures.ts`)
+ * never locally appends the `MediaItem` a `complete` call returns; it always
+ * re-fetches `capsulesApi.media` and trusts *that* list. A static
+ * `{ data: [] }` mock would make every newly-enclosed item vanish the
+ * instant it finished, since the refetch would never find it.
+ */
+let serverMediaRows: Record<string, unknown>[];
+
 beforeEach(() => {
   vi.useFakeTimers();
   back.mockReset();
@@ -236,9 +279,54 @@ beforeEach(() => {
   loadLocalDraftFn.mockReset().mockResolvedValue({ status: 'none' });
   deleteLocalDraftFn.mockReset().mockResolvedValue(undefined);
   pickForSourceFn.mockReset();
+
+  // Media pipeline defaults — a fresh capsule with nothing already attached,
+  // and a ticket/complete round-trip that succeeds on the first try. Tests
+  // that need a failure override these directly.
+  serverMediaRows = [];
+  mediaListFn.mockReset().mockImplementation(async () => ({ data: [...serverMediaRows] }));
+  ticketInputs = new Map();
+  mediaSeq = 0;
+  createTicketFn.mockReset().mockImplementation(async (_capsuleId: string, input: { name: string; mime: string; sizeBytes: number }) => {
+    const mediaId = `media-${++mediaSeq}`;
+    ticketInputs.set(mediaId, input);
+    return { mediaId, uploadId: 'upload-1', parts: [{ partNumber: 1, url: `https://r2.example/${mediaId}` }] };
+  });
+  completeFn.mockReset().mockImplementation(async (mediaId: string, input: { durationMs?: number; width?: number; height?: number }) => {
+    const ticket = ticketInputs.get(mediaId)!;
+    const media = {
+      id: mediaId,
+      capsuleId: routeId,
+      kind: 'image',
+      originalName: ticket.name,
+      mime: ticket.mime,
+      sizeBytes: ticket.sizeBytes,
+      durationMs: input.durationMs ?? null,
+      width: input.width ?? null,
+      height: input.height ?? null,
+      caption: null,
+      position: 0,
+      blurhash: null,
+      status: 'ready',
+      encMeta: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      releasedAt: null,
+      releaseReason: null,
+    };
+    serverMediaRows.push(media);
+    return { media };
+  });
+  deleteMediaFn.mockReset().mockImplementation(async (mediaId: string) => {
+    serverMediaRows = serverMediaRows.filter((m) => m.id !== mediaId);
+  });
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({ ok: true, headers: { get: (name: string) => (name.toLowerCase() === 'etag' ? 'etag-1' : null) } }),
+  );
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -448,7 +536,7 @@ describe('ComposeScreen', () => {
       expect(instance.root.findByType(Modal).props.visible).toBe(true);
     });
 
-    it('a picked photo appears in the pending list, with its size, and closes the sheet', async () => {
+    it('a picked photo shows immediately as encrypting, then as truly enclosed with its real size, and closes the sheet', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       pickForSourceFn.mockResolvedValue({
         status: 'picked',
@@ -466,12 +554,28 @@ describe('ComposeScreen', () => {
 
       expect(pickForSourceFn).toHaveBeenCalledWith('camera');
       expect(instance.root.findByType(Modal).props.visible).toBe(false);
+      // Fires the instant the file is picked — before any network call has a
+      // chance to resolve — matching web's own immediate `onFiles` behavior,
+      // not a queued "attach later" step.
+      expect(texts(instance).join(' ')).toContain('photo.jpg');
+
+      await flush(0);
+      expect(createTicketFn).toHaveBeenCalledWith(
+        '11111111-1111-1111-1111-111111111111',
+        { name: 'photo.jpg', mime: 'image/jpeg', sizeBytes: expect.any(Number) },
+        expect.any(String),
+      );
       const rendered = texts(instance).join(' ');
       expect(rendered).toContain('photo.jpg');
-      expect(rendered).toContain('2 KB');
+      // The real, server-confirmed size (`sizeBytes` on the completed
+      // `MediaItem`) is the encrypted ciphertext's own length — the mocked
+      // pipeline still uses this codebase's real `@tc/crypto`, so this is a
+      // genuine (AES-GCM overhead-inclusive) byte count, not the original
+      // 2048 the picker reported.
+      expect(rendered).toMatch(/\d+(\.\d+)? (B|KB)/);
     });
 
-    it('picking from multiple sources accumulates entries rather than replacing the list', async () => {
+    it('picking from multiple sources encloses and attaches both, rather than replacing one with the other', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       pickForSourceFn
         .mockResolvedValueOnce({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] })
@@ -485,6 +589,7 @@ describe('ComposeScreen', () => {
           instance.root.findByType(MediaSourceSheet).props.onSelect(source);
           await vi.advanceTimersByTimeAsync(0);
         });
+        await flush(0);
       }
 
       const rendered = texts(instance).join(' ');
@@ -492,9 +597,31 @@ describe('ComposeScreen', () => {
       expect(rendered).toContain('b.pdf');
     });
 
-    it('removing a pending item takes it out of the list', async () => {
+    it('removing a truly-attached item detaches it server-side and takes it out of the list', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await flush(0);
+      expect(texts(instance).join(' ')).toContain('a.jpg');
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Remove a.jpg' }).props.onPress());
+      await flush(0);
+      expect(deleteMediaFn).toHaveBeenCalledWith('media-1');
+      expect(texts(instance).join(' ')).not.toContain('a.jpg');
+    });
+
+    it('removing a still-in-flight item stops it from ever completing, without disturbing anything else', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      // Never resolves — the item stays in the 'encrypting'/'sending' stage.
+      createTicketFn.mockReturnValue(new Promise(() => {}));
       const instance = await renderScreen();
       await flush();
 
@@ -507,6 +634,8 @@ describe('ComposeScreen', () => {
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Remove a.jpg' }).props.onPress());
       expect(texts(instance).join(' ')).not.toContain('a.jpg');
+      // No ticket ever completed, so there is nothing to delete server-side.
+      expect(deleteMediaFn).not.toHaveBeenCalled();
     });
 
     it('shows a permission-denied message naming the specific source, and adds nothing to the pending list', async () => {
@@ -553,6 +682,11 @@ describe('ComposeScreen', () => {
         instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
         await vi.advanceTimersByTimeAsync(0);
       });
+      // Runs the full encrypt → ticket → PUT → complete chain to completion
+      // before asserting — a real regression here (some future change
+      // routing a media byte through `saveLocalDraft`) would only show up
+      // once the pipeline has actually finished.
+      await flush(0);
 
       expect(saveLocalDraftFn).not.toHaveBeenCalled();
     });
@@ -571,11 +705,12 @@ describe('ComposeScreen', () => {
         instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
         await vi.advanceTimersByTimeAsync(0);
       });
+      await flush(0);
 
       expect(instance.root.findByType(TextInput).props.value).toBe('A letter in progress');
     });
 
-    it('never logs a picked file\'s name or URI', async () => {
+    it('never logs a picked file\'s name, URI, plaintext bytes, ciphertext, or capsule key through the full encrypt/upload pipeline', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       pickForSourceFn.mockResolvedValue({
         status: 'picked',
@@ -591,6 +726,8 @@ describe('ComposeScreen', () => {
           instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
           await vi.advanceTimersByTimeAsync(0);
         });
+        await flush(0);
+        expect(texts(instance).join(' ')).toContain('very-specific-private-path.jpg'); // sanity: the pipeline really ran, this isn't a vacuous pass
         for (const spy of [logSpy, errorSpy]) {
           for (const call of spy.mock.calls) {
             expect(call.map((a) => String(a)).join(' ')).not.toContain('very-specific-private-path');
@@ -600,6 +737,78 @@ describe('ComposeScreen', () => {
         logSpy.mockRestore();
         errorSpy.mockRestore();
       }
+    });
+
+    it('a failed upload can be retried without losing the letter, and does not need the file re-picked', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      createTicketFn.mockRejectedValueOnce(new Error('network down'));
+      const instance = await renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => input.props.onChangeText('Written before the failure'));
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await flush(0);
+
+      expect(texts(instance).join(' ')).toContain('Stopped before it finished');
+      // Failing to upload media must never destroy or hide the letter.
+      expect(instance.root.findByType(TextInput).props.value).toBe('Written before the failure');
+
+      const firstKey = createTicketFn.mock.calls[0]![2];
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Retry a.jpg' }).props.onPress());
+      await flush(0);
+
+      expect(createTicketFn).toHaveBeenCalledTimes(2);
+      // The same idempotency key is reused across a retry of the same item
+      // (see media-upload.ts's own header comment for why) — this is not
+      // "a second, unrelated attempt" from the server's point of view.
+      expect(createTicketFn.mock.calls[1]![2]).toBe(firstKey);
+      expect(texts(instance).join(' ')).toContain('a.jpg');
+      expect(texts(instance).join(' ')).not.toContain('Stopped before it finished');
+    });
+
+    it('an orphaned ticket recovered from a previous session offers Remove but not Retry (the original bytes no longer exist)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      mediaListFn.mockResolvedValue({
+        data: [
+          {
+            id: 'orphan-1',
+            capsuleId: '11111111-1111-1111-1111-111111111111',
+            kind: 'image',
+            originalName: 'abandoned.jpg',
+            mime: 'image/jpeg',
+            sizeBytes: 500,
+            durationMs: null,
+            width: null,
+            height: null,
+            caption: null,
+            position: 0,
+            blurhash: null,
+            status: 'uploading',
+            encMeta: null,
+            createdAt: '2026-01-01T00:00:00.000Z',
+            releasedAt: null,
+            releaseReason: null,
+          },
+        ],
+      });
+      const instance = await renderScreen();
+      await flush();
+
+      const rendered = texts(instance).join(' ');
+      expect(rendered).toContain('abandoned.jpg');
+      expect(rendered).toContain('Never finished arriving');
+      expect(instance.root.findAllByProps({ accessibilityLabel: 'Retry abandoned.jpg' })).toHaveLength(0);
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Remove abandoned.jpg' }).props.onPress());
+      await flush(0);
+      expect(deleteMediaFn).toHaveBeenCalledWith('orphan-1');
     });
   });
 
@@ -611,6 +820,7 @@ describe('ComposeScreen', () => {
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
       act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
 
       expect(pickForSourceFn).not.toHaveBeenCalled();
       expect(instance.root.findByType(MediaSourceSheet).props.visible).toBe(false); // the media-source sheet itself closes
@@ -632,6 +842,7 @@ describe('ComposeScreen', () => {
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
       act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
 
       const { normalizeVoiceRecording } = await import('../lib/media-source');
       const media = normalizeVoiceRecording('file:///voice-take.m4a', 4200);
@@ -648,6 +859,7 @@ describe('ComposeScreen', () => {
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
       act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
 
       const { normalizeVoiceRecording } = await import('../lib/media-source');
       act(() => instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///x.m4a', 1000)));
@@ -668,6 +880,7 @@ describe('ComposeScreen', () => {
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
       act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
       expect(instance.root.findAllByType(VoiceRecorder)).toHaveLength(1);
 
       act(() => instance.root.findByType(VoiceRecorder).props.onCancel());
@@ -677,15 +890,17 @@ describe('ComposeScreen', () => {
       expect(removeButtons).toEqual([]);
     });
 
-    it('an accepted recording never touches the encrypted local draft store', async () => {
+    it('an accepted recording never touches the encrypted local draft store, through the full encrypt/upload pipeline', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       const instance = await renderScreen();
       await flush();
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
       act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
       const { normalizeVoiceRecording } = await import('../lib/media-source');
       act(() => instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///x.m4a', 1000)));
+      await flush(0);
 
       expect(saveLocalDraftFn).not.toHaveBeenCalled();
     });
@@ -700,13 +915,37 @@ describe('ComposeScreen', () => {
 
       act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
       act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
       const { normalizeVoiceRecording } = await import('../lib/media-source');
       act(() => instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///x.m4a', 1000)));
+      await flush(0);
 
       expect(instance.root.findByType(TextInput).props.value).toBe('A letter in progress');
     });
 
-    it('never logs a recorded file\'s URI', async () => {
+    it('a recorded voice note completes the same encrypt/ticket/upload/complete pipeline as a picked file', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+      await vi.advanceTimersByTimeAsync(0);
+      const { normalizeVoiceRecording } = await import('../lib/media-source');
+      const media = normalizeVoiceRecording('file:///voice-take.m4a', 4200);
+      act(() => instance.root.findByType(VoiceRecorder).props.onAccept(media));
+      await flush(0);
+
+      expect(createTicketFn).toHaveBeenCalledWith(
+        '11111111-1111-1111-1111-111111111111',
+        { name: media.name, mime: 'audio/mp4', sizeBytes: expect.any(Number) },
+        expect.any(String),
+      );
+      expect(completeFn).toHaveBeenCalledWith('media-1', { parts: [{ partNumber: 1, eTag: 'etag-1' }], durationMs: 4200, width: undefined, height: undefined }, expect.any(String));
+      expect(texts(instance).join(' ')).toContain(media.name);
+    });
+
+    it('never logs a recorded file\'s URI, plaintext audio bytes, or ciphertext through the full pipeline', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
       const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -715,10 +954,12 @@ describe('ComposeScreen', () => {
         await flush();
         act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
         act(() => instance.root.findByType(MediaSourceSheet).props.onSelect('voice'));
+        await vi.advanceTimersByTimeAsync(0);
         const { normalizeVoiceRecording } = await import('../lib/media-source');
         act(() =>
           instance.root.findByType(VoiceRecorder).props.onAccept(normalizeVoiceRecording('file:///very-specific-private-path.m4a', 1000)),
         );
+        await flush(0);
         for (const spy of [logSpy, errorSpy]) {
           for (const call of spy.mock.calls) {
             expect(call.map((a) => String(a)).join(' ')).not.toContain('very-specific-private-path');

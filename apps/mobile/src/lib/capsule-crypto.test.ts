@@ -1,4 +1,4 @@
-import { encryptBytes, generateMasterKey, toBase64Url, unwrapCapsuleKeyForOwner, wrapCapsuleKeyForOwner, wrapMasterKeyWithPassword } from '@tc/crypto';
+import { decryptBytes, encryptBytes, generateMasterKey, toBase64Url, unwrapCapsuleKeyForOwner, wrapCapsuleKeyForOwner, wrapMasterKeyWithPassword } from '@tc/crypto';
 import { describe, expect, it } from 'vitest';
 import {
   decryptCapsuleContent,
@@ -6,6 +6,7 @@ import {
   decryptReplyBody,
   emptyEnvelope,
   encodeIvCiphertext,
+  encryptMediaForCapsule,
   envelopeText,
   envelopeToText,
   readEnvelope,
@@ -356,5 +357,50 @@ describe('capsule-crypto.ts', () => {
         expect(unwrapped).toEqual(capsuleKey); // ...but the bytes it decodes to, and therefore the unwrap, do not
       },
     );
+  });
+
+  describe('encryptMediaForCapsule (E1.4.7)', () => {
+    it('produces iv(12) || ciphertext, raw bytes, decryptable by decryptBytes directly — the exact wire format apps/web/src/lib/enclosure-media.ts expects (bytes.slice(0,12) / bytes.slice(12))', async () => {
+      const capsuleKey = generateMasterKey();
+      const plaintext = new TextEncoder().encode('the bytes of a picked file');
+
+      const combined = await encryptMediaForCapsule(capsuleKey, plaintext);
+
+      expect(combined.length).toBe(12 + plaintext.length + 16); // iv + plaintext + AES-GCM's 16-byte auth tag
+      const iv = combined.slice(0, 12);
+      const ciphertext = combined.slice(12);
+      const decrypted = await decryptBytes(capsuleKey, iv, ciphertext);
+      expect(new TextDecoder().decode(decrypted)).toBe('the bytes of a picked file');
+    });
+
+    it('produces raw bytes, never base64 — unlike encodeIvCiphertext, this must NOT be a base64 string, since media travels as a raw HTTP PUT body', async () => {
+      const combined = await encryptMediaForCapsule(generateMasterKey(), new Uint8Array([1, 2, 3]));
+      expect(combined).toBeInstanceOf(Uint8Array);
+    });
+
+    it('two encryptions of the same bytes under the same key produce different ciphertext (a fresh random IV each time)', async () => {
+      const capsuleKey = generateMasterKey();
+      const bytes = new Uint8Array([9, 9, 9, 9]);
+      const first = await encryptMediaForCapsule(capsuleKey, bytes);
+      const second = await encryptMediaForCapsule(capsuleKey, bytes);
+      expect(first).not.toEqual(second);
+    });
+
+    it('the wrong capsule key fails to decrypt — AES-GCM\'s auth tag throws rather than returning wrong plaintext', async () => {
+      const combined = await encryptMediaForCapsule(generateMasterKey(), new TextEncoder().encode('secret'));
+      const iv = combined.slice(0, 12);
+      const ciphertext = combined.slice(12);
+      await expect(decryptBytes(generateMasterKey(), iv, ciphertext)).rejects.toThrow();
+    });
+
+    it('round-trips real binary (non-UTF8) bytes exactly, byte for byte — a picked image/video/audio file, not text', async () => {
+      const capsuleKey = generateMasterKey();
+      const binary = new Uint8Array(256);
+      for (let i = 0; i < binary.length; i++) binary[i] = i;
+
+      const combined = await encryptMediaForCapsule(capsuleKey, binary);
+      const decrypted = await decryptBytes(capsuleKey, combined.slice(0, 12), combined.slice(12));
+      expect(decrypted).toEqual(binary);
+    });
   });
 });

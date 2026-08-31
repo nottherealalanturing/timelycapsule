@@ -3,7 +3,16 @@ import { encryptBytes, generateCapsuleKey, wrapCapsuleKeyForOwner } from '@tc/cr
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClientError, capsulesApi } from './api-client';
 import { useAuth } from './auth-context';
-import { decryptField, emptyEnvelope, encodeIvCiphertext, readEnvelope, resolveCapsuleKey, textToEnvelope, type LetterEnvelope } from './capsule-crypto';
+import {
+  decryptField,
+  emptyEnvelope,
+  encodeIvCiphertext,
+  encryptMediaForCapsule,
+  readEnvelope,
+  resolveCapsuleKey,
+  textToEnvelope,
+  type LetterEnvelope,
+} from './capsule-crypto';
 import { deleteLocalDraft, loadLocalDraft, saveLocalDraft } from './local-draft-store';
 import { useMasterKey } from './master-key-context';
 
@@ -77,6 +86,8 @@ export function useCapsuleCompose(id: string): {
   saveMessage: string | null;
   setText: (text: string) => void;
   flush: () => Promise<void>;
+  /** Encrypts arbitrary bytes (media, E1.4.7) under this capsule's key — see `encryptMediaForCapsule`'s own header comment for the exact wire format. Throws if called before the capsule key has resolved (the media UI only ever mounts once `state.status === 'ready'`, so this is not reachable in practice). */
+  encryptForCapsule: (bytes: Uint8Array) => Promise<Uint8Array>;
 } {
   const { masterKey } = useMasterKey();
   const { user } = useAuth();
@@ -247,5 +258,12 @@ export function useCapsuleCompose(id: string): {
     await runAutosave();
   }, [runAutosave]);
 
-  return { state, retry, autosaveStatus, saveMessage, setText, flush };
+  const encryptForCapsule = useCallback(async (bytes: Uint8Array) => {
+    if (!capsuleKeyRef.current) {
+      throw new Error('Capsule key not ready yet');
+    }
+    return encryptMediaForCapsule(capsuleKeyRef.current, bytes);
+  }, []);
+
+  return { state, retry, autosaveStatus, saveMessage, setText, flush, encryptForCapsule };
 }

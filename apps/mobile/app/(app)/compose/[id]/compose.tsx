@@ -1,3 +1,4 @@
+import type { MediaItem } from '@tc/contracts';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -10,6 +11,7 @@ import { envelopeToText } from '../../../../src/lib/capsule-crypto';
 import { formatMediaSize, pickForSource, type MediaSourceKind, type PickedMedia } from '../../../../src/lib/media-source';
 import { colors, fontSize, fontWeight, radius, space } from '../../../../src/lib/tokens';
 import { useCapsuleCompose, type AutosaveStatus } from '../../../../src/lib/use-capsule-compose';
+import { useMediaEnclosures, type PendingEnclosure } from '../../../../src/lib/use-media-enclosures';
 
 /**
  * Movement II — Compose (E1.4.3; media source selection added E1.4.5).
@@ -33,51 +35,48 @@ import { useCapsuleCompose, type AutosaveStatus } from '../../../../src/lib/use-
  *    has no forward action at all, the same honest dead-end Address itself
  *    was before this screen existed. Back always returns to Address.
  *
- * **Media (E1.4.5)** stops at the selection/normalization boundary — see
- * `media-source.ts`'s own header comment. A picked file is held only in
- * this component's own React state (`pendingMedia`), never the E1.4.4
- * encrypted local draft (Decision 16: media needs connectivity, full stop —
- * there is no offline media concept for a local cache to bridge) and never
- * sent anywhere — actual encryption/upload is E1.4.7's job. This is a
- * disclosed consequence of splitting one continuous web action
- * (`onFiles`/`onEnclose` immediately kick off encryption+upload) across two
- * mobile tickets: navigating away or killing the app currently loses a
- * pending pick, unlike web's own instant-fire behavior. E1.4.7 is expected
- * to close this gap by actually enclosing (encrypting+uploading) on pick.
+ * **Media (E1.4.5 selection, E1.4.7 encrypt/upload)** now fires the full
+ * enclose pipeline the instant a file is picked or a voice take is
+ * accepted — matching web's own `onFiles`/`onEnclose` instant-fire behavior
+ * exactly, closing the gap E1.4.5/E1.4.6 disclosed (a picked file used to
+ * sit inert in local state until this ticket). All of that lifecycle —
+ * encrypting → sending → finishing → enclosed/failed, plus retry/remove —
+ * lives in `useMediaEnclosures`, not this component; this screen only picks
+ * a source and renders whatever that hook reports. Media still never
+ * touches the E1.4.4 encrypted local draft (Decision 16: media needs
+ * connectivity, full stop) — see that hook's own header comment for what
+ * happens if the writer leaves Compose mid-upload.
  *
- * **Voice (E1.4.6)** is a fourth `pendingMedia` source alongside the three
+ * **Voice (E1.4.6)** is a fourth enclose source alongside the three
  * picker-based ones, produced by `VoiceRecorder` instead of `pickForSource`
  * — see `media-source.ts`'s header comment for why that source is handled
  * differently, and `voice-recorder.tsx`'s own header comment for the full
- * Idle→Recording→Preparing→Ready lifecycle. It stops at exactly the same
- * `PickedMedia` handoff boundary as the other three.
+ * Idle→Recording→Preparing→Ready lifecycle. An accepted take is enclosed
+ * exactly like any other picked file, at the same `PickedMedia` boundary.
  *
- * Deliberately not built here (out of E1.4.6's scope, disclosed): actual
- * encryption/upload (`E1.4.7`), place-as-memory (no location UI anywhere in
- * this ticket, and it is not a media kind at all — see the design doc's
+ * Deliberately not built here (out of E1.4.7's scope, disclosed):
+ * place-as-memory (no location UI anywhere in this ticket, and it is not a
+ * media kind at all — see the design doc's
  * "Place as memory, separated from the Place Seal"), the margin
  * writing-prompt (`MarginPrompt.tsx`), and Review/Seal (`E1.4.8`).
  */
-/** A picked-but-not-yet-enclosed file, held only in this screen's own state — see the module header comment for why. */
-interface PendingMedia extends PickedMedia {
-  id: number;
-}
-
 export default function ComposeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { state, retry, autosaveStatus, saveMessage, setText, flush } = useCapsuleCompose(id);
+  const { state, retry, autosaveStatus, saveMessage, setText, flush, encryptForCapsule } = useCapsuleCompose(id);
 
   const [sheetVisible, setSheetVisible] = useState(false);
   const [voiceRecorderOpen, setVoiceRecorderOpen] = useState(false);
-  const [pendingMedia, setPendingMedia] = useState<PendingMedia[]>([]);
   const [mediaMessage, setMediaMessage] = useState<string | null>(null);
-  const nextMediaId = useRef(0);
-
-  const addPendingMedia = useCallback((media: PickedMedia[]) => {
-    setPendingMedia((prev) => [...prev, ...media.map((m) => ({ ...m, id: nextMediaId.current++ }))]);
-  }, []);
+  const {
+    items: attachedMedia,
+    pending: pendingMedia,
+    enclose,
+    retry: retryPending,
+    removePending,
+    removeItem,
+  } = useMediaEnclosures(id, state.status === 'ready' ? encryptForCapsule : null);
 
   const handleSelectSource = useCallback(
     async (source: MediaSourceKind) => {
@@ -92,7 +91,7 @@ export default function ComposeScreen() {
       }
       const result = await pickForSource(source);
       if (result.status === 'picked') {
-        addPendingMedia(result.media);
+        for (const media of result.media) enclose(media);
       } else if (result.status === 'permission_denied') {
         // Only 'camera' and 'library' ever actually produce this status —
         // pickFile() needs no runtime permission (see media-source.ts) — but
@@ -103,19 +102,15 @@ export default function ComposeScreen() {
       }
       // 'cancelled': the user backed out of the native picker — nothing to do.
     },
-    [addPendingMedia],
+    [enclose],
   );
 
   const handleVoiceAccept = useCallback(
     (media: PickedMedia) => {
-      addPendingMedia([media]);
+      enclose(media);
     },
-    [addPendingMedia],
+    [enclose],
   );
-
-  const removePendingMedia = useCallback((mediaId: number) => {
-    setPendingMedia((prev) => prev.filter((m) => m.id !== mediaId));
-  }, []);
 
   // The screen's own typing buffer, decoupled from `state.envelope` (which
   // round-trips through JSON on every save) — seeded once from whatever was
@@ -194,10 +189,13 @@ export default function ComposeScreen() {
             />
 
             <PendingMediaSection
+              items={attachedMedia}
               pending={pendingMedia}
               message={mediaMessage}
               onEnclose={() => setSheetVisible(true)}
-              onRemove={removePendingMedia}
+              onRemoveItem={removeItem}
+              onRemovePending={removePending}
+              onRetryPending={retryPending}
             />
 
             <AutosaveIndicator status={autosaveStatus} message={saveMessage} />
@@ -215,33 +213,70 @@ export default function ComposeScreen() {
 }
 
 /**
- * "Enclosed" (E1.4.5) — the mobile-native shape of web's own `Enclosures`
- * section (see `compose.tsx`'s own header comment for the full boundary
- * this stops at). Ordered Hallmark → letter → enclosures, matching
- * `ComposeMovement.tsx`'s own layout exactly.
+ * "Enclosed" (E1.4.5 selection, E1.4.7 encrypt/upload) — the mobile-native
+ * shape of web's own `Enclosures` section (see `compose.tsx`'s own header
+ * comment for the full boundary this stops at). Ordered Hallmark → letter →
+ * enclosures, matching `ComposeMovement.tsx`'s own layout exactly.
+ *
+ * `items` (truly attached, `status: 'ready'`) and `pending` (in-flight this
+ * session, or recovered from one that never finished) render as the same
+ * row shape — a reading of "what's enclosed," not two visually distinct
+ * lists — differing only in whether a stage line and a Retry control
+ * appear, exactly mirroring `useMediaEnclosures`'s own split.
  */
 function PendingMediaSection({
+  items,
   pending,
   message,
   onEnclose,
-  onRemove,
+  onRemoveItem,
+  onRemovePending,
+  onRetryPending,
 }: {
-  pending: PendingMedia[];
+  items: MediaItem[];
+  pending: PendingEnclosure[];
   message: string | null;
   onEnclose: () => void;
-  onRemove: (id: number) => void;
+  onRemoveItem: (item: MediaItem) => void;
+  onRemovePending: (id: number) => void;
+  onRetryPending: (id: number) => void;
 }) {
   return (
     <View style={styles.enclosures}>
-      {pending.length > 0 ? (
+      {items.length > 0 || pending.length > 0 ? (
         <View style={styles.enclosureList}>
-          {pending.map((media) => (
-            <View key={media.id} style={styles.enclosureRow}>
+          {items.map((item) => (
+            <View key={item.id} style={styles.enclosureRow}>
               <Text style={styles.enclosureName} numberOfLines={1}>
-                {media.name}
+                {item.originalName ?? 'A file'}
               </Text>
-              <Text style={styles.enclosureSize}>{formatMediaSize(media.sizeBytes)}</Text>
-              <Pressable onPress={() => onRemove(media.id)} accessibilityRole="button" accessibilityLabel={`Remove ${media.name}`}>
+              <Text style={styles.enclosureSize}>{formatMediaSize(item.sizeBytes)}</Text>
+              <Pressable
+                onPress={() => onRemoveItem(item)}
+                accessibilityRole="button"
+                accessibilityLabel={`Remove ${item.originalName ?? 'file'}`}
+              >
+                <Text style={styles.enclosureRemove}>Remove</Text>
+              </Pressable>
+            </View>
+          ))}
+
+          {pending.map((p) => (
+            <View key={p.id} style={styles.enclosureRow}>
+              <View style={styles.enclosureInfo}>
+                <Text style={styles.enclosureName} numberOfLines={1}>
+                  {p.name}
+                </Text>
+                <Text style={styles.enclosureStage} accessibilityLiveRegion="polite">
+                  {stageLabel(p)}
+                </Text>
+              </View>
+              {p.stage === 'failed' && p.media ? (
+                <Pressable onPress={() => onRetryPending(p.id)} accessibilityRole="button" accessibilityLabel={`Retry ${p.name}`}>
+                  <Text style={styles.enclosureRemove}>Retry</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => onRemovePending(p.id)} accessibilityRole="button" accessibilityLabel={`Remove ${p.name}`}>
                 <Text style={styles.enclosureRemove}>Remove</Text>
               </Pressable>
             </View>
@@ -260,6 +295,22 @@ function PendingMediaSection({
       </Pressable>
     </View>
   );
+}
+
+/** State stated in text, never color alone — matches `AutosaveIndicator`'s own convention exactly. */
+function stageLabel(p: PendingEnclosure): string {
+  switch (p.stage) {
+    case 'encrypting':
+      return 'Encrypting…';
+    case 'sending':
+      return p.partsTotal > 1 ? `Uploading ${p.partsDone} of ${p.partsTotal}…` : 'Uploading…';
+    case 'finishing':
+      return 'Finishing…';
+    case 'enclosed':
+      return 'Enclosed';
+    case 'failed':
+      return p.error ?? 'Stopped before it finished';
+  }
 }
 
 /**
@@ -343,6 +394,8 @@ const styles = StyleSheet.create({
   },
   enclosureName: { flex: 1, fontSize: fontSize.body, color: colors.ink },
   enclosureSize: { fontSize: fontSize.caption, color: colors.muted, fontVariant: ['tabular-nums'] },
+  enclosureInfo: { flex: 1, gap: 2 },
+  enclosureStage: { fontSize: fontSize.caption, color: colors.muted },
   enclosureRemove: { fontSize: fontSize.caption, color: colors.muted },
   encloseButton: { alignSelf: 'flex-start', paddingVertical: space[2] },
   encloseButtonLabel: { fontSize: fontSize.body, fontWeight: fontWeight.medium, color: colors.brass },
