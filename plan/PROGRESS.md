@@ -4,6 +4,89 @@
 
 ## Current status
 
+### E1.4.3 — Compose movement, capsule-key generation, content encryption (2026-08-31) — DONE, committed, PR open
+
+Branched `e1.4.3-compose` from fresh `origin/main` (PR #61 confirmed merged as `98a15f0`). Implemented per
+the readiness audit's §6/§7/§9 findings, tracing the real web implementation rather than the older planning
+docs (`apps/web/src/lib/use-capsule-draft.ts`, `apps/web/src/lib/letter-envelope.ts`,
+`apps/web/src/components/composer/v2/ComposeMovement.tsx` and `AddressHallmark.tsx`,
+`apps/web/src/components/composer/Composer.tsx`'s `hasMoment` gate).
+
+**Capsule-key bootstrap:** deferred to Compose-screen mount (mobile's per-screen architecture, vs. web's
+container-level bootstrap) — a disclosed adaptation, not a semantics change, since Address never needs the
+key. `generateCapsuleKey()` + `wrapCapsuleKeyForOwner()` from `@tc/crypto`, unchanged, shared with web
+byte-for-byte.
+
+**Content format:** `LetterEnvelope` (`{doc: TipTap-JSON, writtenAt}`), write-side inverse of the existing
+decrypt-only `readEnvelope`/`envelopeText` — new `textToEnvelope`/`envelopeToText` in `capsule-crypto.ts`.
+Plain-text `TextInput`, not a rich editor (readiness audit §6.4's lowest-risk recommendation).
+
+**Base64 interoperability (readiness audit §6.8, resolved empirically this ticket):** `contentDocEnc` gets a
+new `encodeIvCiphertext` mirroring web's own `btoa`-based standard-base64 encoder exactly, rather than
+relying on `toBase64Url` + the server's tolerant `Buffer.from` decode. `ownerKeyWrap` needs no change — it's
+produced by the same shared `wrapCapsuleKeyForOwner` web already ships in production. Both proven via a test
+that replicates the real server's exact `Buffer.from`/`.toString('base64')` round-trip
+(`apps/api/src/modules/capsules/service.ts` / `mappers.ts`), not just Node's tolerant decoding.
+
+**Recipient key wrapping: out of scope, confirmed.** The product has no per-recipient wrapping at all — the
+bare capsule key travels via URL fragment only at Seal/announce time (`E1.4.8`), per readiness audit §6.5
+and `packages/crypto/src/capsule-key.ts`'s `encodeCapsuleKeyForLink`.
+
+**Draft persistence boundary:** debounced (~3s) server-only autosave via `PATCH /capsules/:id`, matching
+web's save-serialization pattern (a rerun loop that re-checks for newer edits arriving mid-save). No local
+cache of any kind, not even plaintext (deliberately not copying web's own plaintext `localStorage` mirror).
+The full encrypted-SQLite offline-draft architecture is `E1.4.4`'s job, untouched here.
+
+**Address gains its "Continue" advance**, reproducing web's exact `hasMoment` gate (`unlockAt || unlockLocal`
+truthy — independent of schedule validity) rather than Address's own "who answered" gate.
+
+**Idempotency:** no new requirement — E1.4.3 only adds more `PATCH` calls, already safe to retry (resending
+identical fields has no duplicating side effect, unlike `POST /capsules`). The pre-existing create-idempotency
+gap belongs to `E1.4.1`, out of scope here.
+
+**Deliberately deferred, disclosed:** media/enclosures (`E1.4.5`–`E1.4.7`), place-as-memory, the
+`MarginPrompt` writing-prompt component, any local/offline draft cache (`E1.4.4`), Review/Seal (`E1.4.8`).
+
+**Testing:** 361/361 mobile tests pass (30 files), `tsc --noEmit` clean, `eslint` clean. New coverage:
+`capsule-crypto.test.ts` (+11 tests: envelope write-side round-trip, base64 wire-format proofs against the
+real server transform), `use-capsule-compose.test.tsx` (17 tests: bootstrap/generate/unwrap, debounced
+autosave incl. rapid-typing collapse and overlapping-save serialization, save-failure messaging, security),
+`compose-compose.test.tsx` (17 screen tests incl. Hallmark, autosave status, accessibility),
+`compose-address.test.tsx` (+3 tests for the new advance button).
+
+**Manual Android verification (E1.4.3 §15), genuinely performed, not inferred:** real Pixel_7 emulator, real
+signup (`e143-verify-0831@example.com`, disposable) through the real API/Postgres. Address → schedule →
+Compose navigation, real multi-paragraph typing (blank line preserved), real capsule-key generation, real
+AES-GCM encryption, real `PATCH` accepted by the API and persisted in Postgres (`content_doc_enc`: 421 bytes;
+`owner_key_wrap`: 76 bytes, verified directly via `psql`), reopened from the Home draft list, content
+decrypted correctly through the app's own reload path.
+
+**Cross-platform verification (E1.4.3 §14), genuinely performed:** the same mobile-written, mobile-encrypted
+capsule was opened in the real web app (same account) and decrypted correctly by web's own independent
+decrypt path — exact text and paragraph structure matched, proving real interop through the real backend,
+not just matching TypeScript types.
+
+**Known tooling note (not a product defect):** `adb shell input text` drops words after the first space
+(remote shell re-splits unquoted args) and doesn't support non-ASCII — typed content during manual testing
+used `%s` for spaces and stayed ASCII; this is a device-input-tooling limitation, not evidence about the
+app's actual Unicode handling (already covered by the automated Unicode round-trip test).
+
+**Observation, not acted on:** `plan/STAGE-E-MOBILE-V1-E1.4-READINESS-AUDIT.md` has never been committed to
+git despite being the authoritative source for E1.4.1–E1.4.3 — it exists only as an untracked working-tree
+file. Left untouched per this session's "preserve unrelated work" instruction; flagging for whoever next
+touches `plan/`.
+
+**Files changed:** `apps/mobile/app/(app)/compose/[id]/address.tsx` (Continue button),
+`apps/mobile/app/(app)/compose/[id]/compose.tsx` (new), `apps/mobile/src/lib/capsule-crypto.ts` (write-side
+envelope + wire encoding), `apps/mobile/src/lib/use-capsule-compose.ts` (new), `apps/mobile/vitest.config.ts`
+(exclude native build dirs), plus the four corresponding test files.
+
+**Branch:** `e1.4.3-compose`. **Commit:** `219ee44`. **PR:** opened against `main`, not merged.
+
+**Exact next ticket:** `E1.4.4` — local encrypted drafts (offline draft cache, device-local draft-encryption
+key independent of the master key), per the readiness audit's ticket map. Not started, per this session's
+explicit "STOP after E1.4.3" instruction.
+
 ### E1.4.2 — Recipients, re-scoping audit (2026-08-29) — COMPLETE, no code changed (satisfied by E1.4.1)
 
 Per this session's explicit instruction: before starting the next E1.4 ticket, re-scope `E1.4.2` against
