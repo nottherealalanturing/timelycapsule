@@ -31,11 +31,12 @@ vi.mock('@react-native-community/datetimepicker', () => ({
 }));
 
 const back = vi.fn();
+const push = vi.fn();
 let routeId = '11111111-1111-1111-1111-111111111111';
 // A stable object, not a fresh literal per render — matching the real
 // expo-router hook's own stability, and avoiding a test-double-only extra
 // re-render each time some unrelated state changes.
-const router = { back };
+const router = { back, push };
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useLocalSearchParams: () => ({ id: routeId }),
@@ -172,6 +173,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(FIXED_NOW);
   back.mockReset();
+  push.mockReset();
   get.mockReset();
   patchFn.mockReset();
   recipientsList.mockReset().mockResolvedValue({ data: [] });
@@ -547,6 +549,43 @@ describe('AddressScreen', () => {
       await flush();
       expect(texts(instance)).not.toContain('A capsule can travel up to fifty years.');
       expect(texts(instance).join(' ')).not.toContain('has passed');
+    });
+  });
+
+  describe('advance to Compose (E1.4.3)', () => {
+    it('is disabled with "Choose when it opens" until a moment is chosen', async () => {
+      // `disabled` itself is real RN Pressable behavior (already relied on
+      // by the "Add" button above, untested for a no-op press there for the
+      // same reason) — a string-tag mock can't enforce it, so this only
+      // asserts the prop, not that a press through it is a no-op.
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = renderScreen();
+      await flush();
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Choose when it opens' });
+      expect(advance.props.disabled).toBe(true);
+      expect(advance.props.accessibilityState).toEqual({ disabled: true });
+    });
+
+    it('enables as "Compose" and navigates once a moment is chosen, regardless of who this is for', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'personal', unlockAt: '2027-01-01T00:00:00.000Z' }) });
+      recipientsList.mockResolvedValue({ data: [recipientFixture()] });
+      const instance = renderScreen();
+      await flush();
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Compose' });
+      expect(advance.props.accessibilityState).toEqual({ disabled: false });
+      await act(async () => {
+        advance.props.onPress();
+      });
+      expect(push).toHaveBeenCalledWith('/(app)/compose/11111111-1111-1111-1111-111111111111/compose');
+    });
+
+    it('stays enabled even when the chosen moment currently reads as invalid — only Seal, not Compose, cares whether the schedule is valid', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self', unlockAt: '2025-01-01T00:00:00.000Z' }) }); // already in the past
+      const instance = renderScreen();
+      await flush();
+      expect(texts(instance).join(' ')).toContain('has passed'); // the validation message is showing...
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Compose' });
+      expect(advance.props.accessibilityState).toEqual({ disabled: false }); // ...but Compose is still reachable
     });
   });
 

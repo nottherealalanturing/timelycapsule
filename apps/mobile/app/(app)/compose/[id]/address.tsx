@@ -33,10 +33,15 @@ import { useCapsuleDraft } from '../../../../src/lib/use-capsule-draft';
  *    ever writes `unlockAt` in the device's own current zone
  *    (`deviceZone()`), matching what `packages/core/src/zoned-time.ts`'s
  *    header comment says this ticket's native date/time picker needs.
- *  - No "Continue" action to Compose — that screen doesn't exist yet
- *    (later E1.4 tickets). Back always returns to Home; every change here
- *    is already saved via an immediate `PATCH`, so there is nothing a
- *    "Continue" button would need to flush.
+ *
+ * E1.4.3 adds the one thing this screen was honestly missing before Compose
+ * existed: a "Continue" advance, gated exactly like web's own footer
+ * (`apps/web/src/components/composer/Composer.tsx`'s `hasMoment` —
+ * `Boolean(capsule.unlockAt || capsule.unlockLocal)`, disabled otherwise with
+ * the exact copy "Choose when it opens") — not on `answeredWho`, and not on
+ * `scheduleProblem` being clear: a moment that currently reads "less than
+ * five minutes away" still advances (only Seal, not yet built, cares whether
+ * the schedule is *valid*; Compose only cares whether one exists at all).
  */
 export default function AddressScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -132,6 +137,17 @@ export default function AddressScreen() {
                     {scheduleProblem.message}
                   </Text>
                 ) : null}
+
+                <Pressable
+                  onPress={() => router.push(`/(app)/compose/${id}/compose`)}
+                  disabled={!selected}
+                  accessibilityRole="button"
+                  accessibilityLabel={selected ? 'Compose' : 'Choose when it opens'}
+                  accessibilityState={{ disabled: !selected }}
+                  style={[styles.advanceButton, !selected && styles.advanceButtonDisabled]}
+                >
+                  <Text style={styles.advanceButtonLabel}>{selected ? 'Compose' : 'Choose when it opens'}</Text>
+                </Pressable>
               </View>
             ) : null}
           </ScrollView>
@@ -496,4 +512,13 @@ const styles = StyleSheet.create({
   },
   fieldLabel: { fontSize: fontSize.caption, fontWeight: fontWeight.medium, color: colors.muted },
   fieldValue: { fontSize: fontSize.body, color: colors.ink },
+  advanceButton: {
+    marginTop: space[2],
+    backgroundColor: colors.brass,
+    borderRadius: radius.input,
+    paddingVertical: space[3],
+    alignItems: 'center',
+  },
+  advanceButtonDisabled: { opacity: 0.5 },
+  advanceButtonLabel: { fontSize: fontSize.body, fontWeight: fontWeight.semibold, color: colors.onAccent },
 });
