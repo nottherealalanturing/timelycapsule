@@ -4,6 +4,108 @@
 
 ## Current status
 
+### E1.4.7 — Media encryption + upload (2026-08-31) — DONE, committed, PR open
+
+Branched `e1.4.7-media-upload` from fresh `origin/main` (PR #65 for E1.4.6 confirmed merged as
+`555733f`). Implemented per the readiness audit's §6.6/§7/§8, tracing the real web implementation
+(`apps/web/src/components/composer/v2/use-enclosures.ts`, `apps/web/src/lib/use-capsule-draft.ts`'s
+`encryptForCapsule`) as the authoritative behavioral/protocol reference.
+
+**Closes the E1.4.5/E1.4.6 gap**: a picked file or accepted voice take now fires the real
+encrypt→ticket→upload→complete pipeline the instant it's picked/accepted, matching web's own
+instant-fire `onFiles`/`onEnclose` behavior exactly — no more "picked but inert" state.
+
+**Crypto/wire format**: new `encryptMediaForCapsule` (`capsule-crypto.ts`) — `iv(12) || ciphertext`,
+raw bytes, deliberately **not** base64 (unlike `contentDocEnc`) since media travels as a raw HTTP PUT
+body per the backend's own contract (`packages/contracts/src/media.ts`). No new crypto primitives —
+reuses `@tc/crypto`'s already-proven `encryptBytes`/native RNG.
+
+**New `media-upload.ts`** (`encloseMedia`): reads real file bytes via `expo-file-system`'s new SDK 57
+`File` API (`.bytes()`), encrypts, creates a ticket, PUTs each part (confirmed RN's `fetch` accepts a
+raw `Uint8Array` body directly via `convertRequestBody.js` — no `Blob` needed), completes.
+`randomIdempotencyKey()` uses `@tc/crypto`'s proven CSPRNG (`generateSalt`), not `Math.random` (Hermes
+has no `crypto.randomUUID`).
+
+**New `use-media-enclosures.ts`**: per-item state machine (encrypting → sending → finishing →
+enclosed/failed), independent retry/remove, orphaned-ticket recovery on remount — mirrors web's own
+`items`/`pending` split exactly. **Idempotency (readiness audit §7.5's own flagged gap, now actually
+used)**: the ticket-creation key is generated once per item and reused across retries of that same
+item (its body is stable across attempts — a real improvement over web, which sends no idempotency
+key at all and instead defensively deletes-and-recreates on retry); `complete` gets a fresh key every
+call since its body legitimately varies run to run.
+
+**`api-client.ts`**: `mediaApi` gains `createTicket`/`complete`/`delete`; `request()` gains
+`Idempotency-Key` header support.
+
+**Dependency**: `expo-file-system` `~57.0.6` (via `expo install`, SDK-57-matched). No config-plugin
+entry added — default storage permissions aren't needed since only content already granted by the
+existing pickers is ever read.
+
+**UI**: `compose.tsx` wires the new pipeline into the existing Enclose UI with no redesign — a stage
+line ("Encrypting…"/"Uploading…"/"Finishing…") replaces file size while pending; Retry appears only
+for a failed item whose bytes are still in memory (never for an orphaned row recovered from a
+previous session).
+
+**Testing**: 514 mobile tests (37 files) — new `media-upload.test.ts` (13 tests, real crypto + mocked
+fetch/ticket-API), `use-media-enclosures.test.tsx` (17 tests, real hook logic against a mocked
+api-client/media-upload boundary), `capsule-crypto.test.ts` (+5 tests for `encryptMediaForCapsule`),
+and a substantial rewrite of `compose-compose.test.tsx`'s media/voice sections for the new real
+pipeline (stateful `capsulesApi.media` mock reflecting actual create/complete/delete calls, since
+`useMediaEnclosures.refresh()` never locally appends a completed item — it trusts the next list
+refetch, exactly like web). `tsc --noEmit` clean, `eslint` clean.
+
+**Manual Android verification, genuinely performed (real Pixel 7 emulator, real local API + Postgres
++ real Cloudflare R2)**: no mobile signup screen exists (by design, E1.2's own scope) — signed up a
+fresh disposable account (`e147-verify-0831@example.com`) through the real **web** signup flow
+instead, then logged into mobile with it. Full Address → Compose flow with real typed content.
+**Image**: picked from library → encrypted → uploaded → completed → confirmed `status: 'ready'` in
+Postgres → **fetched the real R2 object directly and confirmed it is genuine ciphertext (no PNG magic
+bytes anywhere in it)**. **File**: a real PDF via the document picker → same full pipeline → `ready`.
+**Voice**: a real ~75s recording → real JIT `RECORD_AUDIO` permission dialog (no re-prompt on
+subsequent takes) → encrypted → uploaded → completed → `ready` with correct `durationMs` (74589).
+**Failure + retry**: killed the API mid-session, picked a file, confirmed the inline "Stopped before
+it finished" message with Retry/Remove and the letter completely untouched; restarted the API,
+tapped Retry, confirmed it completed **reusing the same idempotency key** without needing the file
+re-picked. **Security**: pulled the real on-device encrypted local draft SQLite file — empty, and its
+schema (`local_drafts`) has no media-related columns at all, structurally confirming media can never
+reach it; grepped the full app logcat — zero hits for any picked filename, URI, or content across the
+entire session. Disposable test data (DB rows, R2 objects, the test account) cleaned up afterward.
+
+**A genuine bug found only by real-device testing, not the mocked suite**: `removeItem`'s
+`mediaApi.delete(...).then(refresh)` had no `.catch` — with the API unreachable, detaching an
+already-attached item produced an uncaught promise rejection that crashed to a redbox. Fixed
+(matches `removePending`'s own existing best-effort-cleanup pattern) with a regression test that
+fails without the fix, committed as a separate follow-up commit once found.
+
+**Known, disclosed limitations**: whole-file-in-memory encryption (matches web exactly — no
+`encryptStream` anywhere in the live product; the readiness audit's own §6.6 flagged large-file
+streaming as a real but explicitly out-of-scope question for this ticket); no resumable/offline
+upload queue (matches web and the existing product's own characteristics — an interrupted upload is
+simply retried from the ticket step, by design); no cross-platform (web-decrypts-mobile-media)
+verification performed, since **no media-viewing UI exists on either platform yet** — release/reveal
+is out of E1.4's scope per the readiness audit; iOS not built/tested this ticket (Android-only device
+verification, matching this ticket's explicit focus).
+
+**Files changed**: `apps/mobile/src/lib/capsule-crypto.ts` (`encryptMediaForCapsule`),
+`apps/mobile/src/lib/use-capsule-compose.ts` (exposes `encryptForCapsule`), `apps/mobile/src/lib/
+media-upload.ts` (new), `apps/mobile/src/lib/use-media-enclosures.ts` (new), `apps/mobile/src/lib/
+api-client.ts` (`mediaApi` write methods, `Idempotency-Key`), `apps/mobile/app/(app)/compose/[id]/
+compose.tsx` (wiring), `apps/mobile/package.json`/`pnpm-lock.yaml` (`expo-file-system`), plus the
+corresponding test files.
+
+**Branch**: `e1.4.7-media-upload`. **Commits**: `f31554a` (implementation), `b370c80` (device-testing
+fix). **PR**: [#67](https://github.com/nottherealalanturing/timelycapsule/pull/67), opened against
+`main`, not merged. CI pending at session end; GitGuardian security check passed.
+
+**Exact next ticket**: `E1.4.8` — Review/Seal movement, per the readiness audit's ticket map. Not
+started, per this session's explicit "STOP after E1.4.7" instruction.
+
+**Unrelated, pre-existing note**: `apps/api/src/db/migrate.ts` has an unrelated, uncommitted fix from
+earlier this same session (a real portability bug — `new URL(...).pathname` percent-encodes spaces in
+the repo's own checkout path, breaking migrations on any path containing a space; fixed via
+`fileURLToPath`). Left uncommitted and untouched throughout this ticket per the session's own "don't
+stage unrelated work" instruction — flagging for whoever next touches that file.
+
 ### E1.4.6 — Voice Recorder (2026-08-31) — DONE, committed, PR open
 
 Branched `e1.4.6-voice-recorder` from fresh `origin/main` (PR #64 for E1.4.5 confirmed merged as `712f755`).
