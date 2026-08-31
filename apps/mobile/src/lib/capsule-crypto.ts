@@ -147,6 +147,67 @@ export function envelopeText(envelope: LetterEnvelope): string {
     .join('\n\n');
 }
 
+/** A freshly-started letter — one empty paragraph, matching web's own `emptyEnvelope()` exactly. */
+export function emptyEnvelope(): LetterEnvelope {
+  return { doc: EMPTY_DOC, writtenAt: null };
+}
+
+/**
+ * The write-side counterpart to `envelopeText`, for Compose's (E1.4.3) plain
+ * multiline text field — not used by the read-only detail screen, which only
+ * ever needs `envelopeText`'s display join. One `\n` is one paragraph break,
+ * matching TipTap's own per-Enter paragraph creation on web (a soft line
+ * break within a paragraph needs Shift+Enter there, which this ticket has no
+ * need to reproduce on a plain `TextInput`). `envelopeToText` is this
+ * function's exact inverse, so reopening Compose reads back precisely what
+ * was typed — not `envelopeText`'s own double-newline *display* convention,
+ * which is a separate, already-established, unrelated rendering choice.
+ */
+export function textToEnvelope(text: string, writtenAt: PlaceMemory | null = null): LetterEnvelope {
+  const doc = {
+    type: 'doc',
+    content: text
+      .split('\n')
+      .map((line) => (line.length > 0 ? { type: 'paragraph', content: [{ type: 'text', text: line }] } : { type: 'paragraph' })),
+  };
+  return { doc, writtenAt };
+}
+
+/** The exact inverse of `textToEnvelope`, for loading existing content back into Compose's editable field. */
+export function envelopeToText(envelope: LetterEnvelope): string {
+  const node = envelope.doc as { content?: { content?: { text?: string }[] }[] } | null;
+  if (!node?.content) return '';
+  return node.content.map((block) => (block.content ?? []).map((leaf) => leaf.text ?? '').join('')).join('\n');
+}
+
+/**
+ * The write-direction counterpart to `splitIvCiphertext` above — mirrors
+ * `apps/web/src/lib/capsule-crypto.ts`'s `encodeIvCiphertext` exactly (plain
+ * `btoa`, standard base64 alphabet and padding). Deliberately **not**
+ * `@tc/crypto`'s `toBase64Url`: `contentDocEnc`/`ownerKeyWrap` are documented
+ * as standard base64 on the wire (`packages/contracts/src/capsules.ts`,
+ * decoded server-side via `Buffer.from(x, 'base64')`). That decode is
+ * empirically tolerant of base64url input too (proven by `splitIvCiphertext`
+ * above, base64url-based, already exercised against real web-sealed content
+ * in every prior on-device test this Stage E arc has performed) — but the
+ * E1.4 readiness audit's own §6.8 is explicit that mobile's *own*
+ * newly-produced ciphertext should match the canonical wire format rather
+ * than merely rely on that tolerance, so this is a small, dedicated encoder
+ * rather than a reused one. `ownerKeyWrap` needs no equivalent: it is
+ * produced by `@tc/crypto`'s own shared `wrapCapsuleKeyForOwner`, unchanged
+ * and byte-for-byte identical on both platforms (including web's own base64
+ * *url* output there) — there is no mobile-specific encoding choice to make
+ * for that field at all.
+ */
+export function encodeIvCiphertext(iv: Uint8Array, ciphertext: Uint8Array): string {
+  const combined = new Uint8Array(iv.length + ciphertext.length);
+  combined.set(iv, 0);
+  combined.set(ciphertext, iv.length);
+  let binary = '';
+  for (const byte of combined) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
 export type DecryptCapsuleContentResult =
   | { status: 'no_content' }
   | { status: 'invalid_key_wrap'; error: Error }
