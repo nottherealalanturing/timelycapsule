@@ -1,6 +1,7 @@
 import type { Capsule, CreateRecipientRequest, PatchCapsuleRequest, Recipient } from '@tc/contracts';
 import { useCallback, useEffect, useState } from 'react';
-import { ApiClientError, capsulesApi, recipientsApi } from './api-client';
+import { capsulesApi, recipientsApi } from './api-client';
+import { describeCapsulePatchFailure, describeRecipientFailure } from './api-error-copy';
 
 export type CapsuleDraftState =
   | { status: 'loading' }
@@ -65,8 +66,8 @@ export function useCapsuleDraft(id: string): {
         const res = await capsulesApi.patch(id, fields);
         setState((prev) => (prev.status === 'ready' ? { ...prev, capsule: res.capsule } : prev));
         return true;
-      } catch {
-        setPatchError("That couldn't be saved. Check your connection and try again.");
+      } catch (err) {
+        setPatchError(describeCapsulePatchFailure(err));
         return false;
       }
     },
@@ -81,11 +82,7 @@ export function useCapsuleDraft(id: string): {
         setState((prev) => (prev.status === 'ready' ? { ...prev, recipients: [...prev.recipients, res.recipient] } : prev));
         return true;
       } catch (err) {
-        setRecipientError(
-          err instanceof ApiClientError && err.code === 'recipient_already_added'
-            ? 'That recipient is already added.'
-            : 'That recipient could not be added.',
-        );
+        setRecipientError(describeRecipientFailure(err, 'add'));
         return false;
       }
     },
@@ -101,8 +98,8 @@ export function useCapsuleDraft(id: string): {
           prev.status === 'ready' ? { ...prev, recipients: prev.recipients.filter((r) => r.id !== recipientId) } : prev,
         );
         return true;
-      } catch {
-        setRecipientError('That recipient could not be removed.');
+      } catch (err) {
+        setRecipientError(describeRecipientFailure(err, 'remove'));
         return false;
       }
     },

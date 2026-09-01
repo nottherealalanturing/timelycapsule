@@ -204,6 +204,28 @@ describe('useCapsuleDraft', () => {
       expect(result).toBe(false);
       expect(h.current.patchError).not.toBeNull();
     });
+
+    it('states a schedule-bounds rejection specifically (E1.4.10) — distinct from a network failure', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture() });
+      recipientsList.mockResolvedValue({ data: [] });
+      const h = await render();
+
+      const { ApiClientError } = await import('./api-client');
+      patchFn.mockRejectedValueOnce(new ApiClientError('unlock_in_past', 'unlockAt must be at least 5 minutes from now', 422));
+      await h.act(() => h.current.patch({ unlockAt: new Date().toISOString() }));
+      expect(h.current.patchError).toMatch(/five minutes/);
+    });
+
+    it('states an already-sealed rejection with the same copy the compose autosave path already uses (E1.4.10)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture() });
+      recipientsList.mockResolvedValue({ data: [] });
+      const h = await render();
+
+      const { ApiClientError } = await import('./api-client');
+      patchFn.mockRejectedValueOnce(new ApiClientError('capsule_sealed', 'Capsule is sealed', 409));
+      await h.act(() => h.current.patch({ type: 'self' }));
+      expect(h.current.patchError).toBe('This capsule has already been sealed and can no longer be edited.');
+    });
   });
 
   describe('addRecipient / removeRecipient', () => {
@@ -234,6 +256,29 @@ describe('useCapsuleDraft', () => {
       recipientsCreate.mockRejectedValueOnce(new Error('network down'));
       await h.act(() => h.current.addRecipient({ email: 'jordan@example.com' }));
       expect(h.current.recipientError).toBe('That recipient could not be added.');
+    });
+
+    it('states the per-capsule recipient limit specifically, not a generic message (E1.4.10)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture() });
+      recipientsList.mockResolvedValue({ data: [] });
+      const h = await render();
+
+      const { ApiClientError } = await import('./api-client');
+      recipientsCreate.mockRejectedValueOnce(new ApiClientError('quota_exceeded', 'Plan limit reached: recipients_per_capsule:3', 403));
+      await h.act(() => h.current.addRecipient({ email: 'amara@example.com' }));
+      expect(h.current.recipientError).toBe('This capsule already has as many recipients as this plan allows.');
+    });
+
+    it('states a locked-recipients rejection specifically when removing (E1.4.10)', async () => {
+      const recipient = recipientFixture();
+      get.mockResolvedValue({ capsule: capsuleFixture() });
+      recipientsList.mockResolvedValue({ data: [recipient] });
+      const h = await render();
+
+      const { ApiClientError } = await import('./api-client');
+      recipientsDelete.mockRejectedValueOnce(new ApiClientError('recipient_locked', 'Recipients can only be edited before the capsule unlocks', 409));
+      await h.act(() => h.current.removeRecipient(recipient.id));
+      expect(h.current.recipientError).toBe('Recipients can only be changed before this capsule opens.');
     });
 
     it('removes the recipient from state on successful delete', async () => {

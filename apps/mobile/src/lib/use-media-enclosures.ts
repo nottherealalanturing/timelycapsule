@@ -1,6 +1,7 @@
 import type { MediaItem } from '@tc/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { capsulesApi, mediaApi } from './api-client';
+import { describeEncloseFailure } from './api-error-copy';
 import { encloseMedia, randomIdempotencyKey, type EncloseStage } from './media-upload';
 import type { PickedMedia } from './media-source';
 
@@ -23,6 +24,8 @@ export interface PendingEnclosure {
   partsDone: number;
   partsTotal: number;
   error?: string;
+  /** E1.4.10 — false for a failure retrying the exact same bytes cannot fix (`describeEncloseFailure`); undefined/true otherwise. Only meaningful alongside `stage: 'failed'`. */
+  retryable?: boolean;
   mediaId?: string;
   media?: PickedMedia;
   ticketIdempotencyKey?: string;
@@ -121,14 +124,19 @@ export function useMediaEnclosures(
         if (!mountedRef.current) return;
         await refresh();
         setPending((prev) => prev.filter((p) => p.id !== id));
-      } catch {
+      } catch (err) {
         // The thrown error is always a plain status/shape message (see
         // media-upload.ts's own throw sites) — never plaintext, ciphertext,
         // or key material — but it is still not shown to the user verbatim;
         // a stated, calm sentence matches this product's established error
         // copy convention (`AutosaveIndicator`, `ErrorState`) better than an
-        // HTTP status code would.
-        update(id, { stage: 'failed', error: 'Stopped before it finished' });
+        // HTTP status code would. `describeEncloseFailure` (E1.4.10) maps
+        // the real server codes reachable here (`file_too_large`,
+        // `unsupported_media_type`, `quota_exceeded`) to specific,
+        // non-retryable copy — network/unmapped failures keep the exact
+        // original generic-but-retryable message.
+        const problem = describeEncloseFailure(err);
+        update(id, { stage: 'failed', error: problem.message, retryable: problem.retryable });
       }
     },
     [capsuleId, encryptForCapsule, refresh, update],
@@ -153,7 +161,7 @@ export function useMediaEnclosures(
         const item = prev.find((p) => p.id === id);
         if (!item?.media || !item.ticketIdempotencyKey) return prev;
         void runEnclose(id, item.media, item.ticketIdempotencyKey);
-        return prev.map((p) => (p.id === id ? { ...p, stage: 'encrypting', partsDone: 0, partsTotal: 1, error: undefined } : p));
+        return prev.map((p) => (p.id === id ? { ...p, stage: 'encrypting', partsDone: 0, partsTotal: 1, error: undefined, retryable: undefined } : p));
       });
     },
     [runEnclose],

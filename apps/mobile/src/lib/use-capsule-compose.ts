@@ -2,6 +2,7 @@ import type { Capsule, Recipient } from '@tc/contracts';
 import { encryptBytes, generateCapsuleKey, wrapCapsuleKeyForOwner } from '@tc/crypto';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiClientError, capsulesApi } from './api-client';
+import { describeCapsulePatchFailure } from './api-error-copy';
 import { useAuth } from './auth-context';
 import {
   decryptField,
@@ -141,13 +142,10 @@ export function useCapsuleCompose(id: string): {
           // A 4xx means the server understood and refused (e.g. the capsule
           // was sealed elsewhere mid-edit) — retrying identical bytes cannot
           // change that answer, matching web's own `saveRejection` handling.
+          setSaveMessage(describeCapsulePatchFailure(err));
           if (err instanceof ApiClientError && err.status >= 400 && err.status < 500) {
-            setSaveMessage(
-              err.code === 'capsule_sealed' ? 'This capsule has already been sealed and can no longer be edited.' : 'That could not be saved.',
-            );
             setAutosaveStatus('rejected');
           } else {
-            setSaveMessage("That couldn't be saved. Check your connection and try again.");
             setAutosaveStatus('error');
           }
           rerun = false;
