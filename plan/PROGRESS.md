@@ -4,6 +4,143 @@
 
 ## Current status
 
+### E1.4.8 — Review/Seal (2026-09-01) — DONE, committed, PR open
+
+Branched `e1.4.8-review-seal` from fresh `origin/main` (PR #67 for E1.4.7 confirmed merged as
+`e5985cf`). Read the readiness audit's own E1.4.8 row (§4.2/§4.4) and `design/21-CAPSULE-CREATION-
+V2.md §V` first, then traced the real web implementation directly rather than assuming from either
+document: `apps/web/src/components/composer/v2/SealMovement.tsx` (301 lines, read in full),
+`seal-errors.ts`, `completeness.ts`, and `Composer.tsx`'s `handleConfirmSeal`/`scheduleProblem`/
+`enclosuresInFlight` wiring. Backend contract confirmed by reading `apps/api/src/modules/capsules/
+lifecycle.ts`'s `sealCapsule` and `routes.ts` directly, not inferred from the ticket map.
+
+**Governing design principle, reproduced not redesigned**: "confidence, not confirmation" — Review
+*is* the record (the actual letter, actual enclosures, actual address, exactly as they will be
+received), so sealing follows from having seen the real thing rather than clicking past a summary
+card. No confirmation dialog; the irreversibility statement appears once, in plain language, beside
+the Seal action — matching web exactly.
+
+**Screen (`app/(app)/compose/[id]/review.tsx`, new)**: reuses `useCapsuleCompose`/
+`useMediaEnclosures` completely unchanged — this screen never resolves, generates, or receives a
+capsule key of its own; it only reads the envelope/capsule/recipients those hooks already produce
+(the same re-derive-from-server-on-each-screen architecture E1.4.1–E1.4.7 already established, not a
+new pattern). Shows who/when (the same reading Compose's own Hallmark gives), the real letter
+paragraphs, enclosed media by name only (never decrypted — `originalName`/`caption`, exactly like
+web's own `item.caption || item.originalName`), the irreversibility statement, and Seal.
+**Deliberately not built, disclosed rather than silent**: the optional "Called" title field (not in
+this ticket's own "at minimum" checklist, and mobile has no capsules-list surface yet where a private
+filing name would matter) and the Conditions detour (Place/Passphrase/Identity seals, retention,
+delivery toggles, break-glass) — matching the readiness audit's own §4.5 recommendation to defer this
+complexity, and "unavailable capabilities are omitted, not shown disabled."
+
+**Seal request carries no cryptographic artifact at all**: `POST /capsules/:id/seal` is bodyless
+(confirmed directly in `lifecycle.ts` — it reads only the already-persisted draft row); the capsule
+key that encrypted the content/media stays exactly where E1.4.3/E1.4.7 already put it. New
+`capsulesApi.seal(id, idempotencyKey)` in `api-client.ts`, using the same `Idempotency-Key` header
+convention E1.4.7's `media-upload.ts` established (`randomIdempotencyKey()`, `@tc/crypto`'s proven
+CSPRNG) — generated once per screen mount and reused across any retry of the same attempt, turning
+"response lost, capsule actually sealed" into a safe replay rather than an error, and reliably 409ing
+as `capsule_sealed` even without one (safe-by-rejection either way).
+
+**New `seal-errors.ts`** (`describeSealFailure`): ports the mobile-reachable subset of web's own
+`describeSealFailure` — `upload_incomplete`/`quota_exceeded`/`capsule_sealed`/`capsule_withdrawn`
+(all non-retryable-or-retryable per web's own judgment) and `unlock_in_past`/`validation_failed`
+(sent back to Address, matching web). Web's guest-only codes (`guest_capsule_limit`,
+`guest_session_invalid`) and `plan_required` are omitted deliberately — mobile has no guest entry
+point and no Conditions UI, so a mobile request can never structurally produce either; an unmapped
+code falls through to a generic retryable message carrying the server's own text, never silently
+mismapped.
+
+**Compose (`compose.tsx`) gained its Review advance button**: reproduces web's own footer gate
+(`firstCompletenessBlocker`) minus its schedule half — Compose is only reachable once Address has
+already set `unlockAt`, so only the "write something to seal" check remains. Flushes any pending
+autosave before navigating, same as the existing back button.
+
+**Client-side gates are UX niceties, never the real enforcement** (matches web exactly, and is stated
+in the code's own comments): a past-schedule or in-flight-enclosure check on Review can only ever be
+advisory, since the server's own `assertUnlockAtWithinBounds`/`upload_incomplete` 409 is the actual
+authority. Confirmed by design: mobile's per-screen architecture means `useMediaEnclosures` starts
+fresh on every Review mount, so `pending` can only ever contain already-`failed` orphaned rows
+recovered from a previous session, never a genuinely still-in-flight one — the "still arriving"
+client-side block is therefore reachable in principle but not in mobile's current architecture; real
+enforcement (the `upload_incomplete` 409) is what actually stops sealing on an incomplete item, and is
+correctly surfaced with a retryable message.
+
+**Known, disclosed limitation — the "something is waiting" announce email**: `announce_on_seal`
+defaults `true` server-side, and web's own `sealCapsule` deliberately does not schedule that email
+itself (its own comment: the server must never hold the bare capsule key the recipient link needs, so
+the owner's client builds/sends it via `POST .../recipients/:id/announce` immediately after seal,
+using a one-time recipient `accessToken`). Building that on mobile needs E1.4.1's Address screen to
+capture that token at recipient-creation time, which it explicitly does not do today. Not retrofitted
+into an already-merged ticket — a real scope reach-back this ticket wasn't asked to make. Hard rule 5
+(delivery never gated by payment/anything here) means the capsule still delivers correctly on
+schedule regardless; only the early heads-up email is skipped.
+
+**Testing**: 45 new tests (559 total mobile tests, up from 514) — `api-client.test.ts` (+5:
+`capsulesApi.seal`'s exact bodyless POST, `Idempotency-Key` header, success, `capsule_sealed`/
+`upload_incomplete` propagation), new `seal-errors.test.ts` (10, every mapped code plus the
+generic/non-`ApiClientError` fallback), new `compose-review.test.tsx` (26: loading/error states, the
+record's who/when/letter/enclosures/irreversibility text, key/content/schedule preservation across
+back-and-return with zero `patch` calls proving no second key or mutation ever happens, the exact
+2-argument bodyless seal call, idempotency-key reuse across a failed retry, success navigating via
+`replace` not `push`, double-submit prevention, network/validation/already-sealed failure handling
+without draft destruction, the real "client-side gate can't fire, server 409 is real enforcement"
+case, a full render+seal cycle asserting nothing sensitive is ever logged, and the "no
+`@tc/crypto`/SecureStore import" static check E1.3.11 established), and 4 new tests on
+`compose-compose.test.tsx` for the Review advance button. `tsc --noEmit` clean, `eslint` clean, full
+suite run twice with no flakiness.
+
+**Manual Android verification, genuinely performed (real Pixel 7 emulator, real local API +
+Postgres + real Cloudflare R2)**: no mobile signup exists by design — signed up a fresh disposable
+account (`e148-verify-0901@example.com`) through the real **web** signup flow, logged into mobile
+with it. Full real flow: Address (real recipient + "a month from now" schedule) → Compose (real typed
+letter, exact text preserved through adb's own input-encoding quirks) → attached a real PDF through
+the full encrypt/ticket/upload/complete pipeline (confirmed `status: 'ready'`, real AES-GCM-inflated
+ciphertext size in Postgres) → Review (confirmed every field — address, schedule, full letter text,
+enclosure glyph/name, irreversibility copy) → back to Compose and returned to Review (confirmed exact
+state preserved, zero duplicate capsule created) → **Sealed for real**: Postgres confirmed
+`state: 'sealed'`, correct `sealed_at`, and all four expected `scheduled_actions` rows
+(`capsule_unlock` at the exact `unlock_at`, `reminder`, `media_release_warning` ×2, `media_release`)
+inserted atomically, media still `status: 'ready'` and correctly associated, exactly one capsule row
+throughout. **Immutability confirmed**: tapping the sealed capsule from Home routes to the read-only
+Capsule Detail screen (E1.3.8's own screen) — there is no path back into Compose/Address for a sealed
+capsule at all. **Real failure + retry**: paused (`SIGSTOP`, not killed) the real API process mid-Seal,
+confirmed the exact "Could not reach the server. Check your connection." message, the Seal button
+re-enabled (retryable), and the letter/media/address completely untouched (capsule still `draft` in
+Postgres); killed and restarted the API, tapped Seal again, confirmed it succeeded with **the same
+idempotency key** as the failed attempt. **Security**: grepped the full device logcat across the
+entire session for the master key, capsule key, letter text, PDF filename, and the test account's
+literal password — zero hits anywhere (only a benign OS-level `MediaProvider` line naming the file
+path, expected system behavior for reading a picked file, not an app leak). Disposable test data (the
+account, capsule, media row, scheduled actions, and the real R2 object) deleted afterward.
+
+**Cross-platform verification — not performed, real environment boundary, not silently skipped**:
+attempting to confirm web can open this account's data hit a real, unrelated new-device
+email-verification gate (a 6-digit code sent to an inbox that doesn't exist for a disposable
+`@example.com` test address) — this is a correct, working security control, not something to bypass.
+Combined with the disclosed announce-email gap above (no recipient `accessToken` captured, so no real
+reveal link exists to test with either), true cross-platform verification could not be performed
+within this ticket's scope. Documented rather than claimed.
+
+**Files changed**: `apps/mobile/src/lib/api-client.ts` (`capsulesApi.seal`), `apps/mobile/src/lib/
+seal-errors.ts` (new), `apps/mobile/app/(app)/compose/[id]/review.tsx` (new),
+`apps/mobile/app/(app)/compose/[id]/compose.tsx` (Review advance button), plus the corresponding test
+files. No new dependencies.
+
+**Branch**: `e1.4.8-review-seal`. **Commit**: `6dac4de` (implementation). **PR**:
+[#68](https://github.com/nottherealalanturing/timelycapsule/pull/68), opened against `main` (E1.4.7's
+PR #67 confirmed merged first), not merged. CI pending at session end.
+
+**Exact next ticket**: `E1.4.8` was the last item in Stage E Mobile V1's E1.4 (Capsule Creation) arc
+per the readiness audit's own ticket map. Not started, per this session's explicit "STOP after
+E1.4.8" instruction — no E1.4.9, no accessibility/error pass beyond what's built, no place-as-memory,
+margin prompt, recovery UI, push notifications, offline media queue, media viewer, or the announce-
+email/cross-platform gaps disclosed above.
+
+**Unrelated, pre-existing note**: `apps/api/src/db/migrate.ts` still carries the same unrelated,
+uncommitted `fileURLToPath` portability fix noted in E1.4.7's own entry below — left untouched again
+this session per the same "don't stage unrelated work" instruction.
+
 ### E1.4.7 — Media encryption + upload (2026-08-31) — DONE, committed, PR open
 
 Branched `e1.4.7-media-upload` from fresh `origin/main` (PR #65 for E1.4.6 confirmed merged as
