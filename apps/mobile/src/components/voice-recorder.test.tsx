@@ -121,7 +121,7 @@ vi.mock('expo-audio', () => ({
   },
 }));
 
-const { VoiceRecorder } = await import('./voice-recorder');
+const { VoiceRecorder, elapsedAnnouncement } = await import('./voice-recorder');
 
 function texts(instance: TestRenderer.ReactTestRenderer): string[] {
   return instance.root.findAllByType(Text).map((node) => node.props.children).flat();
@@ -417,6 +417,16 @@ describe('VoiceRecorder', () => {
       expect(region.length).toBeGreaterThan(0);
     });
 
+    it('E1.4.11: the elapsed reading is a live region, so a writer recording without sight of the screen hears it too', async () => {
+      const instance = await render();
+      await act(async () => byLabel(instance, 'Start recording')!.props.onPress());
+
+      const elapsed = instance.root
+        .findAllByProps({ accessibilityLiveRegion: 'polite' })
+        .find((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.includes('seconds recorded'));
+      expect(elapsed).toBeDefined();
+    });
+
     it('never exposes the raw file URI in any accessibility label or visible text', async () => {
       recorderUri = 'file:///a-very-specific-private-path.m4a';
       const instance = await render();
@@ -426,6 +436,38 @@ describe('VoiceRecorder', () => {
       const allLabels = instance.root.findAllByType(Pressable).map((n) => n.props.accessibilityLabel);
       expect(texts(instance).join(' ')).not.toContain('a-very-specific-private-path');
       expect(allLabels.join(' ')).not.toContain('a-very-specific-private-path');
+    });
+  });
+
+  /**
+   * `elapsedAnnouncement` (E1.4.11) is tested directly rather than through a
+   * full component render + simulated tick sequence: the mocked
+   * `useAudioRecorderStateSpy` above is a plain function with no internal
+   * polling of its own (unlike the real `expo-audio` hook, which re-renders
+   * its caller every 200ms) — nothing in this test file's existing mock
+   * architecture can force `RecordingElapsed` to re-render on a changed
+   * `recorderStateDurationMillis` without a real timer driving it, so a
+   * multi-tick integration test here would only prove the mock's own
+   * plumbing, not this function's real bucketing logic. Testing the exported
+   * pure function directly is exactly this codebase's own established
+   * fallback for that situation (`media-source.test.ts`'s "mock narrowly,
+   * test the logic for real" philosophy, cited in this file's own header
+   * comment) — it is the same function `voice-recorder.tsx` actually calls.
+   */
+  describe('elapsedAnnouncement (E1.4.11)', () => {
+    it('while recording, rounds down to five-second buckets rather than announcing every tick', () => {
+      expect(elapsedAnnouncement(0, 'recording')).toBe('0 seconds recorded');
+      expect(elapsedAnnouncement(1200, 'recording')).toBe('0 seconds recorded');
+      expect(elapsedAnnouncement(4999, 'recording')).toBe('0 seconds recorded'); // one tick before the boundary — must not fire early
+      expect(elapsedAnnouncement(5000, 'recording')).toBe('5 seconds recorded');
+      expect(elapsedAnnouncement(7300, 'recording')).toBe('5 seconds recorded'); // mid-bucket — must not have changed again yet
+      expect(elapsedAnnouncement(9999, 'recording')).toBe('5 seconds recorded');
+      expect(elapsedAnnouncement(10000, 'recording')).toBe('10 seconds recorded');
+    });
+
+    it('once stopped, announces the exact final duration — not rounded to a five-second bucket', () => {
+      expect(elapsedAnnouncement(7300, 'ready')).toBe('7 seconds recorded'); // Math.round(7300 / 1000)
+      expect(elapsedAnnouncement(7600, 'ready')).toBe('8 seconds recorded');
     });
   });
 

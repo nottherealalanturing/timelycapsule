@@ -4,6 +4,132 @@
 
 ## Current status
 
+### E1.4.11 — Accessibility pass, Creation (2026-09-01) — DONE, committed, PR open
+
+Branched `e1.4.11-accessibility-creation` from fresh `origin/main` (PR #70 for E1.4.10 confirmed
+merged). Read the readiness audit's §13 (Accessibility considerations) and `EXECUTION-BACKLOG.md`'s
+`E4.10` directly — the last item in the E1.4 (Capsule Creation) arc per the ticket map. Its own
+citations to "master blueprint §21 Phase 4 DoD" and "blueprint §13's screen spec table" for the
+voice-recorder elapsed-time requirement turned out to be loose/approximate (§21 is the phase list,
+§13 is Universal Links) — the readiness audit's own §13 text is itself the authoritative, sufficient
+requirement, so this was not a missing-file blocker, just a citation looseness noted here rather
+than silently trusted.
+
+**Real audit before implementation, not assumed accessible-by-default:** read Address/Compose/
+Review/`voice-recorder.tsx`/`media-source-sheet.tsx` in full and grepped every existing
+`accessib*` prop. Address turned out to already be thorough (composed candidate/chip/choice labels,
+live regions, alerts) — E1.4.1's own original implementation and E1.4.10's error work had already
+gotten this right; no change needed there. The real gaps, found by direct comparison against
+`capsule-detail.tsx`'s own E1.3.11-established patterns:
+
+1. **VoiceRecorder's elapsed-time readout had no live region at all** — the ticket's own explicitly
+   named "genuinely mobile-only accessibility case" (a writer recording without sight of the screen
+   got zero periodic feedback). Fixed with `accessibilityLiveRegion="polite"` plus a throttled
+   `elapsedAnnouncement()` (exported, unit-tested directly): rounds down to five-second buckets while
+   `stage === 'recording'` (the label string only actually changes once per bucket, so TalkBack
+   doesn't re-announce on every 200ms tick — confirmed by the fact that nothing about *how* a live
+   region fires needed touching, only *when the value changes*), and reads the exact final duration
+   once stopped. Not testable via a full component render (the mocked `useAudioRecorderStateSpy` has
+   no internal polling to drive a re-render across simulated ticks, unlike the real `expo-audio`
+   hook) — tested as a direct unit test of the exported pure function instead, matching this
+   codebase's own "mock narrowly, test the logic for real" fallback.
+2. **Compose's attached/pending media rows** rendered name+size (or name+stage) as separate,
+   ungrouped `Text` siblings — two or three fragments a screen-reader user had to swipe through and
+   mentally reassemble. Grouped into one `accessible accessibilityRole="text"` block per row, matching
+   `capsule-detail.tsx`'s own `ReplyEntry`/`RecipientRow` pattern exactly — with a new
+   `enclosureItemInfo` style (row-direction, matching `enclosureRow`'s own layout) so the ready-item's
+   name+size grouping didn't silently reflow to a column stack the way blindly reusing the existing
+   `enclosureInfo` (column) style would have. Remove/Retry stayed separate sibling `Pressable`s,
+   never nested inside the accessible block — nesting an interactive element inside `accessible={true}`
+   would make it unreachable via TalkBack focus traversal, a real, easy-to-miss mistake this ticket
+   deliberately avoided.
+3. **Address's recipient chips were checked and found already correct** — a single `Text` (the name)
+   next to a separately-labeled `Remove {name}` button needs no additional grouping (unlike the
+   media rows above, which had *two* static fragments to bundle); no change made.
+4. **Review's enclosed-media glyph** (♪/▤/▣, matching web's own three-way choice exactly) would be
+   read as a raw Unicode character name by TalkBack. Given an explicit word-based
+   `accessibilityLabel` ("Audio, voice-note.m4a") instead, never finer-grained than the glyph's own
+   three-way distinction.
+5. **The letter editor gained an `accessibilityHint`**, and **the Seal button's irreversibility
+   statement was added as its hint too** — `design/21-CAPSULE-CREATION-V2.md` §V's own explicit
+   requirement that it be heard "as part of the same accessible flow as the Seal button, not a
+   separate, missable element," which a purely-adjacent (but not guaranteed-encountered) `Text`
+   sibling doesn't fully satisfy for every navigation path.
+
+**A genuine, non-obvious technical finding from reading React Native's own Android source** (not
+assumed): `accessibilityHint` compiles to `AccessibilityNodeInfo.tooltipText`
+(`ReactAccessibilityDelegate.kt`), a *different* native mechanism than `contentDescription` —
+meaning `uiautomator dump`'s standard XML schema (which only surfaces `content-desc`) cannot confirm
+whether a hint reached the tree at all, unlike every other accessibility prop this session verified.
+Resolved empirically, not left as a guess: TalkBack itself logs its own speech-queue contents to
+logcat when TTS isn't yet warmed up (`SpeechControllerImpl: TTS is not ready... Item: {fragments:
+[...]}`), and a captured entry for the real letter field showed the fragment `{text:Edit box, Write
+your letter…, Saved automatically as you write}` — direct, first-party proof the hint text really is
+queued for speech on this Android/TalkBack version. The Seal button uses the identical mechanism but
+its own speech wasn't separately captured this session (disclosed below, not silently assumed
+identical).
+
+**Tests**: 17 new/updated (593 total mobile tests, up from 586) — `voice-recorder.test.tsx` gained a
+dedicated `elapsedAnnouncement` unit-test block (bucket boundaries at 0/1200/4999/5000/7300/9999/
+10000ms while recording, exact-duration reads once stopped) plus updated its existing live-region
+test's surrounding coverage; `compose-compose.test.tsx` gained tests for the grouped media-row labels
+(both the ready-item and pending-item cases) and the letter field's hint; `compose-review.test.tsx`
+gained tests for the enclosure kind-word label and the Seal button's hint. `tsc --noEmit` clean,
+`eslint` clean, full suite run twice — no flakiness.
+
+**Manual TalkBack verification, genuinely performed (real Pixel 7 emulator, TalkBack actually
+enabled and running — confirmed via `dumpsys accessibility`'s `touchExplorationEnabled=true` and
+`Bound services:{Service[label=TalkBack...`, not merely toggled in Settings)**: signed up a fresh
+disposable account (`e1411-verify-0901@example.com`) through the real web signup flow, logged into
+mobile with it. A real system "Allow notifications" permission dialog belonging to TalkBack itself
+(Android's own Accessibility Suite, unrelated to this app) intercepted early taps repeatedly until
+granted directly via `pm grant` — disclosed as a real environment quirk encountered, not a product
+defect. Full real flow with TalkBack live throughout: Address (composed "Myself. It comes back to
+you, and no one else" / "A month from now. Oct 1, 2026" labels confirmed in the live accessibility
+tree) → Compose (typed a real letter; confirmed the letter field's `content-desc="Letter"` and,
+via the TTS-log capture described above, its hint text queued for speech) → real voice recording
+through Compose's actual "Enclose something" → Voice flow (confirmed live: visible timer read
+"00:31" while the announced `content-desc` read "30 seconds recorded" — the throttled bucket value,
+not a per-tick flood; confirmed the stopped reading showed the exact final duration, "85 seconds
+recorded", not bucketed) → enclosed the take through the real encrypt/upload pipeline (confirmed
+live: `content-desc="Voice recording ....m4a, 1.0 MB"` as one grouped node) → Review (confirmed live:
+`content-desc="Audio, Voice recording ....m4a"`, not the raw glyph) → **sealed for real**, confirmed
+`state: 'sealed'` in Postgres with the real voice recording as a `ready` media row. Disposable test
+data (the account, capsule, and DB rows) deleted afterward.
+
+**Known, disclosed gap in this session's own cleanup, not a product issue**: the real R2 object for
+the disposable test capsule's voice recording was not deleted — its `media_items` row (and the
+`storage_key` it held) was deleted via SQL before the R2 delete step was run, an ordering mistake in
+this session's own scratch cleanup script, not a data-retention bug in the product itself.
+
+**iOS/VoiceOver: not verified interactively** — this tooling's already-established, repeatedly
+disclosed limitation across every prior mobile ticket (no working interactive Fabric automation on
+this specific tooling). The props touched here (`accessibilityLiveRegion`, `accessibilityLabel`,
+`accessibilityHint`, `accessible`) are all genuinely cross-platform React Native props, not
+Android-specific code, and their correctness is enforced by the new unit/screen tests above rather
+than by an iOS device pass — a real, live VoiceOver confirmation remains outstanding, disclosed
+rather than claimed.
+
+**Files changed**: `apps/mobile/src/components/voice-recorder.tsx` (`elapsedAnnouncement`, exported;
+live region), `apps/mobile/app/(app)/compose/[id]/compose.tsx` (grouped media rows, letter hint),
+`apps/mobile/app/(app)/compose/[id]/review.tsx` (`enclosureKindWord`, Seal hint), plus the
+corresponding test files. No new dependencies.
+
+**Branch**: `e1.4.11-accessibility-creation`. **Commit**: `1526f86` (implementation). **PR**:
+[#71](https://github.com/nottherealalanturing/timelycapsule/pull/71), opened against `main` (E1.4.10's
+PR #70 confirmed merged first), not merged. CI pending at session end.
+
+**Exact next ticket**: `E1.4.11` was the last item in Stage E Mobile V1's E1.4 (Capsule Creation) arc
+per the readiness audit's own §3.2 ticket map — **the entire E1.4 phase is now complete**. Per this
+session's explicit "do not begin E1.5 or any other ticket" instruction, stopping here; the next
+planned work (Stage E's post-creation phases, e.g. reveal/media/One-Reading-Only per the master
+blueprint's own Phase 5) has not been scoped into `E1.5.N`-style sub-tickets the way E1.4 was, and
+doing so would itself be new planning work, not something to start unprompted.
+
+**Unrelated, pre-existing note**: `apps/api/src/db/migrate.ts` still carries the same unrelated,
+uncommitted `fileURLToPath` portability fix noted in every prior entry below — left untouched again
+this session per the same "don't stage unrelated work" instruction.
+
 ### E1.4.10 — Error/validation states across creation (2026-09-01) — DONE, committed, PR open
 
 Branched `e1.4.10-error-validation` from fresh `origin/main` (PR #69 for E1.4.9 confirmed merged).
