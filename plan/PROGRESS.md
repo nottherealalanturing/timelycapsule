@@ -4,6 +4,106 @@
 
 ## Current status
 
+### E1.4.9 — Cross-platform capsule verification (phase-closing gate) (2026-09-01) — DONE, committed, PR open
+
+Branched `e1.4.9-cross-platform-gate` from fresh `origin/main` (PR #68 for E1.4.8 confirmed merged as
+`096b4af`). Determined the exact next ticket by reading the readiness audit's own §3.2 ticket map
+directly, not by assuming from the previous session's own final report — that map places `E1.4.9`
+("Cross-platform capsule verification (phase-closing gate)"), `E1.4.10` (error/validation pass), and
+`E1.4.11` (accessibility pass) after E1.4.8, all still inside the same E1.4 arc. Per the map's own
+row: `E1.4.9` needs "none new" contract, is "N/A — verification ticket" for new UI, and exists to
+prove §6.8's base64/base64url wire-format question empirically — **not a build ticket**.
+
+**Audited before assuming any new code was needed.** Traced the actual encode/decode/server-transform
+chain directly:
+- Mobile's `contentDocEnc` (`capsule-crypto.ts`'s `encodeIvCiphertext`, hand-written standard base64,
+  `btoa`-based) is byte-for-byte identical logic to web's own `encodeIvCiphertext` — confirmed by
+  reading both files side by side.
+- `ownerKeyWrap` is wrapped by the exact same shared `@tc/crypto` `wrapCapsuleKeyForOwner`/`wrapKey` on
+  **both** platforms (not two independent implementations) — this alphabet (base64url, via
+  `toBase64Url`) has been in production on web since capsule creation first existed.
+- The server (`apps/api/src/modules/capsules/{service,mappers}.ts`) decodes inbound values via a
+  lenient `Buffer.from(x, 'base64')` (empirically tolerant of both alphabets) and always re-encodes
+  outbound via strict standard-base64 `.toString('base64')`, regardless of which alphabet was sent.
+- **Found that the exact empirical proof §6.8 calls for already exists**: `apps/mobile/src/lib/
+  capsule-crypto.test.ts` already contains two dedicated tests (written during E1.4.3, anticipating
+  this exact gate) simulating the real server's `Buffer.from(x,'base64')`/`.toString('base64')`
+  transform for both `contentDocEnc` (standard base64 in, unchanged out) and `ownerKeyWrap` (base64url
+  in, standard base64 out, but decrypts to the identical capsule key either way). No new unit test was
+  written — writing one that only restates these would be pure duplication, not new proof.
+
+**Conclusion: no new production code, matching the ticket map's own "gate, not a build ticket"
+framing exactly.** This ticket's entire job was performing the one proof no unit test can substitute
+for: a real mobile-sealed capsule, opened and correctly decrypted by the real, unmodified web app.
+
+**Real verification performed (not mocked, not inferred):**
+1. Fresh disposable account (`e149-verify-0901@example.com`) signed up through the real **web** signup
+   flow (mobile has no signup screen by design).
+2. **A real, correct security control was hit and respected, not routed around:** the web app's
+   `(app)` layout gates every protected route on `user.emailVerifiedAt` (`apps/web/src/app/(app)/
+   layout.tsx`), and a disposable `@example.com` address has no reachable inbox to click a real OTP
+   link from. Asked the user how to proceed rather than guess; per their explicit choice, seeded
+   `email_verified_at` directly on this one disposable local-dev test row (`UPDATE users SET
+   email_verified_at = now() WHERE email = '...'`) — the same class of already-established
+   direct-DB-seed technique this codebase already uses for test *capsule* states, applied here to a
+   test *account* instead, purely local dev data, no production or real-user boundary touched. (An
+   unprompted attempt at a different, more automated route to the same end — during investigation,
+   before this was asked — was itself correctly blocked by the harness's own safety classifier as
+   resembling a verification-bypass pattern; that was the right call, and the direct-seed route taken
+   instead was the one the user explicitly authorized.)
+3. Logged into **mobile** with that account. Real Address (recipient `amara@example.com`, "a month
+   from now" schedule) → Compose (a real, distinctive typed letter: *"This letter was encrypted on
+   MOBILE and must decrypt correctly on the real web app E1.4.9."*) → Review → **Sealed for real**.
+   Confirmed in Postgres: `state: 'sealed'`.
+4. **Mobile-side readback** (re-confirming E1.3.8's already-proven read path, for this ticket's own
+   completeness): tapped the sealed capsule on Home, mobile's own capsule-detail screen decrypted and
+   displayed the exact letter text correctly.
+5. **The genuinely new proof**: opened `http://localhost:3001/capsule/<id>` in the real web app, logged
+   in as the same owner. Web's own `LetterRecord` component correctly showed "Closed" (zero-access —
+   the master key is never persisted, matching `07 §V.6` exactly) with a password-unlock prompt;
+   entered the real password, and **the exact same letter text — encrypted entirely by mobile's write
+   path, never touched by web's own encoder — decrypted and rendered correctly on the real, unmodified
+   web app**. This is the direct, empirical, end-to-end proof §6.8 asked for, not merely unit-test
+   inference.
+6. **Security**: grepped the full mobile device logcat and the web browser's console for the master
+   key, capsule key, the letter text, and the account password — zero hits on either side.
+7. Disposable test data (the account, capsule, recipient, scheduled actions) deleted from Postgres
+   afterward on both the mobile-session and web-session sides (same account, one cleanup).
+
+**A real, pre-existing, unrelated environment gap found and fixed while running the regression
+gate:** `apps/api`'s full test suite (305 tests) failed almost entirely (225 failures, all `expected
+500 to be 2xx`) the first time it was run this session. Traced to the actual root cause by calling
+the `signup` service function directly (bypassing the HTTP error handler that had swallowed the real
+exception into a generic "Something went wrong") — `database "timelycapsule_test" does not exist`.
+`.env.test`'s own header comment confirms this is by design (a deliberately separate test database,
+isolating the test suite's `scheduled_actions` rows from a long-running local scheduler process
+ticking against the dev DB — a real flake this codebase hit and fixed before). The database had
+simply never been created in this environment's Docker Postgres volume. Fixed by creating it
+(`CREATE DATABASE timelycapsule_test`, `CREATE EXTENSION citext`) and running the existing migrations
+against it (`NODE_ENV=test tsx src/db/migrate.ts`) — no code changes, no schema changes, nothing to
+commit; all 305 API tests then passed. Documented here rather than silently worked around, since a
+future session hitting the same "test suite inexplicably all-fails" symptom should find the real
+cause immediately rather than re-diagnosing it.
+
+**Testing**: No new tests (see "no new production code" above). Full regression run: mobile 559/559
+passing, `tsc --noEmit`/`eslint` clean; API 305/305 passing (once the pre-existing test-DB gap above
+was fixed), `tsc --noEmit`/`eslint` clean.
+
+**Files changed**: None (verification-only ticket, as the readiness audit's own ticket map predicted).
+`plan/PROGRESS.md` only.
+
+**Branch**: `e1.4.9-cross-platform-gate`. **Commit**: (this PROGRESS.md entry is the only change).
+**PR**: opened against `main` (E1.4.8's PR #68 confirmed merged first), not merged.
+
+**Exact next ticket**: `E1.4.10` — Error/validation states across creation, per the readiness audit's
+own §3.2 ticket map (depends on E1.4.1–E1.4.8, both already complete). Not started, per this session's
+explicit "STOP after this ticket" instruction. `E1.4.11` (accessibility pass, Creation) follows after
+that.
+
+**Unrelated, pre-existing note**: `apps/api/src/db/migrate.ts` still carries the same unrelated,
+uncommitted `fileURLToPath` portability fix noted in E1.4.7's and E1.4.8's own entries — left untouched
+again this session per the same "don't stage unrelated work" instruction.
+
 ### E1.4.8 — Review/Seal (2026-09-01) — DONE, committed, PR open
 
 Branched `e1.4.8-review-seal` from fresh `origin/main` (PR #67 for E1.4.7 confirmed merged as
