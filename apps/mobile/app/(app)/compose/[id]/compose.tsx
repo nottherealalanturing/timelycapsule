@@ -30,10 +30,13 @@ import { useMediaEnclosures, type PendingEnclosure } from '../../../../src/lib/u
  *  - **"The address stays visible."** Who and when were settled in Address;
  *    restating them here (`Hallmark`) is a *reading*, never a control —
  *    changing either means going back a movement, exactly like web.
- *  - **"There is no sticky advance."** The way onward — Seal — does not
- *    exist yet (a later E1.4 ticket), so unlike web's own footer this screen
- *    has no forward action at all, the same honest dead-end Address itself
- *    was before this screen existed. Back always returns to Address.
+ *  - **The advance to Review (E1.4.8)** reproduces web's own footer gate
+ *    (`Composer.tsx`'s `<Advance disabled={Boolean(blocker)}>`) exactly,
+ *    minus its schedule half: `firstCompletenessBlocker`'s "choose when it
+ *    opens" branch can never fire here, since Compose is only reachable once
+ *    Address has already set `unlockAt` (its own advance gate). Only the
+ *    "write something to seal" check remains. Flushes any pending autosave
+ *    before navigating, same as the back button.
  *
  * **Media (E1.4.5 selection, E1.4.7 encrypt/upload)** now fires the full
  * enclose pipeline the instant a file is picked or a voice take is
@@ -54,11 +57,10 @@ import { useMediaEnclosures, type PendingEnclosure } from '../../../../src/lib/u
  * Idle→Recording→Preparing→Ready lifecycle. An accepted take is enclosed
  * exactly like any other picked file, at the same `PickedMedia` boundary.
  *
- * Deliberately not built here (out of E1.4.7's scope, disclosed):
- * place-as-memory (no location UI anywhere in this ticket, and it is not a
- * media kind at all — see the design doc's
- * "Place as memory, separated from the Place Seal"), the margin
- * writing-prompt (`MarginPrompt.tsx`), and Review/Seal (`E1.4.8`).
+ * Deliberately not built here (out of scope, disclosed): place-as-memory (no
+ * location UI anywhere in this ticket, and it is not a media kind at all —
+ * see the design doc's "Place as memory, separated from the Place Seal"),
+ * and the margin writing-prompt (`MarginPrompt.tsx`).
  */
 export default function ComposeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -143,6 +145,19 @@ export default function ComposeScreen() {
     router.back();
   }, [router]);
 
+  // The one thing standing between this draft and Review — matches
+  // `apps/web/src/components/composer/completeness.ts`'s own
+  // `firstCompletenessBlocker` exactly, minus its schedule check: Compose is
+  // only ever reached once Address has already set `unlockAt` (its own
+  // advance gate), so a moment always exists by the time this screen can
+  // render at all.
+  const blocker = text.trim().length === 0 ? 'Write something to seal' : null;
+
+  const goToReview = useCallback(async () => {
+    await flushRef.current();
+    router.push(`/(app)/compose/${id}/review`);
+  }, [id, router]);
+
   // Covers hardware back / swipe-back gestures that skip the button above —
   // web's own equivalent (`flush()` before navigation/seal) has no such gap
   // since it has no separate back gesture to miss.
@@ -199,6 +214,17 @@ export default function ComposeScreen() {
             />
 
             <AutosaveIndicator status={autosaveStatus} message={saveMessage} />
+
+            <Pressable
+              onPress={() => void goToReview()}
+              disabled={Boolean(blocker)}
+              accessibilityRole="button"
+              accessibilityLabel={blocker ?? 'Review'}
+              accessibilityState={{ disabled: Boolean(blocker) }}
+              style={[styles.advanceButton, Boolean(blocker) && styles.advanceButtonDisabled]}
+            >
+              <Text style={styles.advanceButtonLabel}>{blocker ?? 'Review'}</Text>
+            </Pressable>
           </ScrollView>
         </KeyboardAvoidingView>
       ) : null}
@@ -399,4 +425,13 @@ const styles = StyleSheet.create({
   enclosureRemove: { fontSize: fontSize.caption, color: colors.muted },
   encloseButton: { alignSelf: 'flex-start', paddingVertical: space[2] },
   encloseButtonLabel: { fontSize: fontSize.body, fontWeight: fontWeight.medium, color: colors.brass },
+  advanceButton: {
+    marginTop: space[2],
+    backgroundColor: colors.brass,
+    borderRadius: radius.input,
+    paddingVertical: space[3],
+    alignItems: 'center',
+  },
+  advanceButtonDisabled: { opacity: 0.5 },
+  advanceButtonLabel: { fontSize: fontSize.body, fontWeight: fontWeight.semibold, color: colors.onAccent },
 });
