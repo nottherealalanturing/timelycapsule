@@ -4,6 +4,134 @@
 
 ## Current status
 
+### E1.4.10 — Error/validation states across creation (2026-09-01) — DONE, committed, PR open
+
+Branched `e1.4.10-error-validation` from fresh `origin/main` (PR #69 for E1.4.9 confirmed merged).
+Read the readiness audit's own ticket map (§3.2, `E1.4.10`/`E4.9`) and `EXECUTION-BACKLOG.md`'s
+original `E4.9` definition: "every validation failure (schedule out of range, quota exceeded, media
+failed) is stated specifically... no generic error message reachable anywhere in the creation flow."
+No new backend/crypto deps per the ticket map — this is a cross-cutting mobile-only copy pass.
+
+**Audited the real backend directly, not the readiness audit's own aspirational §7.6 error-code
+list** — confirmed by reading `entitlements.ts`, `recipients/service.ts`, `media/service.ts`
+directly: `file_too_large`/`unsupported_media_type` really are thrown at `POST .../media/tickets`
+(via `assertFileWithinSizeLimit`/`mimeToKind`), not merely theoretical; `quota_exceeded` covers three
+genuinely distinct limits (active-sealed-capsules at seal, recipients-per-capsule at add, storage at
+enclose) that must never share one message.
+
+**Real gap found, matching the ticket's own "every validation failure... stated specifically"
+requirement**: `use-capsule-draft.ts`'s `patch()`/`addRecipient()`/`removeRecipient()` each collapsed
+every failure — network, `capsule_sealed`, `unlock_in_past`, `quota_exceeded`, `velocity_limit_exceeded`,
+`recipient_locked` — into one or two generic strings, indistinguishable from a network problem.
+`use-media-enclosures.ts`'s enclose pipeline did the same for `file_too_large`/`unsupported_media_type`/
+`quota_exceeded`, with a dangling Retry button that could never succeed for any of them.
+
+**Real, pre-existing gap found on web itself, not fixed (out of a mobile ticket's scope)**: web's own
+equivalent call sites have the identical generic-bucket problem — `Composer.tsx`'s `addRecipient`
+catch is `'That recipient could not be added.'` for every code, `removeRecipient` has no error
+handling at all, and `use-enclosures.ts`'s catch is `'Stopped before it finished'` for every code,
+including `console.error('Enclosure failed:', err)` logging the raw error. Confirmed by reading web's
+source directly. This ticket's own DoD is a higher bar than web currently meets — the new mobile copy
+below is written against the real error codes, not ported from web strings that don't exist.
+**Separately found**: `use-capsule-draft.ts`'s own `saveRejection: ApiClientError | null` state is
+never actually rendered anywhere in web's real UI (`AutosaveIndicator`'s own "Not saved — see below"
+copy promises detail that was never wired) — a genuine dangling UI affordance on web, documented here
+and left untouched.
+
+**New `apps/mobile/src/lib/api-error-copy.ts`** — three small `describe*Failure` functions (matching
+`seal-errors.ts`'s established pattern from E1.4.8), one per concern, reused across every call site
+that can hit the same codes:
+- `describeCapsulePatchFailure` — Address's `patch()` and Compose's content-autosave both PATCH the
+  same capsule; `capsule_sealed` keeps the exact existing string, `unlock_in_past`/`validation_failed`
+  get new specific copy.
+- `describeRecipientFailure` — Address's add/remove; `recipient_already_added` keeps its exact
+  existing string, new specific copy for `quota_exceeded` (per-capsule limit, distinct from storage),
+  `velocity_limit_exceeded` (reuses the server's own already-good message verbatim rather than
+  duplicating it), `recipient_locked`, `not_found`.
+- `describeEncloseFailure` — the enclosure pipeline; returns `{message, retryable}` since retryability
+  now has a real behavioral consequence (see below). `file_too_large`/`unsupported_media_type`/
+  storage `quota_exceeded`/`capsule_sealed` are all non-retryable; the exact existing "Stopped before
+  it finished" string is preserved for network/unmapped failures.
+
+Deliberately **not** plumbing the server's structured `details` payload (`limitBytes`, `used`/`limit`)
+through `ApiClientError` just to show exact numbers — the code-only mapping is already specific and
+actionable without expanding `request()`'s error-parsing surface for a nice-to-have.
+
+**`PendingEnclosure` gains `retryable`** (`use-media-enclosures.ts`): `runEnclose`'s catch now calls
+`describeEncloseFailure` instead of hardcoding the message, storing both the message and whether
+retrying could ever succeed; `retry()` resets it to `undefined` on a fresh attempt. `compose.tsx`'s
+Retry button now checks `p.retryable !== false` — matches the ticket's own "retryable operations
+remain retryable" requirement in the other direction: a non-retryable one no longer dangles a control
+that can't work.
+
+**Testing**: 27 new tests (586 total, up from 559) — new `api-error-copy.test.ts` (15, every mapped
+code across all three functions plus each fallback), `use-capsule-draft.test.tsx` (+4: schedule-bounds
+and already-sealed patch rejections, recipient-limit and locked-recipient removal), `use-media-
+enclosures.test.tsx` (+5: the three new enclose-failure codes, the network-failure `retryable: true`
+assertion, and `retryable` correctly clearing on retry), `compose-address.test.tsx` (+3: recipient
+limit and locked-removal shown on the real screen, a server-side schedule rejection shown specifically
+rather than as "check your connection"), `compose-compose.test.tsx` (+1: a too-large-file rejection
+shows the specific message and offers Remove but not Retry). `tsc --noEmit` clean, `eslint` clean,
+full suite run twice with no flakiness.
+
+**Manual Android verification, genuinely performed (real Pixel 7 emulator, real local API +
+Postgres)**: signed up a fresh disposable account (`e1410-verify-0901@example.com`) through the real
+web signup flow, seeded `email_verified_at` directly in the local dev DB (explicit, user-approved
+technique for this local-only check — a real inbox for a disposable `@example.com` address doesn't
+exist; the same standard this codebase already uses for seeding test capsule states via direct DB
+insert). **Three of the ticket's own named examples verified live, not just in unit tests**:
+1. **Recipient limit** — added amara/jordan/delta (3, the Free-plan cap), then a 4th (`echo`); server
+   genuinely rejected it (`quota_exceeded`), UI showed "This capsule already has as many recipients as
+   this plan allows.", and direct Postgres query confirmed exactly 3 rows throughout — no partial
+   write, no generic message.
+2. **File too large** — pushed a real 30MB file (`.pdf`, over the 25MB Free cap) to the emulator,
+   enclosed it through the real encrypt-then-upload pipeline; server genuinely rejected it at ticket
+   creation (`file_too_large`), UI showed "This file is larger than this plan allows.", **and
+   correctly offered no Retry button** (confirmed absent via UI dump) since retrying the same
+   oversized bytes cannot succeed; zero `media_items` rows created (confirmed via Postgres).
+3. **Schedule-bounds rejection** — used the native date picker to set the schedule to today at the
+   already-passed default hour; server genuinely rejected it (`unlock_in_past`), UI showed "That
+   moment doesn't work — it needs to be at least five minutes from now, and no more than fifty years
+   out." instead of a generic connection message, and — critically — the previously-valid schedule
+   (four weeks out) remained correctly displayed and unchanged in Postgres, proving a failed patch
+   never corrupts valid draft state.
+
+**Two scenarios explicitly marked automated-only, not live-verified, with the specific reason
+recorded rather than silently skipped or falsely claimed**:
+- `unsupported_media_type` — mobile's own file picker (`media-source.ts`, an E1.4.5 decision)
+  restricts selection client-side to the server's exact allow-list, so this code is structurally
+  unreachable through the real picker UI by design; a `.xyz`-extension test file was confirmed
+  disabled/unselectable in the real Storage Access Framework UI. Verified via the automated tests
+  instead.
+- Storage `quota_exceeded` (media) — would require ~80MB of real successful uploads against the
+  100MB Free cap to trigger live; impractical for this pass. Verified via the automated tests.
+- `recipient_locked`/defensive `capsule_sealed` on patch/enclose — only reachable post-unlock or via
+  a genuinely concurrent second session; not practically reproducible in this environment. Verified
+  at the hook level.
+
+**Security**: grepped the full device logcat across the entire session (signup, login, all four
+recipient-limit attempts, the 30MB file enclosure, the schedule rejection) for the master key,
+capsule key, ciphertext, tokens, and every test recipient's email/password — zero hits. Static
+source-scan (`console.*`/`Math.random`/`AsyncStorage`/`SecureStore`) across every changed production
+file — clean. Disposable test data (the account, capsules, recipients) deleted afterward.
+
+**Files changed**: new `apps/mobile/src/lib/api-error-copy.ts`, `apps/mobile/src/lib/{use-capsule-
+draft,use-capsule-compose,use-media-enclosures}.ts`, `apps/mobile/app/(app)/compose/[id]/compose.tsx`
+(Retry-button gating), plus the corresponding test files. No new dependencies.
+
+**Branch**: `e1.4.10-error-validation`. **Commit**: `adef324` (implementation). **PR**:
+[#70](https://github.com/nottherealalanturing/timelycapsule/pull/70), opened against `main` (E1.4.9's
+PR #69 confirmed merged first), not merged. CI pending at session end.
+
+**Exact next ticket**: `E1.4.11` — Accessibility pass, Creation (VoiceOver/TalkBack across Address/
+Compose/Seal, including the voice recorder's periodic elapsed-time announcement), per the readiness
+audit's own §3.2 ticket map — the last item in Stage E Mobile V1's E1.4 (Capsule Creation) arc. Not
+started, per this session's explicit "STOP after E1.4.10" instruction.
+
+**Unrelated, pre-existing note**: `apps/api/src/db/migrate.ts` still carries the same unrelated,
+uncommitted `fileURLToPath` portability fix noted in every prior entry below — left untouched again
+this session per the same "don't stage unrelated work" instruction.
+
 ### E1.4.9 — Cross-platform capsule verification (phase-closing gate) (2026-09-01) — DONE, committed, PR open
 
 Branched `e1.4.9-cross-platform-gate` from fresh `origin/main` (PR #68 for E1.4.8 confirmed merged as

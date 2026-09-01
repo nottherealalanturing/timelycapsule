@@ -297,7 +297,7 @@ function PendingMediaSection({
                   {stageLabel(p)}
                 </Text>
               </View>
-              {p.stage === 'failed' && p.media ? (
+              {p.stage === 'failed' && p.media && p.retryable !== false ? (
                 <Pressable onPress={() => onRetryPending(p.id)} accessibilityRole="button" accessibilityLabel={`Retry ${p.name}`}>
                   <Text style={styles.enclosureRemove}>Retry</Text>
                 </Pressable>

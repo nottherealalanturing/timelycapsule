@@ -395,6 +395,25 @@ describe('AddressScreen', () => {
       expect(texts(instance)).toContain('That recipient could not be added.');
     });
 
+    it('shows a specific message when the per-capsule recipient limit is reached (E1.4.10)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'personal' }) });
+      const { ApiClientError } = await import('../lib/api-client');
+      recipientsCreate.mockRejectedValue(new ApiClientError('quota_exceeded', 'Plan limit reached: recipients_per_capsule:3', 403));
+      const instance = renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => {
+        input.props.onChangeText('amara@example.com');
+      });
+      const addButton = instance.root.findByProps({ accessibilityLabel: 'Add' });
+      await act(async () => {
+        addButton.props.onPress();
+      });
+      await flush();
+      expect(texts(instance)).toContain('This capsule already has as many recipients as this plan allows.');
+    });
+
     it('removing a recipient calls the delete API and removes its chip', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'personal' }) });
       recipientsList.mockResolvedValue({ data: [recipientFixture({ displayName: 'Amara' })] });
@@ -410,6 +429,23 @@ describe('AddressScreen', () => {
       await flush();
       expect(recipientsDelete).toHaveBeenCalledWith('11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222');
       expect(texts(instance)).not.toContain('Amara');
+    });
+
+    it('shows a specific message when removing a recipient is locked (E1.4.10)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'personal' }) });
+      recipientsList.mockResolvedValue({ data: [recipientFixture({ displayName: 'Amara' })] });
+      const { ApiClientError } = await import('../lib/api-client');
+      recipientsDelete.mockRejectedValue(new ApiClientError('recipient_locked', 'Recipients can only be edited before the capsule unlocks', 409));
+      const instance = renderScreen();
+      await flush();
+
+      const removeButton = instance.root.findByProps({ accessibilityLabel: 'Remove Amara' });
+      await act(async () => {
+        removeButton.props.onPress();
+      });
+      await flush();
+      expect(texts(instance)).toContain('Recipients can only be changed before this capsule opens.');
+      expect(texts(instance)).toContain('Amara'); // the failed remove leaves the chip in place
     });
   });
 
@@ -549,6 +585,24 @@ describe('AddressScreen', () => {
       await flush();
       expect(texts(instance)).not.toContain('A capsule can travel up to fifty years.');
       expect(texts(instance).join(' ')).not.toContain('has passed');
+    });
+
+    it('states a server-side schedule-bounds rejection specifically, not as a generic save failure (E1.4.10)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const { ApiClientError } = await import('../lib/api-client');
+      patchFn.mockRejectedValue(new ApiClientError('unlock_in_past', 'unlockAt must be at least 5 minutes from now', 422));
+      const instance = renderScreen();
+      await flush();
+
+      const candidateRow = instance.root
+        .findAllByType(Pressable)
+        .find((n) => typeof n.props.accessibilityLabel === 'string' && /\d{4}$/.test(n.props.accessibilityLabel));
+      await act(async () => {
+        candidateRow!.props.onPress();
+      });
+      await flush();
+      expect(texts(instance).join(' ')).toContain('five minutes');
+      expect(texts(instance).join(' ')).not.toContain('Check your connection');
     });
   });
 

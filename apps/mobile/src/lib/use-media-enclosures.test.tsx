@@ -8,6 +8,19 @@ const deleteMediaFn = vi.fn();
 vi.mock('./api-client', () => ({
   capsulesApi: { media: (...args: unknown[]) => mediaListFn(...args) },
   mediaApi: { delete: (...args: unknown[]) => deleteMediaFn(...args) },
+  // api-error-copy.ts (E1.4.10) imports the real class to `instanceof`-check
+  // against — this file's own mock is a full replacement (not
+  // `importActual`-based like use-capsule-draft.test.tsx/use-capsule-
+  // compose.test.tsx), so it needs its own stand-in with the same shape.
+  ApiClientError: class ApiClientError extends Error {
+    constructor(
+      public readonly code: string,
+      message: string,
+      public readonly status: number,
+    ) {
+      super(message);
+    }
+  },
 }));
 
 const encloseMediaFn = vi.fn();
@@ -165,7 +178,40 @@ describe('useMediaEnclosures', () => {
       await h.act(() => h.current.enclose(pickedMediaFixture({ name: 'a.jpg' })));
 
       expect(h.current.pending).toHaveLength(1);
-      expect(h.current.pending[0]).toMatchObject({ name: 'a.jpg', stage: 'failed', error: 'Stopped before it finished' });
+      expect(h.current.pending[0]).toMatchObject({ name: 'a.jpg', stage: 'failed', error: 'Stopped before it finished', retryable: true });
+    });
+
+    it('states a too-large-file rejection specifically, and marks it not retryable (E1.4.10)', async () => {
+      const { ApiClientError } = await import('./api-client');
+      encloseMediaFn.mockRejectedValue(new ApiClientError('file_too_large', "File exceeds the plan's per-file size limit", 413));
+      const h = await render();
+      await h.act(() => h.current.enclose(pickedMediaFixture({ name: 'huge.mov' })));
+
+      expect(h.current.pending[0]).toMatchObject({
+        stage: 'failed',
+        error: 'This file is larger than this plan allows.',
+        retryable: false,
+      });
+    });
+
+    it('states an unsupported-file-type rejection specifically, and marks it not retryable (E1.4.10)', async () => {
+      const { ApiClientError } = await import('./api-client');
+      encloseMediaFn.mockRejectedValue(new ApiClientError('unsupported_media_type', 'Unsupported media type: image/bmp', 415));
+      const h = await render();
+      await h.act(() => h.current.enclose(pickedMediaFixture({ name: 'weird.bmp' })));
+
+      expect(h.current.pending[0]).toMatchObject({ stage: 'failed', retryable: false });
+      expect(h.current.pending[0]!.error).toMatch(/isn't supported/);
+    });
+
+    it('states a storage-quota rejection specifically, and marks it not retryable (E1.4.10)', async () => {
+      const { ApiClientError } = await import('./api-client');
+      encloseMediaFn.mockRejectedValue(new ApiClientError('quota_exceeded', 'Plan limit reached: storage_bytes', 403));
+      const h = await render();
+      await h.act(() => h.current.enclose(pickedMediaFixture()));
+
+      expect(h.current.pending[0]).toMatchObject({ stage: 'failed', retryable: false });
+      expect(h.current.pending[0]!.error).toMatch(/storage/);
     });
 
     it('each pending item fails or succeeds independently — one failure does not affect another in flight', async () => {
@@ -234,6 +280,19 @@ describe('useMediaEnclosures', () => {
 
       expect(h.current.pending).toEqual([]);
       expect(h.current.items).toHaveLength(1);
+    });
+
+    it('clears a stale retryable flag the moment a retry starts (E1.4.10)', async () => {
+      const { ApiClientError } = await import('./api-client');
+      encloseMediaFn.mockRejectedValueOnce(new ApiClientError('file_too_large', 'too big', 413));
+      const h = await render();
+      await h.act(() => h.current.enclose(pickedMediaFixture()));
+      expect(h.current.pending[0]!.retryable).toBe(false);
+
+      encloseMediaFn.mockReturnValueOnce(new Promise(() => {})); // hangs, so the reset is observable before the next resolution
+      const id = h.current.pending[0]!.id;
+      await h.act(() => h.current.retry(id));
+      expect(h.current.pending[0]).toMatchObject({ stage: 'encrypting', retryable: undefined });
     });
 
     it('is a no-op for an orphaned row recovered from a previous session (no bytes to retry with)', async () => {

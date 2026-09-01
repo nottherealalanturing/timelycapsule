@@ -775,6 +775,26 @@ describe('ComposeScreen', () => {
       expect(texts(instance).join(' ')).not.toContain('Stopped before it finished');
     });
 
+    it('a too-large-file rejection states the specific reason and offers Remove but not Retry, since retrying cannot succeed (E1.4.10)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///huge.mov', name: 'huge.mov', mimeType: 'video/quicktime', sizeBytes: 30_000_000 }] });
+      const { ApiClientError } = await import('../lib/api-client');
+      createTicketFn.mockRejectedValue(new ApiClientError('file_too_large', "File exceeds the plan's per-file size limit", 413));
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await flush(0);
+
+      expect(texts(instance).join(' ')).toContain('This file is larger than this plan allows.');
+      expect(instance.root.findAllByProps({ accessibilityLabel: 'Retry huge.mov' })).toHaveLength(0);
+      expect(instance.root.findByProps({ accessibilityLabel: 'Remove huge.mov' })).toBeTruthy();
+    });
+
     it('an orphaned ticket recovered from a previous session offers Remove but not Retry (the original bytes no longer exist)', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
       mediaListFn.mockResolvedValue({
