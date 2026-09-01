@@ -186,6 +186,50 @@ describe('api-client.ts — capsule domain', () => {
     });
   });
 
+  describe('capsulesApi.seal (E1.4.8)', () => {
+    it('POSTs to the exact seal endpoint with no body at all', async () => {
+      const sealed = { ...capsule, state: 'sealed' as const };
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ capsule: sealed }));
+      await capsulesApi.seal(capsule.id, 'idem-key-1');
+
+      const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(url).toBe(`http://localhost:4001/v1/capsules/${capsule.id}/seal`);
+      expect((init as RequestInit).method).toBe('POST');
+      expect((init as RequestInit).body).toBeUndefined();
+    });
+
+    it('sends the given idempotency key as the Idempotency-Key header', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ capsule }));
+      await capsulesApi.seal(capsule.id, 'stable-key-abc');
+
+      const [, init] = vi.mocked(fetch).mock.calls[0]!;
+      const headers = (init as RequestInit).headers as Record<string, string>;
+      expect(headers['Idempotency-Key']).toBe('stable-key-abc');
+    });
+
+    it('returns the sealed capsule on success', async () => {
+      const sealed = { ...capsule, state: 'sealed' as const, sealedAt: '2026-06-01T00:00:00.000Z' };
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ capsule: sealed }));
+      const result = await capsulesApi.seal(capsule.id, 'idem-key-1');
+      expect(result.capsule.state).toBe('sealed');
+      expect(result.capsule.sealedAt).toBe('2026-06-01T00:00:00.000Z');
+    });
+
+    it('propagates capsule_sealed (an already-sealed capsule) as ApiClientError, not a raw throw', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse({ error: { code: 'capsule_sealed', message: 'This capsule is already sealed.', requestId: 'x' } }, 409),
+      );
+      await expect(capsulesApi.seal(capsule.id, 'idem-key-1')).rejects.toMatchObject({ code: 'capsule_sealed', status: 409 });
+    });
+
+    it('propagates upload_incomplete (a media row not yet ready) as ApiClientError', async () => {
+      vi.mocked(fetch).mockResolvedValue(
+        jsonResponse({ error: { code: 'upload_incomplete', message: 'Media is still uploading or processing', requestId: 'x' } }, 409),
+      );
+      await expect(capsulesApi.seal(capsule.id, 'idem-key-1')).rejects.toMatchObject({ code: 'upload_incomplete', status: 409 });
+    });
+  });
+
   describe('recipientsApi.create', () => {
     it('POSTs the recipient input and returns the recipient plus its one-time access token', async () => {
       const recipient = {

@@ -20,8 +20,9 @@ vi.mock('react-native', () => ({
 }));
 
 const back = vi.fn();
+const push = vi.fn();
 let routeId = '11111111-1111-1111-1111-111111111111';
-const router = { back };
+const router = { back, push };
 vi.mock('expo-router', () => ({
   useRouter: () => router,
   useLocalSearchParams: () => ({ id: routeId }),
@@ -265,6 +266,7 @@ let serverMediaRows: Record<string, unknown>[];
 beforeEach(() => {
   vi.useFakeTimers();
   back.mockReset();
+  push.mockReset();
   get.mockReset();
   // A sensible default so tests that don't care about the exact bootstrap
   // path (most of the hallmark/editor tests below) don't also need to mock
@@ -969,6 +971,65 @@ describe('ComposeScreen', () => {
         logSpy.mockRestore();
         errorSpy.mockRestore();
       }
+    });
+  });
+
+  describe('advancing to Review (E1.4.8)', () => {
+    it('is disabled with "Write something to seal" when the letter is empty', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Write something to seal' });
+      expect(advance.props.disabled).toBe(true);
+      expect(advance.props.accessibilityState.disabled).toBe(true);
+    });
+
+    it('becomes an enabled "Review" control once something has been written', async () => {
+      const { wrapCapsuleKeyForOwner } = await import('@tc/crypto');
+      const ownerKeyWrap = await wrapCapsuleKeyForOwner(generateMasterKey(), mockMasterKey!);
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self', ownerKeyWrap }) });
+      const instance = await renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => input.props.onChangeText('Something worth sealing'));
+
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Review' });
+      expect(advance.props.disabled).toBe(false);
+    });
+
+    it('flushes any pending autosave, then navigates to Review for this same capsule', async () => {
+      const { wrapCapsuleKeyForOwner } = await import('@tc/crypto');
+      const ownerKeyWrap = await wrapCapsuleKeyForOwner(generateMasterKey(), mockMasterKey!);
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self', ownerKeyWrap }) });
+      const instance = await renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => input.props.onChangeText('On its way to Review'));
+      expect(patchFn).not.toHaveBeenCalled();
+
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Review' });
+      await act(async () => {
+        advance.props.onPress();
+      });
+      await flush(0);
+
+      expect(patchFn).toHaveBeenCalledTimes(1); // flushed before navigating away, same as the back button
+      expect(push).toHaveBeenCalledWith(`/(app)/compose/${routeId}/review`);
+    });
+
+    it('a whitespace-only letter still counts as empty — the button stays disabled', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      const instance = await renderScreen();
+      await flush();
+
+      const input = instance.root.findByType(TextInput);
+      act(() => input.props.onChangeText('   \n  '));
+
+      const advance = instance.root.findByProps({ accessibilityLabel: 'Write something to seal' });
+      expect(advance.props.disabled).toBe(true);
     });
   });
 

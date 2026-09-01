@@ -227,6 +227,22 @@ export const capsulesApi = {
    * per-capsule recipient limit).
    */
   recipients: (id: string) => request(`/capsules/${id}/recipients`, RecipientsListResponseSchema, { auth: true }),
+
+  /**
+   * Movement III — Seal (E1.4.8). No body at all — the server reads the
+   * already-persisted draft row (`apps/api/src/modules/capsules/
+   * lifecycle.ts`'s `sealCapsule`), matching web's own `capsulesApi.seal`
+   * exactly. `idempotencyKey` should be generated once per Review-screen
+   * mount and reused across retries of that same attempt: seal is already
+   * safe-by-rejection without one (a second call on an already-sealed
+   * capsule reliably 409s as `capsule_sealed` rather than re-sealing), but
+   * reusing a key turns "response lost, capsule actually sealed" into a
+   * genuine replayed success instead of a confusing rejection — the exact
+   * gap the E1.4 readiness audit's §7.5 flagged web itself as never closing
+   * (web sends no Idempotency-Key on any request, seal included).
+   */
+  seal: (id: string, idempotencyKey: string) =>
+    request(`/capsules/${id}/seal`, CapsuleResponseSchema, { method: 'POST', auth: true, idempotencyKey }),
 };
 
 /**
