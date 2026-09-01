@@ -1,37 +1,37 @@
 import type { RevealResponse } from '@tc/contracts';
+import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { emptyEnvelope, type LetterEnvelope } from '../../../src/lib/capsule-crypto';
 import { IdentityGate } from '../../../src/components/identity-gate';
 import { LoadingState } from '../../../src/components/loading-state';
 import { PassphraseGate } from '../../../src/components/passphrase-gate';
 import { PlaceGate } from '../../../src/components/place-gate';
+import { RevealCeremony } from '../../../src/components/reveal-ceremony';
 import { SealStampsRow } from '../../../src/components/seal-stamps-row';
 import { revealApi } from '../../../src/lib/api-client';
+import { decryptRevealLetter, keyFromOpenedUrl } from '../../../src/lib/reveal-crypto';
 import { formatAbsoluteDate, formatDuration, horizonPhrase } from '../../../src/lib/reveal-format';
 import { colors, fontSize, fontWeight, space } from '../../../src/lib/tokens';
 import { useNow } from '../../../src/lib/use-now';
 import { useReveal, useUnlockTimer } from '../../../src/lib/use-reveal';
 
 /**
- * PHASE-5.1 — Reveal entry, locked state, Seal gates
- * (plan/STAGE-E-MOBILE-V1-PHASE-5-READINESS-AUDIT.md §14, ticket
- * PHASE-5.1). Mobile equivalent of `apps/web/src/app/(reveal)/c/[token]/
- * page.tsx`'s state machine and `LockedWait` component, for exactly the
- * states and gates this ticket scopes — reachable only via manual/dev
- * navigation or a `timelycapsule://c/:token` deep link today (no
- * Universal/App Link infrastructure exists yet; that's PHASE-5.5's job,
- * not this one's).
+ * PHASE-5.1 (reveal entry/locked/gates) + PHASE-5.2 (reveal ceremony,
+ * letter decryption) — mobile equivalent of `apps/web/src/app/(reveal)/c/
+ * [token]/page.tsx`'s full state machine, for exactly the states this pair
+ * of tickets scopes. Reachable only via manual/dev navigation or a
+ * `timelycapsule://c/:token[#k=...]` deep link today — no Universal/App
+ * Link infrastructure exists yet (PHASE-5.5's job).
  *
- * Deliberately stops at the boundary between "gate state" and "capsule
- * content": once every required Seal is satisfied, this screen renders a
- * plain, honest "capsule is open" placeholder rather than the transit
- * ceremony, letter, or media viewer (PHASE-5.2/5.3's own scope) — see
- * `Opened` below. No capsule content is ever fetched, decrypted, or
- * rendered by this file; `data.contentDocEnc`/`data.media` are read from
- * the response only to confirm a state, never passed to any decrypt
- * function.
+ * PHASE-5.2 stops at the boundary between "the letter" and "everything
+ * else a sealed capsule can carry": no media viewer, no confirm-read/One
+ * Reading Only, no reply composer, no download-a-copy, no save-to-account
+ * (PHASE-5.3+'s own scope). `data.media` is read from the response only to
+ * confirm nothing about it is rendered here — no media item is ever passed
+ * to a decrypt function by this file.
  */
 type PageState = 'loading' | 'not-found' | 'rate-limited' | 'locked' | 'unlocked' | 'withdrawn' | 'expired';
 
@@ -169,25 +169,102 @@ function LockedWait({
 }
 
 /**
- * The boundary this ticket does not cross. A recipient who has satisfied
- * every gate this screen knows about sees an honest statement that the
- * capsule is open, not a fabricated ceremony or an indefinite spinner —
- * `07-EXPERIENCE-BIBLE.md` §VI.3 forbids a loading state that never
- * resolves, and inventing a placeholder ceremony would be worse.
+ * PHASE-5.2's own state machine, once every Seal gate is satisfied:
+ * resolve a capsule key (passphrase unwrap or the link fragment), decrypt
+ * the letter, and render the ceremony — or an honest, specific system
+ * state for the two ways this can fail (no key available at all; a key
+ * that does not open this capsule). Never a fabricated ceremony and never
+ * an indefinite spinner (`07-EXPERIENCE-BIBLE.md` §VI.3).
+ *
+ * `capsuleKey` never comes from `useMasterKey()`/`resolveCapsuleKey` (the
+ * owner-only path) — only from `PassphraseGate`'s unwrap or
+ * `keyFromOpenedUrl`, matching the readiness audit's explicit security
+ * requirement that this path never confuse itself with the owner's.
  */
-function Opened({ publicId }: { publicId: string }) {
-  return (
-    <View style={styles.systemContainer}>
-      <View style={styles.header}>
-        <Text style={styles.hallmark}>{publicId}</Text>
-        <Text style={styles.hallmark}>Open</Text>
-      </View>
-      <View style={styles.systemBody}>
-        <Text style={styles.systemHeadline}>This capsule is open.</Text>
-        <Text style={styles.systemText}>The reveal itself opens in a later release. Nothing further is shown here yet.</Text>
-      </View>
-    </View>
+type LetterState = { status: 'decrypting' } | { status: 'key_mismatch' } | { status: 'ready'; envelope: LetterEnvelope };
+
+function UnlockedReveal({ data }: { data: Extract<RevealResponse, { status: 'unlocked' }> }) {
+  const openedUrl = Linking.useLinkingURL();
+  const [passphraseKey, setPassphraseKey] = useState<Uint8Array | null>(null);
+  // Memoized so its reference is stable across renders that don't actually
+  // change any input — `keyFromOpenedUrl` allocates a fresh `Uint8Array` on
+  // every call, and without this the effect below (keyed on `capsuleKey`)
+  // would refire on every render, re-decrypting forever.
+  const capsuleKey = useMemo(
+    () => passphraseKey ?? (!data.passphraseSeal ? keyFromOpenedUrl(openedUrl) : null),
+    [passphraseKey, openedUrl, data.passphraseSeal],
   );
+
+  // `letter` is derived, not set synchronously inside the effect (matches
+  // PHASE-5.1's own `use-reveal.ts` fix for the identical eslint
+  // react-hooks rule) — `result` only ever changes from the async
+  // `.then()` continuation.
+  const [result, setResult] = useState<{ capsuleKey: Uint8Array; contentDocEnc: string | null; letter: LetterState } | null>(null);
+
+  useEffect(() => {
+    if (!capsuleKey) return;
+    let cancelled = false;
+    decryptRevealLetter(capsuleKey, data.contentDocEnc).then((decrypted) => {
+      if (cancelled) return;
+      const letter: LetterState =
+        decrypted.status === 'key_mismatch'
+          ? { status: 'key_mismatch' }
+          : { status: 'ready', envelope: decrypted.status === 'empty' ? emptyEnvelope() : decrypted.envelope };
+      setResult({ capsuleKey, contentDocEnc: data.contentDocEnc, letter });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [capsuleKey, data.contentDocEnc]);
+
+  const letter: LetterState =
+    result?.capsuleKey === capsuleKey && result.contentDocEnc === data.contentDocEnc ? result.letter : { status: 'decrypting' };
+
+  if (data.passphraseSeal && !capsuleKey) {
+    return (
+      <View style={styles.systemContainer}>
+        <PassphraseGate hint={data.passphraseSeal.hint} wrappedKeyB64={data.passphraseSeal.wrappedKeyB64} onUnwrapped={setPassphraseKey} />
+      </View>
+    );
+  }
+
+  // A link forwarded, copied out of a preview pane, or dropped its `#k=`
+  // fragment in transit — matches web's own "Key missing" system state
+  // exactly, including why it happens.
+  if (!capsuleKey) {
+    return (
+      <SystemScreen
+        state="Key missing"
+        headline="This link is missing its key."
+        body="The part after the # carries the key that opens this capsule, and some apps drop it when a link is forwarded. Ask the sender for the original link."
+      />
+    );
+  }
+
+  if (letter.status === 'decrypting') {
+    return (
+      <View style={styles.systemContainer}>
+        <View style={styles.header}>
+          <Text style={styles.hallmark}>{data.publicId}</Text>
+          <Text style={styles.hallmark}>Opening</Text>
+        </View>
+        <LoadingState message="Decrypting this capsule." />
+      </View>
+    );
+  }
+
+  // A key was supplied and it did not open this capsule.
+  if (letter.status === 'key_mismatch') {
+    return (
+      <SystemScreen
+        state="Key mismatch"
+        headline="This link did not open the capsule."
+        body="The key it carries does not match. It may have been shortened or edited in transit. Ask the sender for the original link."
+      />
+    );
+  }
+
+  return <RevealCeremony publicId={data.publicId} senderName={data.senderName} envelope={letter.envelope} alreadyOpened={data.alreadyOpened} />;
 }
 
 export default function RevealScreen() {
@@ -238,28 +315,10 @@ export default function RevealScreen() {
           <View style={styles.systemContainer}>
             <IdentityGate token={token} onSatisfied={setIdentityGate} />
           </View>
-        ) : data.passphraseSeal ? (
-          <PassphraseGateStep hint={data.passphraseSeal.hint} wrappedKeyB64={data.passphraseSeal.wrappedKeyB64} publicId={data.publicId} />
         ) : (
-          <Opened publicId={data.publicId} />
+          <UnlockedReveal data={data} />
         )
       ) : null}
-    </View>
-  );
-}
-
-/**
- * Wraps `PassphraseGate` so the capsule key it produces stays local to
- * this step and is never threaded any further — PHASE-5.1 must not decrypt
- * content, so once unwrapped, the screen has nothing left to do with the
- * key except prove the gate was satisfied.
- */
-function PassphraseGateStep({ hint, wrappedKeyB64, publicId }: { hint: string; wrappedKeyB64: string; publicId: string }) {
-  const [unwrapped, setUnwrapped] = useState(false);
-  if (unwrapped) return <Opened publicId={publicId} />;
-  return (
-    <View style={styles.systemContainer}>
-      <PassphraseGate hint={hint} wrappedKeyB64={wrappedKeyB64} onUnwrapped={() => setUnwrapped(true)} />
     </View>
   );
 }

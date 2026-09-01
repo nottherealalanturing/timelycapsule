@@ -2,12 +2,15 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { RevealResponse } from '@tc/contracts';
-import { generateMasterKey, wrapCapsuleKeyWithPassphrase } from '@tc/crypto';
+import { encodeCapsuleKeyForLink, encryptBytes, generateMasterKey, wrapCapsuleKeyWithPassphrase } from '@tc/crypto';
 import { act } from 'react';
 import { Text } from 'react-native';
 import TestRenderer from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const announceForAccessibility = vi.fn();
+const setAccessibilityFocus = vi.fn();
+let mockReduceMotionEnabled = false;
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
@@ -15,6 +18,13 @@ vi.mock('react-native', () => ({
   TextInput: 'TextInput',
   ScrollView: 'ScrollView',
   StyleSheet: { create: (styles: unknown) => styles },
+  findNodeHandle: vi.fn(() => 1),
+  AccessibilityInfo: {
+    isReduceMotionEnabled: vi.fn(async () => mockReduceMotionEnabled),
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+    announceForAccessibility: (...args: unknown[]) => announceForAccessibility(...args),
+    setAccessibilityFocus: (...args: unknown[]) => setAccessibilityFocus(...args),
+  },
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -25,6 +35,21 @@ let routeToken = 'test-token';
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ token: routeToken }),
 }));
+
+let mockOpenedUrl: string | null = null;
+vi.mock('expo-linking', () => ({
+  useLinkingURL: () => mockOpenedUrl,
+}));
+
+// The ceremony's `useTransit` schedules real `requestAnimationFrame` calls,
+// which don't exist as a global in this test environment (plain Node, no
+// jsdom). A no-op stub is enough for every test here: bucket-boundary
+// timing itself is covered by `reveal-transit.test.ts`'s dedicated pure-
+// function tests, and every screen-level test below reaches the completed
+// ceremony via `transit.skip()` (a synchronous state jump, no frame needed)
+// or `alreadyOpened: true` (which never starts the animation loop at all).
+vi.stubGlobal('requestAnimationFrame', vi.fn(() => 0));
+vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
 const get = vi.fn();
 const requestIdentityCode = vi.fn();
@@ -82,7 +107,17 @@ function renderScreen(): TestRenderer.ReactTestRenderer {
   return instance;
 }
 
+/**
+ * Two back-to-back macrotask delays, not one — PHASE-5.2 chains a second
+ * async step (`decryptRevealLetter`) after the reveal fetch resolves, and a
+ * single 10ms `act()` window isn't reliably enough for both to settle in
+ * order, matching `capsule-detail.test.tsx`'s own established reasoning for
+ * the identical shape of problem (a fetch → decrypt chain).
+ */
 async function flush() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  });
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
   });
@@ -110,7 +145,11 @@ function unlockedFixture(overrides: Partial<Extract<RevealResponse, { status: 'u
     publicId: 'pub-1',
     senderName: 'Ada',
     cover: null,
-    contentDocEnc: 'ignored-in-5.1',
+    // `null` by default — a real ciphertext is a per-test concern (see
+    // `encryptEnvelope` below); tests that don't care about letter content
+    // simply get the honest, real "empty" outcome rather than a fixture
+    // value that only worked because PHASE-5.1 never tried to decrypt it.
+    contentDocEnc: null,
     media: [],
     location: null,
     replyPrompt: null,
@@ -124,8 +163,22 @@ function unlockedFixture(overrides: Partial<Extract<RevealResponse, { status: 'u
   };
 }
 
+/** Real `@tc/crypto` — the same wire format `capsule-crypto.ts`'s `encodeIvCiphertext` produces. */
+async function encryptEnvelope(capsuleKey: Uint8Array, doc: unknown): Promise<string> {
+  const { encodeIvCiphertext } = await import('../lib/capsule-crypto');
+  const plaintext = new TextEncoder().encode(JSON.stringify(doc));
+  const { iv, ciphertext } = await encryptBytes(capsuleKey, plaintext);
+  return encodeIvCiphertext(iv, ciphertext);
+}
+
+function letterDoc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
 beforeEach(() => {
   routeToken = 'test-token';
+  mockOpenedUrl = null;
+  mockReduceMotionEnabled = false;
   get.mockReset();
   requestIdentityCode.mockReset();
   verifyIdentity.mockReset();
@@ -133,6 +186,9 @@ beforeEach(() => {
   remind.mockReset();
   requestForegroundPermissionsAsync.mockReset();
   getCurrentPositionAsync.mockReset();
+  announceForAccessibility.mockReset();
+  setAccessibilityFocus.mockReset();
+  vi.mocked(requestAnimationFrame).mockClear();
 });
 
 afterEach(() => {
@@ -328,11 +384,12 @@ describe('Identity Seal gate', () => {
   });
 });
 
-describe('Passphrase Seal gate (unlocked branch — key derived, never used to decrypt)', () => {
-  it('unwraps the key on the correct passphrase and stops at the "open" placeholder', async () => {
+describe('Passphrase Seal gate (unlocked branch)', () => {
+  it('unwraps the key on the correct passphrase and decrypts the real letter behind it', async () => {
     const capsuleKey = generateMasterKey();
     const wrappedKeyB64 = await wrapCapsuleKeyWithPassphrase(capsuleKey, 'correct horse battery staple');
-    get.mockResolvedValue(unlockedFixture({ passphraseSeal: { hint: 'a childhood pet', wrappedKeyB64 } }));
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('Hello from Ada.'));
+    get.mockResolvedValue(unlockedFixture({ passphraseSeal: { hint: 'a childhood pet', wrappedKeyB64 }, contentDocEnc, alreadyOpened: true }));
 
     const instance = renderScreen();
     await flush();
@@ -349,9 +406,9 @@ describe('Passphrase Seal gate (unlocked branch — key derived, never used to d
       unlockButton.props.onPress();
       await new Promise((resolve) => setTimeout(resolve, 1500));
     });
+    await flush();
 
-    expect(texts(instance)).toContain('This capsule is open.');
-    // PHASE-5.1's own boundary: a key was derived, but never sent anywhere and never used to decrypt anything.
+    expect(texts(instance)).toContain('Hello from Ada.');
     expect(get).toHaveBeenCalledTimes(1);
   });
 
@@ -380,11 +437,113 @@ describe('Passphrase Seal gate (unlocked branch — key derived, never used to d
     expect(get).toHaveBeenCalledTimes(1);
   });
 
-  it('goes straight to the "open" placeholder when no passphrase/identity gate is required', async () => {
-    get.mockResolvedValue(unlockedFixture());
+});
+
+describe('PHASE-5.2 — reveal ceremony and letter decryption', () => {
+  it('decrypts and displays the letter directly from the link fragment when no seal gates it', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('The garden is doing well.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: true }));
+
     const instance = renderScreen();
     await flush();
-    expect(texts(instance)).toContain('This capsule is open.');
+
+    expect(texts(instance)).toContain('The garden is doing well.');
+    expect(texts(instance).join(' ').replace(/\s+/g, ' ')).toContain('Ada wrote to you.');
+  });
+
+  it('shows "Key missing" when the link carries no fragment and there is no passphrase seal', async () => {
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc: 'some-ciphertext' }));
+    const instance = renderScreen();
+    await flush();
+
+    expect(texts(instance)).toContain('This link is missing its key.');
+  });
+
+  it('shows "Key mismatch" when the fragment key does not open this capsule', async () => {
+    const rightKey = generateMasterKey();
+    const wrongKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(rightKey, letterDoc('Never seen.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(wrongKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: true }));
+
+    const instance = renderScreen();
+    await flush();
+
+    expect(texts(instance)).toContain('This link did not open the capsule.');
+  });
+
+  it('shows "Nothing was written." for a capsule with no content, without attempting to decrypt', async () => {
+    const capsuleKey = generateMasterKey();
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc: null, alreadyOpened: true }));
+
+    const instance = renderScreen();
+    await flush();
+
+    expect(texts(instance)).toContain('Nothing was written.');
+  });
+
+  it('alreadyOpened skips the ceremony entirely — the record renders at rest, not mid-transit', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('Read before.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: true }));
+
+    const instance = renderScreen();
+    await flush();
+
+    // The full paragraph text is immediately present at full opacity — a
+    // mid-ceremony render would only ever show a letterProgress-scaled
+    // fragment, never the complete, fully-arrived record on the first flush.
+    expect(texts(instance)).toContain('Read before.');
+    // requestAnimationFrame is stubbed to a no-op in this file — if the
+    // ceremony had actually started (`active: true`), the transit hook's
+    // effect would have called it; `alreadyOpened` must keep `active`
+    // false so this never happens.
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+  });
+
+  it('a fresh reveal announces the crossing once and moves focus to the letter heading once it fully arrives (skip-to-end path)', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('Focus should land here.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: false }));
+
+    const instance = renderScreen();
+    await flush();
+
+    const skip = instance.root.findByProps({ accessibilityLabel: 'Show the letter now' });
+    await act(async () => {
+      skip.props.onPress();
+    });
+
+    expect(texts(instance)).toContain('Focus should land here.');
+    expect(announceForAccessibility).toHaveBeenCalledWith('Capsule opened. Ada wrote to you.');
+    expect(setAccessibilityFocus).toHaveBeenCalled();
+  });
+
+  it('respects the real reduced-motion preference by waiting on it before the ceremony starts', async () => {
+    mockReduceMotionEnabled = true;
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('Shorter, not skipped.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: false }));
+
+    const instance = renderScreen();
+    await flush();
+    // Two flushes: one for the reveal fetch, a second for the async
+    // `AccessibilityInfo.isReduceMotionEnabled()` resolution the ceremony
+    // waits on before it starts (see `reveal-ceremony.tsx`'s own comment).
+    await flush();
+
+    const skip = instance.root.findByProps({ accessibilityLabel: 'Show the letter now' });
+    await act(async () => {
+      skip.props.onPress();
+    });
+
+    expect(texts(instance)).toContain('Shorter, not skipped.');
   });
 });
 
@@ -394,16 +553,28 @@ describe('security / scope boundary — static source scan', () => {
     return readFileSync(join(here, relativePath), 'utf-8');
   }
 
-  it('the reveal screen never imports the owner master-key path or the owner-only capsule-crypto module', () => {
-    const source = sourceOf('../../app/(reveal)/c/[token].tsx');
-    const importLines = source
+  function importLinesOf(relativePath: string): string {
+    return sourceOf(relativePath)
       .split('\n')
       .filter((line) => line.trim().startsWith('import '))
       .join('\n');
-    expect(importLines).not.toMatch(/master-key-context|capsule-crypto|expo-secure-store|AsyncStorage/);
+  }
+
+  it('the reveal screen and its PHASE-5.2 crypto helper never import the owner master-key path', () => {
+    // A precise identifier check against actual imports, not a blanket ban
+    // on `capsule-crypto` (PHASE-5.2 legitimately reuses that module's
+    // shared, non-owner-specific exports: `decryptField`, `readEnvelope`,
+    // `emptyEnvelope`) and not a whole-file text scan (this ticket's own
+    // comments name the forbidden owner-only functions explicitly, by
+    // design, to document why they're avoided — scanning prose as well as
+    // code would make the test fail on its own documentation).
+    for (const file of ['../../app/(reveal)/c/[token].tsx', '../lib/reveal-crypto.ts', '../components/reveal-ceremony.tsx']) {
+      const importLines = importLinesOf(file);
+      expect(importLines, `${file} must never import the owner master-key path`).not.toMatch(/master-key-context|resolveCapsuleKey|decryptCapsuleContent/);
+    }
   });
 
-  it('none of the PHASE-5.1 files log the raw token, passphrase, OTP code, gate token, or coordinates', () => {
+  it('none of the PHASE-5.1/5.2 files log the raw token, passphrase, OTP code, gate token, coordinates, or decrypted plaintext', () => {
     const files = [
       '../../app/(reveal)/c/[token].tsx',
       '../../app/(reveal)/_layout.tsx',
@@ -411,7 +582,10 @@ describe('security / scope boundary — static source scan', () => {
       '../components/passphrase-gate.tsx',
       '../components/identity-gate.tsx',
       '../components/seal-stamps-row.tsx',
+      '../components/reveal-ceremony.tsx',
       '../lib/use-reveal.ts',
+      '../lib/reveal-crypto.ts',
+      '../lib/reveal-transit.ts',
     ];
     for (const file of files) {
       const source = sourceOf(file);
@@ -419,8 +593,10 @@ describe('security / scope boundary — static source scan', () => {
     }
   });
 
-  it('PHASE-5.1 never imports letter/media decryption or confirm-read — that belongs to a later ticket', () => {
-    const source = sourceOf('../../app/(reveal)/c/[token].tsx');
-    expect(source).not.toMatch(/decryptContentDoc|decryptBytes|confirmRead|EnclosureViewer|decodeCapsuleKeyFromLink/);
+  it('PHASE-5.2 never imports media decryption/rendering, confirm-read, or reply composition — that belongs to a later ticket', () => {
+    for (const file of ['../../app/(reveal)/c/[token].tsx', '../components/reveal-ceremony.tsx', '../lib/reveal-crypto.ts']) {
+      const importLines = importLinesOf(file);
+      expect(importLines, file).not.toMatch(/decryptEnclosure|EnclosureViewer|confirmRead|sealReply|Correspondence|listReplies/);
+    }
   });
 });

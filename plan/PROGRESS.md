@@ -4,6 +4,94 @@
 
 ## Current status
 
+### PHASE-5.2 — Reveal ceremony, letter decryption (2026-09-01) — DONE, committed, PR open
+
+Branched `phase-5.2-reveal-ceremony` from fresh `origin/main` (`4ea1724`, PR #72/PHASE-5.1 merged —
+verified via `gh pr view 72` and `git merge-base --is-ancestor`, not assumed). Source of truth: the
+readiness audit's own §14 ticket text for PHASE-5.2. Scope held to exactly that boundary: the transit
+ceremony, real letter decryption, and the `alreadyOpened` no-replay branch — no media viewer, no
+confirm-read/One Reading Only, no reply composer, no download-a-copy (confirmed absent by a
+post-implementation grep of the diff's import lines for `EnclosureViewer`/`decryptEnclosure`/
+`confirmRead`/`sealReply`/`Correspondence`/`listReplies` — zero matches).
+
+**Key resolution — the missing piece PHASE-5.1 deliberately didn't build:** `Linking.useLinkingURL()`
+(from `expo-linking`, already a dependency) reads the opening deep link's raw URL — including the
+`#k=...` fragment intact — via a synchronous native getter as its initial state, which sidesteps the
+exact race the E0.2/E0.4 spikes documented (a root-layout capture was necessary only because
+`Linking.getInitialURL()` is async; `useLinkingURL()`'s synchronous initial read needs no such
+workaround). `keyFromOpenedUrl()` (new, `reveal-crypto.ts`) mirrors web's own `keyFromUrlFragment()`
+regex exactly. The passphrase path is unchanged from PHASE-5.1's own `PassphraseGate`.
+
+**Decryption**: `decryptRevealLetter()` (new, `reveal-crypto.ts`) composes `capsule-crypto.ts`'s
+already-exported `decryptField`/`readEnvelope`/`emptyEnvelope` — no new cryptography, no second
+capsule-key implementation. Collapses `decryption_failed` and a downstream JSON-parse failure into
+one `key_mismatch` outcome, matching `capsule-detail.tsx`'s own established convention (not web's
+simpler single boolean) since both read identically to a recipient. A `null` `contentDocEnc` renders
+"Nothing was written." rather than attempting to decrypt anything.
+
+**Ceremony**: `reveal-transit.ts` ports web's `use-transit.ts` scalar timeline verbatim (`TRANSIT`/
+`TRANSIT_REDUCED`/`segment`) as a manual `requestAnimationFrame` driver rather than Reanimated — the
+readiness audit's own ticket text explicitly allows either, and a plain rAF-driven scalar needed no
+worklet-runtime mocking to test. `useReducedMotion()` reads `AccessibilityInfo.isReduceMotionEnabled()`
++ `reduceMotionChanged` — asynchronous, unlike web's synchronous `matchMedia`, so the ceremony
+deliberately waits for `known: true` before starting rather than risk animating the wrong timeline.
+`reveal-ceremony.tsx` renders the crossing (Frame/instrument/record) letter-only; `AccessibilityInfo.
+announceForAccessibility` fires once on the crossing, `AccessibilityInfo.setAccessibilityFocus` moves
+focus to the letter heading once fully arrived — both genuinely new to this app (grepped: no prior
+usage anywhere), not a straight port of a web-only API. No haptics anywhere (PHASE-5.1 already
+established the ban; nothing here reintroduces it).
+
+**A real accessibility defect found and fixed on-device, not caught by any unit test beforehand:**
+the ceremony's original structure wrapped the *entire* screen — including the arrived letter — in one
+`Pressable` for the "tap anywhere to skip" gesture. `uiautomator dump` on a real device showed Android
+collapsing every paragraph into a single aggregated speakable node once the letter arrived, a
+regression web's DOM doesn't have (a plain `<main onClick>` div doesn't trigger this merging; a native
+touchable container does). Fixed by restructuring so the tap-to-skip region only ever covers the
+instrument/blank area — the arrived record renders as a plain sibling `View`, never nested inside a
+touchable, restoring individually-navigable paragraphs. Re-verified via a second on-device
+`uiautomator dump` after the fix, confirmed corrected.
+
+**Tests**: 25 new (644 total mobile tests, up from 619) — 9 in `reveal-transit.test.ts` (pure
+`segment()`/`deriveTransitFlags()` bucket-boundary math, both timelines, mirroring
+`elapsedAnnouncement`'s own E1.4.11 precedent for testing exported pure logic rather than driving a
+real animation loop under Vitest, which has no `requestAnimationFrame` global at all in this project's
+plain-Node test environment — confirmed empirically, not assumed), 10 in `reveal-crypto.test.ts` (real
+`@tc/crypto` round-trips: correct key, legacy bare-document tolerance, wrong key, non-JSON garbage,
+null content, and `keyFromOpenedUrl`'s four cases), 6 new in `reveal.test.tsx` (fragment-key direct
+decrypt, Key missing, Key mismatch, empty content, `alreadyOpened` no-replay, skip-to-end with
+announcement+focus assertions, reduced-motion wiring) plus 2 rewritten Passphrase tests (now asserting
+real decrypted letter text instead of PHASE-5.1's retired boundary stub) and 2 rewritten static-scan
+tests (precise import-line checks for the owner master-key path and PHASE-5.3 media/reply-composition
+imports, scoped to avoid matching this ticket's own explanatory comments — an early version of these
+tests failed on its own documentation before being narrowed to import lines only). A screen-level
+`requestAnimationFrame`/`cancelAnimationFrame` stub (no-op) was added to `reveal.test.tsx` — every test
+reaches the completed ceremony via `alreadyOpened: true` or `transit.skip()`'s direct state jump,
+neither of which needs real frame timing; bucket-boundary timing itself is covered separately by the
+pure-function tests. `tsc --noEmit` clean, `eslint` clean, full suite run clean.
+
+**Real Android device verification (Pixel 7 emulator, real backend, real Postgres, real `@tc/crypto`
+fixtures built via `npx tsx`, disposable seeded capsules deleted afterward)**: fragment-key decrypt end
+-to-end (real device, real AES-256-GCM, exact plaintext displayed); passphrase decrypt end-to-end
+(real Argon2id unwrap + real decrypt); key mismatch with a real wrong key (correctly rejected, no
+plaintext ever exposed); empty-content capsule ("Nothing was written."); `alreadyOpened` no-replay
+(record shown instantly, no ceremony delay, confirmed via `senderName`); Key missing (same-shaped link
+with no fragment); the full live ceremony watched end-to-end on-device (~5.8s real full-motion
+timeline, marker visibly approaching, Transit→Opened hallmark flip, letter arriving, all without any
+test stub — the real production code path, not the test file's rAF stub). TalkBack verification via
+two `uiautomator dump` passes (before and after the accessibility fix above), confirming the fix.
+Full-session device logcat grepped for every real key fragment, the real passphrase, and every real
+decrypted plaintext string used in fixtures — zero hits, and zero JS `console.*` output at all beyond
+the two expected startup lines. iOS: NOT VERIFIED (no interactive iOS tooling in this environment,
+consistent with every prior ticket's own disclosed limitation).
+
+**Deferred, explicitly out of scope for this ticket**: PHASE-5.3 (media viewer, confirm-read/One
+Reading Only), PHASE-5.4 (reveal-specific error/a11y hardening pass), PHASE-5.5 (Universal/App Links),
+reply composition, download-a-copy, save-to-account, push notifications, biometrics.
+
+**Exact next ticket**: `PHASE-5.3` — Media viewer + One Reading Only, per the readiness audit's own
+§14 ticket map. Do not start it without the same audit-first, trace-the-real-code discipline this
+ticket and PHASE-5.1 both used.
+
 ### PHASE-5.1 — Reveal entry, locked state, Seal gates (2026-09-01) — DONE, committed, PR open
 
 Branched `phase-5.1-reveal-entry` from fresh `origin/main` (`04b4cf6`, E1.4.11 merged via PR #71).
