@@ -1064,11 +1064,52 @@ describe('ComposeScreen', () => {
       expect(paddingTop).toBe(40 + 16); // insets.top (40) + space[4] (16)
     });
 
-    it('the letter field carries an accessible label', async () => {
+    it('the letter field carries an accessible label and hint (E1.4.11)', async () => {
       get.mockResolvedValue({ capsule: capsuleFixture() });
       const instance = await renderScreen();
       await flush();
-      expect(instance.root.findByType(TextInput).props.accessibilityLabel).toBe('Letter');
+      const input = instance.root.findByType(TextInput);
+      expect(input.props.accessibilityLabel).toBe('Letter');
+      expect(input.props.accessibilityHint).toBeTruthy();
+    });
+
+    it('an attached media row is grouped into one accessible reading (name, size) rather than two separate stops (E1.4.11)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      await flush(0);
+
+      const grouped = instance.root.findAllByProps({ accessibilityRole: 'text' }).find((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('a.jpg,'));
+      expect(grouped).toBeTruthy();
+      expect(grouped!.props.accessible).toBe(true);
+    });
+
+    it('a pending (in-flight) media row groups name and stage into one live-announced reading (E1.4.11)', async () => {
+      get.mockResolvedValue({ capsule: capsuleFixture({ type: 'self' }) });
+      pickForSourceFn.mockResolvedValue({ status: 'picked', media: [{ uri: 'file:///a.jpg', name: 'a.jpg', mimeType: 'image/jpeg', sizeBytes: 10 }] });
+      // Never resolves — the item stays in the 'encrypting' pending stage.
+      createTicketFn.mockReturnValue(new Promise(() => {}));
+      const instance = await renderScreen();
+      await flush();
+
+      act(() => instance.root.findByProps({ accessibilityLabel: 'Enclose something' }).props.onPress());
+      await act(async () => {
+        instance.root.findByType(MediaSourceSheet).props.onSelect('camera');
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      const grouped = instance.root
+        .findAllByProps({ accessibilityLiveRegion: 'polite' })
+        .find((n) => typeof n.props.accessibilityLabel === 'string' && n.props.accessibilityLabel.startsWith('a.jpg,'));
+      expect(grouped).toBeTruthy();
+      expect(grouped!.props.accessibilityLabel).toContain('Encrypting');
     });
 
     it('never imports SecureStore, AsyncStorage, the token store, or the raw @tc/crypto package by name — key material flows only through useMasterKey() and use-capsule-compose.ts', async () => {

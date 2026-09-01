@@ -201,6 +201,7 @@ export default function ComposeScreen() {
               placeholder="Write your letter…"
               placeholderTextColor={colors.muted}
               accessibilityLabel="Letter"
+              accessibilityHint="Saved automatically as you write"
             />
 
             <PendingMediaSection
@@ -273,10 +274,17 @@ function PendingMediaSection({
         <View style={styles.enclosureList}>
           {items.map((item) => (
             <View key={item.id} style={styles.enclosureRow}>
-              <Text style={styles.enclosureName} numberOfLines={1}>
-                {item.originalName ?? 'A file'}
-              </Text>
-              <Text style={styles.enclosureSize}>{formatMediaSize(item.sizeBytes)}</Text>
+              <View
+                style={styles.enclosureItemInfo}
+                accessible
+                accessibilityRole="text"
+                accessibilityLabel={`${item.originalName ?? 'A file'}, ${formatMediaSize(item.sizeBytes)}`}
+              >
+                <Text style={styles.enclosureName} numberOfLines={1}>
+                  {item.originalName ?? 'A file'}
+                </Text>
+                <Text style={styles.enclosureSize}>{formatMediaSize(item.sizeBytes)}</Text>
+              </View>
               <Pressable
                 onPress={() => onRemoveItem(item)}
                 accessibilityRole="button"
@@ -289,13 +297,17 @@ function PendingMediaSection({
 
           {pending.map((p) => (
             <View key={p.id} style={styles.enclosureRow}>
-              <View style={styles.enclosureInfo}>
+              <View
+                style={styles.enclosureInfo}
+                accessible
+                accessibilityRole="text"
+                accessibilityLiveRegion="polite"
+                accessibilityLabel={`${p.name}, ${stageLabel(p)}`}
+              >
                 <Text style={styles.enclosureName} numberOfLines={1}>
                   {p.name}
                 </Text>
-                <Text style={styles.enclosureStage} accessibilityLiveRegion="polite">
-                  {stageLabel(p)}
-                </Text>
+                <Text style={styles.enclosureStage}>{stageLabel(p)}</Text>
               </View>
               {p.stage === 'failed' && p.media && p.retryable !== false ? (
                 <Pressable onPress={() => onRetryPending(p.id)} accessibilityRole="button" accessibilityLabel={`Retry ${p.name}`}>
@@ -421,6 +433,11 @@ const styles = StyleSheet.create({
   enclosureName: { flex: 1, fontSize: fontSize.body, color: colors.ink },
   enclosureSize: { fontSize: fontSize.caption, color: colors.muted, fontVariant: ['tabular-nums'] },
   enclosureInfo: { flex: 1, gap: 2 },
+  // E1.4.11 — a row-direction wrapper (matches `enclosureRow`'s own layout
+  // exactly, unlike `enclosureInfo`'s column stack above) purely so the
+  // ready-item's name+size can be grouped into one accessible block without
+  // changing their existing side-by-side visual arrangement.
+  enclosureItemInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space[2] },
   enclosureStage: { fontSize: fontSize.caption, color: colors.muted },
   enclosureRemove: { fontSize: fontSize.caption, color: colors.muted },
   encloseButton: { alignSelf: 'flex-start', paddingVertical: space[2] },

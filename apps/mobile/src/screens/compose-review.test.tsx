@@ -651,5 +651,28 @@ describe('ReviewScreen', () => {
       act(() => backButton.props.onPress());
       expect(back).toHaveBeenCalledTimes(1);
     });
+
+    it('an enclosed item names its kind in words for accessibility, rather than letting the glyph character be read literally (E1.4.11)', async () => {
+      const { capsule } = await readyCapsule({ type: 'self' });
+      get.mockResolvedValue({ capsule });
+      mediaListFn.mockResolvedValue({
+        data: [mediaFixture({ id: 'media-1', kind: 'audio', originalName: 'voice-note.m4a' }), mediaFixture({ id: 'media-2', kind: 'video', originalName: 'clip.mov' })],
+      });
+      const instance = await renderScreen();
+      await flush();
+
+      const labels = instance.root.findAllByType(Text).map((n) => n.props.accessibilityLabel).filter(Boolean);
+      expect(labels).toContain('Audio, voice-note.m4a');
+      expect(labels).toContain('Video, clip.mov');
+    });
+
+    it('the Seal button carries the irreversibility statement as its hint, so it is heard regardless of how a screen-reader user reaches it (E1.4.11)', async () => {
+      const { capsule } = await readyCapsule({ type: 'self' });
+      get.mockResolvedValue({ capsule });
+      const instance = await renderScreen();
+      await flush();
+      const sealButton = instance.root.findByProps({ accessibilityLabel: 'Seal capsule' });
+      expect(sealButton.props.accessibilityHint).toContain('cannot be changed');
+    });
   });
 });

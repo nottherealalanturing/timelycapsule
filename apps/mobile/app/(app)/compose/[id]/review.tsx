@@ -189,7 +189,11 @@ export default function ReviewScreen() {
                 <View style={styles.enclosedList}>
                   <Text style={styles.enclosedHeading}>Enclosed</Text>
                   {items.map((item) => (
-                    <Text key={item.id} style={styles.enclosedItem}>
+                    <Text
+                      key={item.id}
+                      style={styles.enclosedItem}
+                      accessibilityLabel={`${enclosureKindWord(item.kind)}, ${item.caption || item.originalName}`}
+                    >
                       {enclosureGlyph(item.kind)}
                       {'  '}
                       {item.caption || item.originalName}
@@ -238,6 +242,7 @@ export default function ReviewScreen() {
             disabled={sealing || enclosuresInFlight > 0 || scheduleProblem !== null || sealProblem?.retryable === false}
             accessibilityRole="button"
             accessibilityLabel={sealing ? 'Sealing…' : 'Seal capsule'}
+            accessibilityHint="Once sealed, what is inside cannot be changed. You can withdraw it at any time before it opens."
             accessibilityState={{
               disabled: sealing || enclosuresInFlight > 0 || scheduleProblem !== null || sealProblem?.retryable === false,
               busy: sealing,
@@ -266,6 +271,19 @@ function enclosureGlyph(kind: string): string {
   if (kind === 'audio' || kind === 'voice') return '♪';
   if (kind === 'video') return '▤';
   return '▣';
+}
+
+/**
+ * E1.4.11 — the glyphs above are meaningful to a sighted reader but not to
+ * TalkBack/VoiceOver, which would otherwise read the raw Unicode character
+ * (e.g. "eighth note") in place of it. Overriding `accessibilityLabel`
+ * entirely with a word matching the same three-way distinction the glyph
+ * itself draws — never finer-grained than what's visually shown.
+ */
+function enclosureKindWord(kind: string): string {
+  if (kind === 'audio' || kind === 'voice') return 'Audio';
+  if (kind === 'video') return 'Video';
+  return 'File';
 }
 
 const styles = StyleSheet.create({

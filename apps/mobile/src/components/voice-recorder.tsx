@@ -37,11 +37,34 @@ import { colors, fontSize, fontWeight, radius, space } from '../lib/tokens';
  * shape `media-source.ts`'s pickers already produce, via
  * `normalizeVoiceRecording`. No encryption, no upload, no media ticket.
  */
-type RecorderStage = 'idle' | 'recording' | 'preparing' | 'ready';
+export type RecorderStage = 'idle' | 'recording' | 'preparing' | 'ready';
 
 function elapsedReading(ms: number): string {
   const total = Math.floor(ms / 1000);
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+}
+
+/**
+ * E1.4.11 — "a genuinely mobile-only accessibility case" (readiness audit
+ * §13): a writer recording without sight of the screen has no other way to
+ * know time is passing. `accessibilityLiveRegion="polite"` on the elapsed
+ * `Text` (added alongside this function) only re-announces when this
+ * *string's value* actually changes — the underlying `elapsedMs` ticks
+ * every 200ms (`RecordingElapsed`'s own polling interval, kept exactly as
+ * it was for the smooth visual counter), but rounding down to five-second
+ * buckets while recording means the label itself is identical across ~25
+ * consecutive ticks and only changes once every five seconds, giving a
+ * periodic "5 seconds recorded"/"10 seconds recorded" cadence rather than
+ * an unusable flood of an announcement per tick. Once stopped (`'ready'`),
+ * the value is static, so the exact final duration is used instead of a
+ * rounded one — there is no flood to guard against, and the writer likely
+ * wants the real total.
+ */
+export function elapsedAnnouncement(ms: number, stage: RecorderStage): string {
+  if (stage === 'recording') {
+    return `${Math.floor(ms / 5000) * 5} seconds recorded`;
+  }
+  return `${Math.round(ms / 1000)} seconds recorded`;
 }
 
 export interface VoiceRecorderProps {
@@ -176,7 +199,7 @@ export function VoiceRecorder({ onAccept, onCancel }: VoiceRecorderProps) {
             </Text>
           </View>
           {stage === 'recording' || stage === 'ready' ? (
-            <Text style={styles.elapsed} accessibilityLabel={`${Math.round(elapsedMs / 1000)} seconds`}>
+            <Text style={styles.elapsed} accessibilityLiveRegion="polite" accessibilityLabel={elapsedAnnouncement(elapsedMs, stage)}>
               {elapsedReading(elapsedMs)}
             </Text>
           ) : null}
