@@ -16,10 +16,17 @@ import {
   MediaViewResponseSchema,
   NotificationsListResponseSchema,
   PatchCapsuleRequestSchema,
+  PlaceCheckRequestSchema,
+  PlaceCheckResponseSchema,
   ReceivedListResponseSchema,
   RecipientsListResponseSchema,
   RefreshResponseSchema,
+  RemindRequestSchema,
   ReplyThreadListResponseSchema,
+  RequestIdentityCodeResponseSchema,
+  RevealResponseSchema,
+  VerifyIdentityRequestSchema,
+  VerifyIdentityResponseSchema,
   type CompleteMediaRequest,
   type CreateCapsuleRequest,
   type CreateMediaTicketRequest,
@@ -28,6 +35,7 @@ import {
   type LoginRequest,
   type PaginatedQuery,
   type PatchCapsuleRequest,
+  type PlaceCheckRequest,
 } from '@tc/contracts';
 import { Platform } from 'react-native';
 import { z } from 'zod';
@@ -338,4 +346,39 @@ export const mediaApi = {
 
   /** Cleans up an abandoned/orphaned ticket row (never-finished upload) or a truly-attached item the writer removed. No idempotency middleware on this route (`apps/api/src/modules/media/routes.ts`) — matches web's own `mediaApi.delete`, unprotected the same way there. */
   delete: (mediaId: string) => request(`/media/${mediaId}`, z.void(), { method: 'DELETE', auth: true }),
+};
+
+/**
+ * Recipient (token-auth, no account) reveal endpoints — PHASE-5.1's own
+ * scope, matching `apps/web/src/lib/api-client.ts`'s `revealApi` exactly
+ * for the calls this ticket needs (`get`, `requestIdentityCode`,
+ * `verifyIdentity`, `placeCheck`, `remind`). Every call is unauthenticated
+ * (`auth` omitted/false) — the raw recipient token in the path is the only
+ * credential, exactly as `apps/api/src/modules/reveal/routes.ts` expects.
+ * Deliberately does not include `confirmRead`/`listReplies`/`reply` —
+ * those are PHASE-5.3/6's own scope (see the readiness audit's ticket
+ * map), and adding them here now would be exactly the kind of speculative,
+ * unused surface this codebase's own conventions avoid.
+ */
+export const revealApi = {
+  get: (token: string, gates: { placeGate?: string; identityGate?: string } = {}) =>
+    request(`/r/${token}${toQueryString({ placeGate: gates.placeGate, identityGate: gates.identityGate })}`, RevealResponseSchema),
+
+  requestIdentityCode: (token: string) =>
+    request(`/r/${token}/verify/request`, RequestIdentityCodeResponseSchema, { method: 'POST', body: {} }),
+
+  verifyIdentity: (token: string, code: string) =>
+    request(`/r/${token}/verify`, VerifyIdentityResponseSchema, {
+      method: 'POST',
+      body: VerifyIdentityRequestSchema.parse({ code }),
+    }),
+
+  placeCheck: (token: string, input: PlaceCheckRequest) =>
+    request(`/r/${token}/place-check`, PlaceCheckResponseSchema, {
+      method: 'POST',
+      body: PlaceCheckRequestSchema.parse(input),
+    }),
+
+  remind: (token: string, enabled: boolean) =>
+    request(`/r/${token}/remind`, z.void(), { method: 'POST', body: RemindRequestSchema.parse({ enabled }) }),
 };

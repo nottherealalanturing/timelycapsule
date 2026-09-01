@@ -19,7 +19,7 @@ vi.mock('expo-secure-store', () => ({
   }),
 }));
 
-const { capsulesApi, recipientsApi, receivedApi, notificationsApi, mediaApi, ApiClientError } = await import('./api-client');
+const { capsulesApi, recipientsApi, receivedApi, notificationsApi, mediaApi, revealApi, ApiClientError } = await import('./api-client');
 const { setTokens } = await import('./token-store');
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -339,6 +339,65 @@ describe('api-client.ts — capsule domain', () => {
         jsonResponse({ error: { code: 'media_released', message: 'This enclosure was released.', requestId: 'x' } }, 409),
       );
       await expect(mediaApi.view('media-1')).rejects.toMatchObject({ code: 'media_released' });
+    });
+  });
+
+  describe('revealApi (PHASE-5.1)', () => {
+    it('get() sends no auth header and encodes only the gate params that are present', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: 'withdrawn' }));
+      await revealApi.get('raw-token', { placeGate: 'place-gate' });
+      const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(String(url)).toBe('http://localhost:4001/v1/r/raw-token?placeGate=place-gate');
+      expect((init as RequestInit).headers).not.toHaveProperty('Authorization');
+    });
+
+    it('get() omits the query string entirely when no gates are supplied', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: 'expired' }));
+      await revealApi.get('raw-token');
+      const [url] = vi.mocked(fetch).mock.calls[0]!;
+      expect(String(url)).toBe('http://localhost:4001/v1/r/raw-token');
+    });
+
+    it('get() parses every RevealResponse branch as-is (locked/unlocked/withdrawn/expired)', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ status: 'expired' }));
+      await expect(revealApi.get('raw-token')).resolves.toEqual({ status: 'expired' });
+    });
+
+    it('requestIdentityCode() posts with no body content the server needs beyond the token in the path', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ sent: true }));
+      const result = await revealApi.requestIdentityCode('raw-token');
+      expect(result).toEqual({ sent: true });
+      const [url, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(String(url)).toBe('http://localhost:4001/v1/r/raw-token/verify/request');
+      expect((init as RequestInit).method).toBe('POST');
+    });
+
+    it('verifyIdentity() sends only the 6-digit code and returns the gate token', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ gateToken: 'identity-gate-token' }));
+      const result = await revealApi.verifyIdentity('raw-token', '123456');
+      expect(result).toEqual({ gateToken: 'identity-gate-token' });
+      const [, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ code: '123456' });
+    });
+
+    it('placeCheck() sends only lat/lng and surfaces the real gate-token-or-null contract', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ withinRange: false, distanceM: 500, bearingDeg: 10, gateToken: null }));
+      const result = await revealApi.placeCheck('raw-token', { lat: 1, lng: 2 });
+      expect(result.gateToken).toBeNull();
+      const [, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ lat: 1, lng: 2 });
+    });
+
+    it('remind() sends the enabled flag and parses the 204 as void', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse(null, 204));
+      await expect(revealApi.remind('raw-token', true)).resolves.toBeUndefined();
+      const [, init] = vi.mocked(fetch).mock.calls[0]!;
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ enabled: true });
+    });
+
+    it('masks a 429 distinctly via ApiClientError.status, matching the reveal screen\'s own rate-limit branch', async () => {
+      vi.mocked(fetch).mockResolvedValue(jsonResponse({ error: { code: 'rate_limited', message: 'slow down' } }, 429));
+      await expect(revealApi.get('raw-token')).rejects.toMatchObject({ status: 429 });
     });
   });
 });

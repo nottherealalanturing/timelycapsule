@@ -182,6 +182,9 @@ importers:
       expo-linking:
         specifier: ~57.0.8
         version: 57.0.8(expo@57.0.17)(react-native@0.86.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
+      expo-location:
+        specifier: ~57.0.15
+        version: 57.0.15(expo@57.0.17)(typescript@6.0.3)
       expo-router:
         specifier: ~57.0.17
         version: 57.0.17(edvzcw57za33tefeqvdoedyxbu)
@@ -6001,6 +6004,11 @@ packages:
     peerDependencies:
       react: '*'
       react-native: '*'
+
+  expo-location@57.0.15:
+    resolution: {integrity: sha512-7ry8gr9I77dDJC3bN+svsmWkJgnm9Xkxq8P4tg6dXtjv+YqulFimCN/4ExYPIzqNiug1PbqHpUFH70k8uyReNw==}
+    peerDependencies:
+      expo: '*'
 
   expo-manifests@57.0.1:
     resolution: {integrity: sha512-qB/mDG2dYdl+EvUeQuqP8KFYCFgFCQjJYdWIHo8SFBgDzMYmdF286DFY2M1M9Okr99wkb5M4tgA3aCcwv3aEQA==}
@@ -15788,6 +15796,14 @@ snapshots:
       - expo
       - supports-color
     optional: true
+
+  expo-location@57.0.15(expo@57.0.17)(typescript@6.0.3):
+    dependencies:
+      '@expo/image-utils': 0.11.5(typescript@6.0.3)
+      expo: 57.0.17(@babel/core@7.29.7)(@expo/dom-webview@57.0.1)(@expo/metro-runtime@57.0.14)(expo-router@57.0.17)(react-dom@19.2.4(react@19.2.3))(react-native-worklets@0.10.4(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(react-native@0.86.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3))(react-native@0.86.0(@babel/core@7.29.7)(@react-native/metro-config@0.86.0(@babel/core@7.29.7))(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)(typescript@6.0.3)
+    transitivePeerDependencies:
+      - supports-color
+      - typescript
 
   expo-manifests@57.0.1(expo@57.0.17):
     dependencies:

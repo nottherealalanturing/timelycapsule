@@ -44,6 +44,12 @@
           "microphonePermission": "Allow TimelyCapsule to record a voice note to enclose in your capsule.",
           "enableBackgroundPlayback": false
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow TimelyCapsule to check your location against the place this capsule opens near."
+        }
       ]
     ]
   }
