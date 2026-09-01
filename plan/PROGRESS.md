@@ -4,6 +4,120 @@
 
 ## Current status
 
+### PHASE-5.1 — Reveal entry, locked state, Seal gates (2026-09-01) — DONE, committed, PR open
+
+Branched `phase-5.1-reveal-entry` from fresh `origin/main` (`04b4cf6`, E1.4.11 merged via PR #71).
+Source of truth: `plan/STAGE-E-MOBILE-V1-PHASE-5-READINESS-AUDIT.md` (written earlier this session,
+not committed until this ticket's docs commit) — its own §14 ticket map, not a re-derivation. Scope
+held exactly to that ticket's boundary: the reveal entry route, locked/countdown state, Seal-stamps
+row, remind-me, and all three pre-unlock Seal gates (Place/Passphrase/Identity). Explicitly excluded
+and genuinely absent from the diff: the transit ceremony, letter decryption, media viewer,
+confirm-read/One Reading Only, and reply composition — all confirmed by a post-implementation grep
+of the new files for `decryptContentDoc`/`decryptBytes`/`confirmRead`/`EnclosureViewer`/
+`decodeCapsuleKeyFromLink`, zero matches.
+
+**New unauthenticated route**: `app/(reveal)/c/[token].tsx`, its own `_layout.tsx` (`<Slot/>`, no
+guard) — sits outside both `(app)`'s auth gate and `(auth)`'s login stack, matching web's own
+`(reveal)/c/[token]` grouping and hard rule 4 (recipient reveal needs no account). Reachable today
+only via manual/dev navigation or the existing custom `timelycapsule://` scheme — no Universal/App
+Link config was added (`associatedDomains`/`intentFilters` are PHASE-5.5's own job, per the
+readiness audit's explicit scope boundary).
+
+**State machine**: `use-reveal.ts`'s `useReveal()` hook wraps a new `revealApi` (added to
+`api-client.ts`, mirroring web's own `revealApi` for exactly the calls this ticket needs — `get`,
+`requestIdentityCode`, `verifyIdentity`, `placeCheck`, `remind`; deliberately not `confirmRead`/
+`listReplies`/`reply`, later tickets' scope). `loading` is derived from comparing a composite fetch
+key against the last-resolved one rather than set synchronously inside the effect — this project's
+eslint `react-hooks` rules flagged the naive version (`setState` at the top of an effect body) during
+this ticket, fixed before it ever reached a commit. A 429 is distinguished from every other failure
+(masked as `not-found`, matching the backend's own deliberate masked-404 design for a suppressed or
+nonexistent token — confirmed by re-reading `apps/api/src/modules/reveal/service.ts`'s
+`findRecipientOrThrow` directly, not assumed from the stale `03-ARCHITECTURE.md` endpoint list).
+`useUnlockTimer()` schedules the same T-0 auto-refetch web's page does; verified live on a real
+capsule whose `unlock_at` had already passed (see device verification below).
+
+**Locked wait screen**: states sender, teaser, absolute unlock date, horizon phrase, and an
+elapsed/remaining pair — the same information web's Dual Clock/Meridian Approach carry, through
+plain grouped `Text` rather than a ported visual dial/ring instrument. This is a deliberate,
+disclosed lower-fidelity substitution for this ticket (not a missing requirement): `07-EXPERIENCE-
+BIBLE.md` §V.4 requires state to be stated in text regardless of the visual instrument, and a text-
+only reading arguably serves TalkBack better than a decorative ring would. "Add to calendar" (web's
+`.ics` data-URL download) was **not** implemented — no client-side equivalent exists on this platform
+without a new native dependency (`expo-calendar`) this ticket wasn't scoped to add; disclosed here
+rather than faked with an inert button, per the ticket's own "stop and document the exact blocker"
+instruction. "Tell me when it opens" **was** implemented — it's a real, existing backend endpoint
+(`POST /r/:token/remind`), no new dependency needed.
+
+**Seal gates**, one new component each (`place-gate.tsx`, `passphrase-gate.tsx`,
+`identity-gate.tsx`), each a direct port of web's own component under the same name:
+- **Place**: real `expo-location` (new dependency, added exactly like `expo-audio`'s own
+  `app.json` plugin-config pattern — a custom `locationWhenInUsePermission` message, just-in-time
+  request, never on mount). Ceremony/intent, not a cryptographic boundary — the actual haversine
+  check stays entirely server-side (`placeCheck`), matching the readiness audit's own wording
+  verbatim.
+- **Passphrase**: the existing `@tc/crypto` `unwrapCapsuleKeyWithPassphrase` primitive, same
+  client-only throttle web uses (no server oracle). Stops exactly where this ticket's scope ends —
+  the derived capsule key is held only long enough to prove the gate was satisfied and is never
+  passed to any decrypt function; a screen that reaches this state renders a plain, honest "This
+  capsule is open" placeholder, never a fabricated ceremony.
+- **Identity**: the real OTP round-trip (`POST /r/:token/verify/request`, `POST /r/:token/verify`)
+  against the existing backend — no client-side shortcut, no six-box widget (this app has none yet;
+  a plain numeric `TextInput` carries the same information).
+
+**A real device finding, found and fixed before this ticket closed**: `PlaceGate`'s original catch
+block set `status: 'far'` on *any* thrown error, but the "far" message only renders when a real
+`distanceM` is present — a genuine failure (as opposed to an out-of-range result) silently reverted
+the button to idle with **no visible error at all**, reachable in practice (hit on a real Pixel 7
+emulator during this ticket's own verification, cause not fully isolated — see device notes below).
+Fixed with a distinct `'error'` status carrying its own visible message, matching this codebase's own
+E1.4.10 standard ("no generic error message reachable anywhere"); a regression test now covers it.
+
+**Security**: capsule key never logged (grepped every new file for `console.*` — zero matches,
+matching the codebase's blanket-none convention for this surface, not a scoped "avoid *these*
+values" check); passphrase/OTP/gate-tokens/coordinates never logged; the reveal screen statically
+scanned (test-enforced) to confirm it never imports `master-key-context` or the owner-only
+`capsule-crypto` module — the recipient-path key never touches the owner's `ownerKeyWrap`+`masterKey`
+path. Grepped the full device logcat across the entire verification session (all three gates, all
+four terminal states, TalkBack on) for every raw token, the real passphrase, the wrapped-key blob,
+and the seeded coordinates — zero hits.
+
+**Tests**: 26 new (619 total mobile tests, up from 593) — 8 in `api-client.test.ts` for the new
+`revealApi` (query-string construction, auth-header absence, every `RevealResponse` branch, the 429
+distinction), 18 in a new `reveal.test.tsx` (loading/locked/withdrawn/expired/not-found/rate-limited;
+Place success/far/denied/error; Identity request/verify success/failure; Passphrase success/failure
+with **real** `@tc/crypto` Argon2id, not mocked; two static-source-scan security tests). `tsc --noEmit`
+clean, `eslint` clean, full suite run clean.
+
+**Real Android device verification (Pixel 7 emulator, real backend, real Postgres, disposable seeded
+capsules deleted afterward)**: all four terminal states (locked/unlocked/withdrawn/expired/not-found)
+confirmed via real `timelycapsule://c/:token` deep links against a running `apps/api`; the T-0
+auto-unlock timer confirmed by manually flipping a seeded capsule's `state` mid-session and observing
+a fresh mount pick up `unlocked` correctly (the already-fired one-shot timer itself was not re-
+observed firing a second time on the same mounted screen — matches web's own one-shot design, not a
+gap); Identity Seal's real rejection path confirmed end-to-end against the real OTP table (right-code
+success not verified, since dev has no way to read the plaintext code back out of a real, hashed,
+provider-less send — a deliberate security property, not a testing gap); Passphrase Seal confirmed
+end-to-end both ways (wrong passphrase rejected, correct passphrase unwraps and stops at the "open"
+placeholder) using a real capsule key wrapped with `@tc/crypto`; Place Seal's permission flow
+confirmed genuine (real system prompt, the custom message from `app.json`) but its actual GPS
+resolution did **not** reliably succeed on this AVD despite a confirmed-correct `adb emu geo fix` and
+Location Accuracy being enabled (`dumpsys location` showed the exact expected coordinate available
+system-wide) — a disclosed, NOT VERIFIED end-to-end gap for the success/far branches specifically
+(both fully covered by mocked unit tests instead), most likely a known category of AVD GPS flakiness
+rather than an app defect, and the reason the error-status bug above was found in the first place.
+TalkBack verification done via `uiautomator dump`'s content-desc/text tree (same data TalkBack reads,
+following E1.3.11/E1.4.11's own established fallback methodology) across every state — every control
+carries a real accessible name, the seal-stamps row and dual-clock figures read as single grouped
+blocks, no state is carried by color alone. iOS: NOT VERIFIED (no interactive iOS tooling in this
+environment, consistent with every prior ticket's own disclosed limitation).
+
+**Deferred, explicitly out of scope for this ticket**: PHASE-5.2 (transit ceremony, letter decrypt),
+PHASE-5.3 (media viewer, confirm-read/One Reading Only), PHASE-5.4 (reveal-specific error/a11y
+hardening pass), PHASE-5.5 (Universal/App Links), reply composition, push notifications, biometrics.
+
+**Exact next ticket**: `PHASE-5.2` — Transit ceremony, letter decrypt and display, per the readiness
+audit's own §14 ticket map. Do not start it without the same audit-first discipline this ticket used.
+
 ### E1.4.11 — Accessibility pass, Creation (2026-09-01) — DONE, committed, PR open
 
 Branched `e1.4.11-accessibility-creation` from fresh `origin/main` (PR #70 for E1.4.10 confirmed
