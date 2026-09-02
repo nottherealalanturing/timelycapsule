@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { RevealResponse } from '@tc/contracts';
+import type { RevealMedia, RevealResponse } from '@tc/contracts';
 import { encodeCapsuleKeyForLink, encryptBytes, generateMasterKey, wrapCapsuleKeyWithPassphrase } from '@tc/crypto';
 import { act } from 'react';
 import { Text } from 'react-native';
@@ -17,6 +17,7 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   TextInput: 'TextInput',
   ScrollView: 'ScrollView',
+  Image: 'Image',
   StyleSheet: { create: (styles: unknown) => styles },
   findNodeHandle: vi.fn(() => 1),
   AccessibilityInfo: {
@@ -25,6 +26,31 @@ vi.mock('react-native', () => ({
     announceForAccessibility: (...args: unknown[]) => announceForAccessibility(...args),
     setAccessibilityFocus: (...args: unknown[]) => setAccessibilityFocus(...args),
   },
+}));
+
+// PHASE-5.3's media viewer, reached whenever a rendered record has any
+// `media` items — mocked the same minimal way `enclosure-viewer.test.tsx`
+// does, since this file exercises the full screen tree, not the viewer in
+// isolation.
+vi.mock('expo-file-system', () => {
+  class FakeFile {
+    uri = 'file:///cache/fake-temp-file';
+    create() {}
+    write() {}
+    get exists() {
+      return true;
+    }
+    delete() {}
+  }
+  return { File: FakeFile, Paths: { cache: 'fake-cache-dir' } };
+});
+vi.mock('expo-video', () => ({
+  useVideoPlayer: (source: unknown) => ({ source }),
+  VideoView: 'VideoView',
+}));
+vi.mock('expo-audio', () => ({
+  useAudioPlayer: (source: unknown) => ({ source, play: vi.fn(), pause: vi.fn() }),
+  useAudioPlayerStatus: () => ({ playing: false }),
 }));
 
 vi.mock('react-native-safe-area-context', () => ({
@@ -56,6 +82,7 @@ const requestIdentityCode = vi.fn();
 const verifyIdentity = vi.fn();
 const placeCheck = vi.fn();
 const remind = vi.fn();
+const confirmRead = vi.fn().mockResolvedValue(undefined);
 vi.mock('../lib/api-client', () => ({
   revealApi: {
     get: (...args: unknown[]) => get(...args),
@@ -63,6 +90,7 @@ vi.mock('../lib/api-client', () => ({
     verifyIdentity: (...args: unknown[]) => verifyIdentity(...args),
     placeCheck: (...args: unknown[]) => placeCheck(...args),
     remind: (...args: unknown[]) => remind(...args),
+    confirmRead: (...args: unknown[]) => confirmRead(...args),
   },
   ApiClientError: class ApiClientError extends Error {
     constructor(
@@ -184,6 +212,8 @@ beforeEach(() => {
   verifyIdentity.mockReset();
   placeCheck.mockReset();
   remind.mockReset();
+  confirmRead.mockReset();
+  confirmRead.mockResolvedValue(undefined);
   requestForegroundPermissionsAsync.mockReset();
   getCurrentPositionAsync.mockReset();
   announceForAccessibility.mockReset();
@@ -547,6 +577,110 @@ describe('PHASE-5.2 — reveal ceremony and letter decryption', () => {
   });
 });
 
+function mediaFixture(overrides: Partial<RevealMedia> = {}): RevealMedia {
+  return {
+    id: '11111111-1111-1111-1111-111111111111',
+    kind: 'image',
+    caption: null,
+    position: 0,
+    encMeta: null,
+    viewUrl: 'https://signed.example/blob',
+    released: false,
+    releasedAt: null,
+    mime: 'image/jpeg',
+    originalName: 'sunset.jpg',
+    ...overrides,
+  };
+}
+
+describe('PHASE-5.3 — media viewer and One Reading Only', () => {
+  it('renders a media item and states its kind in words, unopened by default', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('A photo from the trip.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: true, media: [mediaFixture()] }));
+
+    const instance = renderScreen();
+    await flush();
+
+    expect(texts(instance).join(' ')).toContain('Photograph');
+    expect(instance.root.findByProps({ accessibilityLabel: 'Open, Photograph, sunset.jpg' })).toBeTruthy();
+  });
+
+  it('states a released enclosure plainly, with no Open control', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('Something was here.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(
+      unlockedFixture({ contentDocEnc, alreadyOpened: true, media: [mediaFixture({ released: true, releasedAt: '2026-02-01T00:00:00.000Z', viewUrl: null })] }),
+    );
+
+    const instance = renderScreen();
+    await flush();
+
+    expect(texts(instance).join(' ')).toContain('Released from storage on 1 February 2026');
+    expect(instance.root.findAllByProps({ accessibilityLabel: /^Open,/ })).toHaveLength(0);
+  });
+
+  it('fires confirm-read exactly once, right after a real successful letter decrypt', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('This capsule reads once.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: false }));
+
+    renderScreen();
+    await flush();
+
+    expect(confirmRead).toHaveBeenCalledTimes(1);
+    expect(confirmRead).toHaveBeenCalledWith('test-token');
+  });
+
+  it('never fires confirm-read on a decrypt (key mismatch) failure', async () => {
+    const rightKey = generateMasterKey();
+    const wrongKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(rightKey, letterDoc('Never confirmed.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(wrongKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: true }));
+
+    renderScreen();
+    await flush();
+
+    expect(confirmRead).not.toHaveBeenCalled();
+  });
+
+  it('never fires confirm-read for a capsule with nothing written — matches web\'s own "never even attempts a decrypt" behavior', async () => {
+    const capsuleKey = generateMasterKey();
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc: null, alreadyOpened: true }));
+
+    renderScreen();
+    await flush();
+
+    expect(confirmRead).not.toHaveBeenCalled();
+  });
+
+  it('does not fire confirm-read again on a re-render after it already fired once', async () => {
+    const capsuleKey = generateMasterKey();
+    const contentDocEnc = await encryptEnvelope(capsuleKey, letterDoc('Steady state.'));
+    mockOpenedUrl = `timelycapsule://c/test-token#${encodeCapsuleKeyForLink(capsuleKey)}`;
+    get.mockResolvedValue(unlockedFixture({ contentDocEnc, alreadyOpened: false }));
+
+    const instance = renderScreen();
+    await flush();
+    expect(confirmRead).toHaveBeenCalledTimes(1);
+
+    // A skip-to-end tap re-renders the ceremony tree repeatedly as the
+    // transit finishes — confirm-read must not be sensitive to that at all.
+    const skip = instance.root.findByProps({ accessibilityLabel: 'Show the letter now' });
+    await act(async () => {
+      skip.props.onPress();
+    });
+    await flush();
+
+    expect(confirmRead).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('security / scope boundary — static source scan', () => {
   function sourceOf(relativePath: string): string {
     const here = dirname(fileURLToPath(import.meta.url));
@@ -583,9 +717,12 @@ describe('security / scope boundary — static source scan', () => {
       '../components/identity-gate.tsx',
       '../components/seal-stamps-row.tsx',
       '../components/reveal-ceremony.tsx',
+      '../components/enclosure-viewer.tsx',
       '../lib/use-reveal.ts',
       '../lib/reveal-crypto.ts',
       '../lib/reveal-transit.ts',
+      '../lib/enclosure-media.ts',
+      '../lib/media-temp-file.ts',
     ];
     for (const file of files) {
       const source = sourceOf(file);
@@ -593,10 +730,17 @@ describe('security / scope boundary — static source scan', () => {
     }
   });
 
-  it('PHASE-5.2 never imports media decryption/rendering, confirm-read, or reply composition — that belongs to a later ticket', () => {
-    for (const file of ['../../app/(reveal)/c/[token].tsx', '../components/reveal-ceremony.tsx', '../lib/reveal-crypto.ts']) {
+  it('PHASE-5.3 never imports reply composition, download-a-copy, or save-to-account — that belongs to PHASE-6', () => {
+    for (const file of ['../../app/(reveal)/c/[token].tsx', '../components/reveal-ceremony.tsx', '../components/enclosure-viewer.tsx', '../lib/reveal-crypto.ts', '../lib/enclosure-media.ts']) {
       const importLines = importLinesOf(file);
-      expect(importLines, file).not.toMatch(/decryptEnclosure|EnclosureViewer|confirmRead|sealReply|Correspondence|listReplies/);
+      expect(importLines, file).not.toMatch(/sealReply|Correspondence|listReplies|saveToAccount/);
     }
+  });
+
+  it('media temp files are never written outside the OS cache directory', () => {
+    const importLines = importLinesOf('../lib/media-temp-file.ts');
+    expect(importLines).toMatch(/Paths/);
+    const source = sourceOf('../lib/media-temp-file.ts');
+    expect(source).not.toMatch(/Paths\.document/);
   });
 });

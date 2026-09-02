@@ -1,16 +1,18 @@
+import type { RevealMedia } from '@tc/contracts';
 import { useEffect, useRef } from 'react';
-import { AccessibilityInfo, findNodeHandle, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { envelopeText, type LetterEnvelope } from '../lib/capsule-crypto';
+import { decryptEnclosure } from '../lib/enclosure-media';
 import { segment, useReducedMotion, useTransit } from '../lib/reveal-transit';
 import { colors, fontSize, fontWeight, space } from '../lib/tokens';
+import { EnclosureViewer } from './enclosure-viewer';
 
 /**
  * Mobile port of `apps/web/src/components/reveal/{TransitStage,
- * RevealCeremony}.tsx`'s `RecordAtRest`, letter-only. PHASE-5.2's own
- * boundary: no media (`EnclosureViewer`'s job is PHASE-5.3's), no reply
- * composer, no download-a-copy, no "Keep this"/save-to-account — those are
- * real web features this ticket deliberately does not port, matching the
- * readiness audit's explicit non-goals for this ticket.
+ * RevealCeremony}.tsx`'s `RecordAtRest`, letter + media. PHASE-5.3 adds the
+ * media list (§9 of the readiness audit); reply composer, download-a-copy,
+ * and "Keep this"/save-to-account remain out of scope — real web features
+ * this arc deliberately does not port yet (PHASE-6's own job).
  *
  * `alreadyOpened` skips the ceremony animation entirely and renders the
  * record at rest immediately (`06`: "Never replay. Returning to an opened
@@ -21,7 +23,21 @@ import { colors, fontSize, fontWeight, space } from '../lib/tokens';
  * bans them on the reveal permanently; PHASE-5.1 already established this
  * and nothing here reintroduces it.
  */
-export function RevealCeremony({ publicId, senderName, envelope, alreadyOpened }: { publicId: string; senderName: string; envelope: LetterEnvelope; alreadyOpened: boolean }) {
+export function RevealCeremony({
+  publicId,
+  senderName,
+  envelope,
+  media,
+  capsuleKey,
+  alreadyOpened,
+}: {
+  publicId: string;
+  senderName: string;
+  envelope: LetterEnvelope;
+  media: RevealMedia[];
+  capsuleKey: Uint8Array;
+  alreadyOpened: boolean;
+}) {
   const { known: motionKnown, reduced } = useReducedMotion();
   // Ceremony never starts before the real reduced-motion preference is
   // known — starting with an assumed value risks animating the wrong
@@ -59,10 +75,10 @@ export function RevealCeremony({ publicId, senderName, envelope, alreadyOpened }
 
   if (alreadyOpened) {
     return (
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <Frame publicId={publicId} label="Opened" />
-        <Record senderName={senderName} paragraphs={paragraphs} headingRef={headingRef} progress={1} />
-      </View>
+        <Record senderName={senderName} paragraphs={paragraphs} headingRef={headingRef} progress={1} media={media} capsuleKey={capsuleKey} />
+      </ScrollView>
     );
   }
 
@@ -70,7 +86,7 @@ export function RevealCeremony({ publicId, senderName, envelope, alreadyOpened }
   const instrumentVisible = transit.elapsedMs < transit.marks.recedeEnd;
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       {!transit.done ? (
         <Pressable
           onPress={transit.skip}
@@ -112,9 +128,9 @@ export function RevealCeremony({ publicId, senderName, envelope, alreadyOpened }
       ) : null}
 
       {recordPresent ? (
-        <Record senderName={senderName} paragraphs={paragraphs} headingRef={headingRef} progress={letterProgress} />
+        <Record senderName={senderName} paragraphs={paragraphs} headingRef={headingRef} progress={letterProgress} media={media} capsuleKey={capsuleKey} />
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 
@@ -139,11 +155,15 @@ function Record({
   paragraphs,
   headingRef,
   progress,
+  media,
+  capsuleKey,
 }: {
   senderName: string;
   paragraphs: string[];
   headingRef: React.RefObject<View | null>;
   progress: number;
+  media: RevealMedia[];
+  capsuleKey: Uint8Array;
 }) {
   return (
     <View style={styles.record}>
@@ -159,6 +179,25 @@ function Record({
       ) : (
         <Text style={styles.paragraph}>Nothing was written.</Text>
       )}
+
+      {media.length > 0 ? (
+        <View style={styles.mediaSection}>
+          {media.map((item) => (
+            <EnclosureViewer
+              key={item.id}
+              enclosure={item}
+              load={() => {
+                // Unreachable while `released` is true (the viewer offers no
+                // "Open" for it), but `viewUrl` is genuinely nullable — a
+                // thrown error here is a better answer than passing `null`
+                // into the decrypt path, matching web's own identical guard.
+                if (!item.viewUrl) throw new Error('This enclosure was released from storage');
+                return decryptEnclosure(item.viewUrl, capsuleKey);
+              }}
+            />
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -182,6 +221,7 @@ const styles = StyleSheet.create({
   skipButton: { alignSelf: 'flex-start', paddingVertical: space[1], paddingHorizontal: space[2] },
   skipLabel: { fontSize: fontSize.caption, color: colors.muted },
   record: { gap: space[4] },
+  mediaSection: { gap: space[3] },
   heading: { fontSize: fontSize.body, color: colors.muted },
   paragraph: { fontSize: fontSize.bodyLarge, color: colors.ink, lineHeight: fontSize.bodyLarge * 1.5 },
 });
