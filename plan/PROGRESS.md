@@ -4,6 +4,64 @@
 
 ## Current status
 
+### PHASE-5.4 — Error/validation + accessibility hardening pass (2026-09-02) — DONE, committed, PR open
+
+Branched `phase-5.4-error-a11y-hardening` from fresh `origin/main` (`c219ed1`, PR #74/PHASE-5.3
+confirmed merged via `gh pr view 74` and `git log origin/main`, not assumed). Source of truth: the
+readiness audit's own §14 ticket map for PHASE-5.4 exactly ("mirror E1.4.10/E1.4.11's own
+end-of-phase discipline for the reveal surface specifically").
+
+**Audit before implementation** (per this ticket's own explicit instruction): read every
+reveal-specific error/system state in `[token].tsx` and every gate component's error copy, and
+diffed each string against web's real `SystemPage`/`LockedWait`/gate-component text verbatim — not
+approximated from memory. Result: withdrawn/expired/not-found/rate-limited/key-missing/key-mismatch
+and every Place/Identity/Passphrase gate error message already matched web's own copy exactly (all
+established in PHASE-5.1/5.2's own work). Also traced the full decrypt chain
+(`decryptRevealLetter` → `decryptField` → `readEnvelope`) end to end to rule out an indefinite-hang
+risk — confirmed every throw path is caught internally and the function can never reject, so no
+error state was silently swallowed into a stuck spinner.
+
+**The one real gap found**: the `loading` state ("Retrieving this capsule.") was the only state in
+the whole reveal surface rendered without the same `TimelyCapsule` hallmark header every other state
+(locked, withdrawn, expired, not-found, rate-limited, key-missing, key-mismatch, decrypting) carries
+— a real, if minor, parity gap against web's own loading branch, which does show that header. Fixed
+by wrapping `LoadingState` in the same header treatment.
+
+**Real TalkBack pass, genuinely performed (real Pixel 7 emulator, TalkBack actually enabled, real
+backend, seven fresh disposable capsules covering every state)**: locked (no seals), locked+Place
+seal, locked+Identity seal, unlocked+Passphrase seal (real Argon2id unwrap → real letter decrypt →
+ceremony → record at rest), withdrawn, expired, and a genuinely key-missing unlocked capsule (no
+passphrase seal, no link fragment) — all seven captured via `uiautomator dump`'s content-desc/text
+tree (the same data TalkBack reads), following E1.4.11's own established real-device methodology.
+Every state's hallmark header, body copy, and gate controls read correctly and are grouped
+accessibly; no state relies on color alone. The ceremony's mid-transit announce/focus/skip-button
+behavior (already unit-tested deterministically in PHASE-5.2 via `transit.skip()` and a mocked
+`requestAnimationFrame`) completed too quickly during the live device pass to catch a mid-animation
+screenshot — real elapsed wall-clock time (Argon2id derivation + adb round-trip overhead) exceeded
+the ceremony's own ~4.7s full-motion duration before the next screenshot was taken; this is a timing
+artifact of manual device testing, not a defect, and the exact behavior remains verified by the
+existing deterministic unit tests, which is the correct instrument for something that fast.
+
+**Security**: full-session device logcat grepped for the real passphrase, the real wrapped-key blob,
+the decrypted letter text, every seeded token, and the seeded Place-seal coordinates — zero hits,
+matching every prior ticket's own established discipline.
+
+**Tests**: 1 existing test strengthened (the loading-state test now also asserts the header renders),
+673 total mobile tests unchanged in count (no new behavior, only a rendering fix to existing scope).
+`tsc --noEmit` clean, `eslint` clean, full suite (46 files) run clean.
+
+**iOS**: build/render only, per this ticket's own explicit scope (no interactive iOS tooling in this
+environment, consistent with every prior ticket's own disclosed limitation).
+
+**Deferred, explicitly out of scope for this ticket**: PHASE-5.5 (Universal/App Links), reply
+composition, biometrics, push notifications, recovery-code restoration — none touched, matching the
+ticket's own explicit non-goals list (which for PHASE-5.4 itself is empty: "this is intentionally a
+narrow, cross-cutting pass, not a place to add new features").
+
+**Exact next ticket**: `PHASE-5.5` — Universal/App Links spike, per the readiness audit's own §14
+ticket map — the last ticket in the arc's own dependency chain before the mobile Phase 5 reveal
+surface is reachable via a real recipient email link rather than only manual/dev navigation.
+
 ### PHASE-5.3 — Media viewer, One Reading Only (2026-09-02) — DONE, committed, PR open
 
 Branched `phase-5.3-media-viewer` from fresh `origin/main` (`f188003`, PR #73/PHASE-5.2 merged —
