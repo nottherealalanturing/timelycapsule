@@ -349,16 +349,14 @@ export const mediaApi = {
 };
 
 /**
- * Recipient (token-auth, no account) reveal endpoints — PHASE-5.1's own
+ * Recipient (token-auth, no account) reveal endpoints — PHASE-5.1/5.2/5.3's
  * scope, matching `apps/web/src/lib/api-client.ts`'s `revealApi` exactly
- * for the calls this ticket needs (`get`, `requestIdentityCode`,
- * `verifyIdentity`, `placeCheck`, `remind`). Every call is unauthenticated
- * (`auth` omitted/false) — the raw recipient token in the path is the only
- * credential, exactly as `apps/api/src/modules/reveal/routes.ts` expects.
- * Deliberately does not include `confirmRead`/`listReplies`/`reply` —
- * those are PHASE-5.3/6's own scope (see the readiness audit's ticket
- * map), and adding them here now would be exactly the kind of speculative,
- * unused surface this codebase's own conventions avoid.
+ * for the calls this arc needs (`get`, `requestIdentityCode`,
+ * `verifyIdentity`, `placeCheck`, `remind`, `confirmRead`). Every call is
+ * unauthenticated (`auth` omitted/false) — the raw recipient token in the
+ * path is the only credential, exactly as `apps/api/src/modules/reveal/
+ * routes.ts` expects. Deliberately does not include `listReplies`/`reply`
+ * — those are PHASE-6's own scope.
  */
 export const revealApi = {
   get: (token: string, gates: { placeGate?: string; identityGate?: string } = {}) =>
@@ -381,4 +379,15 @@ export const revealApi = {
 
   remind: (token: string, enabled: boolean) =>
     request(`/r/${token}/remind`, z.void(), { method: 'POST', body: RemindRequestSchema.parse({ enabled }) }),
+
+  /**
+   * The completed-reading signal for `expiry_strict` capsules — PHASE-5.3's
+   * own addition. A no-op server-side for every other capsule (confirmed by
+   * directly reading `apps/api/src/modules/reveal/service.ts`'s
+   * `confirmRead` → `scheduleCapsuleExpiry`'s own early-return guard), so
+   * calling it unconditionally on every successful letter decrypt — never
+   * conditioned on some client-side guess about whether this capsule is
+   * strict — is exactly what web itself does and is both safe and correct.
+   */
+  confirmRead: (token: string) => request(`/r/${token}/confirm-read`, z.void(), { method: 'POST', body: {} }),
 };

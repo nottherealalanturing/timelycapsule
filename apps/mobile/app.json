@@ -50,7 +50,8 @@
         {
           "locationWhenInUsePermission": "Allow TimelyCapsule to check your location against the place this capsule opens near."
         }
-      ]
+      ],
+      "expo-video"
     ]
   }
 }

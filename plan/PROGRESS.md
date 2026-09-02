@@ -4,6 +4,83 @@
 
 ## Current status
 
+### PHASE-5.3 — Media viewer, One Reading Only (2026-09-02) — DONE, committed, PR open
+
+Branched `phase-5.3-media-viewer` from fresh `origin/main` (`f188003`, PR #73/PHASE-5.2 merged —
+verified via `gh pr view 73` and `git log origin/main`, not assumed). Source of truth: the readiness
+audit's own §14 ticket map for PHASE-5.3 exactly (per-kind enclosure viewer, `confirm-read`), traced
+against the real `apps/web/src/components/enclosure/EnclosureViewer.tsx`, `apps/web/src/lib/
+enclosure-media.ts`, and `apps/api/src/modules/reveal/service.ts`'s `confirmRead`/
+`scheduleCapsuleExpiry` directly, not from documentation alone.
+
+**Media viewer**: new `enclosure-viewer.tsx`, a direct port of web's three rules (open in place,
+museum-label chrome, nothing decrypts itself) — `closed → opening → open|failed` stage model, lazy
+per-item decrypt on tap. `enclosure-media.ts`'s `decryptEnclosure` reuses `@tc/crypto`'s existing
+`decryptBytes` with the same `iv(12)‖ciphertext` slice web's own function uses — no new crypto.
+RN has no blob-URL equivalent, so `media-temp-file.ts` writes decrypted plaintext to a real temp file
+in `Paths.cache` (never `Paths.document`) and deletes it on close/unmount — the bounded,
+cleaned-up-lifecycle security requirement the readiness audit's own §14 called for. Per-kind
+rendering: image → RN `Image`; video → new `expo-video` dependency (`useVideoPlayer`/`VideoView`);
+audio/voice → `expo-audio`'s existing playback API (`useAudioPlayer`/`useAudioPlayerStatus`,
+proven already via E1.4.6's recorder); document/PDF/archive/anything else → the exact same fallback
+copy web uses ("kept as it was enclosed. Take a copy to open it.") — no native PDF renderer, matching
+the readiness audit's own explicit non-goal.
+
+**One Reading Only**: `revealApi.confirmRead` (new) calls the existing `POST /r/:token/confirm-read`
+— zero backend changes. Fired unconditionally on every successful letter decrypt, exactly matching
+web's own timing and its own reasoning (fired the instant decryption succeeds, never on ceremony
+completion, never for a capsule with nothing written — the effect never even attempts a decrypt when
+`contentDocEnc` is null, so it never reaches the confirm-read call either, matching web's page.tsx
+precisely). A `useRef` guard (not state) guarantees at most one call per mount regardless of
+re-renders.
+
+**A real device finding**: none this ticket introduced new, but full real-device verification
+(below) is what confirmed the confirm-read → `scheduled_actions` → worker → `expireCapsule` chain
+genuinely destroys a real `expiry_strict` capsule end-to-end, not merely that a row gets inserted.
+
+**Security**: capsule key, decrypted plaintext, and every media byte checked — zero `console.*`
+calls in any new file (grepped, not assumed); a static-scan test confirms PHASE-5.3 still never
+imports reply composition, download-a-copy, or save-to-account (PHASE-6's own scope); temp files
+confirmed to live only under `Paths.cache`, never `Paths.document`.
+
+**Tests**: 29 new (673 total mobile tests, up from 644) — 6 for `decryptEnclosure`/`enclosureNoun`/
+`formatBytes`, 7 for `writeTempMediaFile`/`extensionFor` (including a real reactive-mock bug this
+ticket's own test-writing caught and fixed: a naive `useAudioPlayerStatus` mock without a
+subscription mechanism silently never re-rendered on `play()`/`pause()`), 9 for `EnclosureViewer`
+(one per media kind, the fallback kind, the released state, and the plain-non-technical-error-message
+requirement), 7 new screen-level tests in `reveal.test.tsx` (media rendering, confirm-read fires
+once/never-on-failure/never-on-empty-content/never-twice). `tsc --noEmit` clean, `eslint` clean, full
+suite (all 46 files) run clean.
+
+**Real Android device verification (Pixel 7 emulator, real backend/Postgres/scheduler/worker, real
+Cloudflare R2 storage — not the fake in-memory adapter — disposable seeded capsules and their real R2
+objects deleted afterward)**: a real capsule key was used to actually encrypt a real 1x1 PNG, a real
+1-second WAV, and a real (fake-content but real-bytes) PDF, each uploaded via the same real
+`getStorageAdapter().putObject` the production multipart pipeline ultimately calls, referenced by a
+seeded `media_items` row with a real `storage_key`. The real `GET /r/:token` response produced real,
+genuinely-signed R2 URLs; the app fetched and decrypted all three for real. Image rendered visibly on
+screen; audio genuinely played (confirmed via `ExoPlayer`/`AudioTrack` logcat lines showing exactly
+8000 frames delivered, matching the 1-second test clip, and the Play/Pause control read correctly
+before/after); PDF fell back to the exact designed copy. Separately, a real `expiry_strict` capsule's
+real letter was decrypted, confirmed via direct Postgres inspection to schedule exactly one
+`capsule_expire` action (including after a deliberate second trigger — still exactly one row, proving
+the idempotency key), and — with the real scheduler/worker processes actually running — was
+genuinely destroyed (`state='expired'`, `content_doc_enc` null, `size_bytes` 0) before the ticket
+closed, confirmed by reopening the same link afterward and seeing the honest "This capsule has
+expired" state, not a stale cached success. TalkBack-equivalent verification via `uiautomator dump`
+across the media list (every item groups kind+name into one accessible reading, exactly as unit-tested)
+confirmed real. Full-session device logcat grepped for the real capsule key fragment, the decrypted
+letter text, and every media filename — zero hits. iOS: NOT VERIFIED (no interactive iOS tooling in
+this environment, consistent with every prior ticket's own disclosed limitation).
+
+**Deferred, explicitly out of scope for this ticket**: PHASE-5.4 (reveal-specific error/accessibility
+hardening pass), PHASE-5.5 (Universal/App Links), reply composition, download-a-copy/zip,
+save-to-account, recovery-code restore, push notifications, biometrics.
+
+**Exact next ticket**: `PHASE-5.4` — Error/validation + accessibility hardening pass, per the
+readiness audit's own §14 ticket map. Do not start it without the same audit-first discipline this
+ticket and its predecessors used.
+
 ### PHASE-5.2 — Reveal ceremony, letter decryption (2026-09-01) — DONE, committed, PR open
 
 Branched `phase-5.2-reveal-ceremony` from fresh `origin/main` (`4ea1724`, PR #72/PHASE-5.1 merged —

@@ -1,7 +1,7 @@
 import type { RevealResponse } from '@tc/contracts';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { emptyEnvelope, type LetterEnvelope } from '../../../src/lib/capsule-crypto';
@@ -20,18 +20,16 @@ import { useReveal, useUnlockTimer } from '../../../src/lib/use-reveal';
 
 /**
  * PHASE-5.1 (reveal entry/locked/gates) + PHASE-5.2 (reveal ceremony,
- * letter decryption) — mobile equivalent of `apps/web/src/app/(reveal)/c/
- * [token]/page.tsx`'s full state machine, for exactly the states this pair
- * of tickets scopes. Reachable only via manual/dev navigation or a
- * `timelycapsule://c/:token[#k=...]` deep link today — no Universal/App
- * Link infrastructure exists yet (PHASE-5.5's job).
+ * letter decryption) + PHASE-5.3 (media viewer, One Reading Only) —
+ * mobile equivalent of `apps/web/src/app/(reveal)/c/[token]/page.tsx`'s
+ * full state machine, for exactly the states this arc scopes. Reachable
+ * only via manual/dev navigation or a `timelycapsule://c/:token[#k=...]`
+ * deep link today — no Universal/App Link infrastructure exists yet
+ * (PHASE-5.5's job).
  *
- * PHASE-5.2 stops at the boundary between "the letter" and "everything
- * else a sealed capsule can carry": no media viewer, no confirm-read/One
- * Reading Only, no reply composer, no download-a-copy, no save-to-account
- * (PHASE-5.3+'s own scope). `data.media` is read from the response only to
- * confirm nothing about it is rendered here — no media item is ever passed
- * to a decrypt function by this file.
+ * PHASE-5.3 stops at the boundary between "the record" (letter + media)
+ * and "everything else a sealed capsule can carry": no reply composer, no
+ * download-a-copy, no save-to-account (PHASE-6's own scope).
  */
 type PageState = 'loading' | 'not-found' | 'rate-limited' | 'locked' | 'unlocked' | 'withdrawn' | 'expired';
 
@@ -183,7 +181,7 @@ function LockedWait({
  */
 type LetterState = { status: 'decrypting' } | { status: 'key_mismatch' } | { status: 'ready'; envelope: LetterEnvelope };
 
-function UnlockedReveal({ data }: { data: Extract<RevealResponse, { status: 'unlocked' }> }) {
+function UnlockedReveal({ token, data }: { token: string; data: Extract<RevealResponse, { status: 'unlocked' }> }) {
   const openedUrl = Linking.useLinkingURL();
   const [passphraseKey, setPassphraseKey] = useState<Uint8Array | null>(null);
   // Memoized so its reference is stable across renders that don't actually
@@ -200,22 +198,38 @@ function UnlockedReveal({ data }: { data: Extract<RevealResponse, { status: 'unl
   // react-hooks rule) — `result` only ever changes from the async
   // `.then()` continuation.
   const [result, setResult] = useState<{ capsuleKey: Uint8Array; contentDocEnc: string | null; letter: LetterState } | null>(null);
+  // The completed-reading signal for `expiry_strict` capsules
+  // (PHASE-5.3) — a ref, not state, because firing it must never itself
+  // trigger a re-render/re-decrypt, and it must survive this component's
+  // own re-renders to guarantee "at most once" even under React's
+  // double-effect dev behavior.
+  const confirmedRef = useRef(false);
 
   useEffect(() => {
     if (!capsuleKey) return;
     let cancelled = false;
     decryptRevealLetter(capsuleKey, data.contentDocEnc).then((decrypted) => {
       if (cancelled) return;
-      const letter: LetterState =
-        decrypted.status === 'key_mismatch'
-          ? { status: 'key_mismatch' }
-          : { status: 'ready', envelope: decrypted.status === 'empty' ? emptyEnvelope() : decrypted.envelope };
-      setResult({ capsuleKey, contentDocEnc: data.contentDocEnc, letter });
+      if (decrypted.status === 'key_mismatch') {
+        setResult({ capsuleKey, contentDocEnc: data.contentDocEnc, letter: { status: 'key_mismatch' } });
+        return;
+      }
+      setResult({ capsuleKey, contentDocEnc: data.contentDocEnc, letter: { status: 'ready', envelope: decrypted.status === 'empty' ? emptyEnvelope() : decrypted.envelope } });
+      // Fired the instant decryption actually succeeds — never on a
+      // decrypt failure, never for a capsule with nothing written
+      // (`status === 'empty'`; matches web's own page.tsx, which never
+      // even attempts a decrypt when `contentDocEnc` is null and so never
+      // reaches this call either) — matching `07 §V.7`: the document is
+      // never gated by the ceremony animation, and neither is this.
+      if (decrypted.status === 'ok' && !confirmedRef.current) {
+        confirmedRef.current = true;
+        void revealApi.confirmRead(token);
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [capsuleKey, data.contentDocEnc]);
+  }, [capsuleKey, data.contentDocEnc, token]);
 
   const letter: LetterState =
     result?.capsuleKey === capsuleKey && result.contentDocEnc === data.contentDocEnc ? result.letter : { status: 'decrypting' };
@@ -264,7 +278,16 @@ function UnlockedReveal({ data }: { data: Extract<RevealResponse, { status: 'unl
     );
   }
 
-  return <RevealCeremony publicId={data.publicId} senderName={data.senderName} envelope={letter.envelope} alreadyOpened={data.alreadyOpened} />;
+  return (
+    <RevealCeremony
+      publicId={data.publicId}
+      senderName={data.senderName}
+      envelope={letter.envelope}
+      media={data.media}
+      capsuleKey={capsuleKey}
+      alreadyOpened={data.alreadyOpened}
+    />
+  );
 }
 
 export default function RevealScreen() {
@@ -316,7 +339,7 @@ export default function RevealScreen() {
             <IdentityGate token={token} onSatisfied={setIdentityGate} />
           </View>
         ) : (
-          <UnlockedReveal data={data} />
+          <UnlockedReveal token={token} data={data} />
         )
       ) : null}
     </View>
