@@ -233,10 +233,11 @@ afterEach(() => {
 });
 
 describe('reveal screen — top-level states', () => {
-  it('shows a loading placeholder before the fetch resolves', () => {
+  it('shows a loading placeholder before the fetch resolves, with the same header every other state carries (PHASE-5.4)', () => {
     get.mockReturnValue(new Promise(() => {}));
     const instance = renderScreen();
     expect(texts(instance)).toContain('Retrieving this capsule.');
+    expect(texts(instance)).toContain('TimelyCapsule');
   });
 
   it('renders the locked wait screen with sender, teaser, and horizon', async () => {

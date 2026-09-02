@@ -306,7 +306,14 @@ export default function RevealScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {pageState === 'loading' ? <LoadingState message="Retrieving this capsule." /> : null}
+      {pageState === 'loading' ? (
+        <View style={styles.systemContainer}>
+          <View style={styles.header}>
+            <Text style={styles.hallmark}>TimelyCapsule</Text>
+          </View>
+          <LoadingState message="Retrieving this capsule." />
+        </View>
+      ) : null}
 
       {pageState === 'not-found' ? (
         <SystemScreen state="Not found" headline="No capsule at this link." body="The link may be incomplete or mistyped. Ask the sender for the full one." />
