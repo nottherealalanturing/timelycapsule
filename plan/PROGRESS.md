@@ -4,6 +4,95 @@
 
 ## Current status
 
+### PHASE-5.5 — Universal/App Links spike (2026-09-02) — SPIKE COMPLETE, report committed, PR open; READY AFTER HUMAN INPUT
+
+Branched `phase-5.5-universal-links-spike` from fresh `origin/main` (`4389f63`, PR #75/
+PHASE-5.4 confirmed merged via `gh pr view 75` and `git log origin/main`, not assumed).
+Full report: `plan/STAGE-E-MOBILE-V1-PHASE-5.5-UNIVERSAL-LINKS-SPIKE.md`. Deliberately a
+spike/audit, not an implementation ticket — no `intentFilters`/`associatedDomains` were
+applied to `apps/mobile/app.json` (it is byte-identical to before this spike started).
+
+**Builds on, does not repeat, the prior E0.2 spike** (2026-08-26): E0.2 tested a
+throwaway app against a throwaway domain; this spike re-tested the identical question
+against this repository's own real, merged PHASE-5.1–5.4 code, which didn't exist when
+E0.2 ran.
+
+**Confirmed absent from the repo, checked directly**: no `intentFilters` in
+`apps/mobile/app.json`'s `android` block, no `associatedDomains` in its `ios` block, no
+`assetlinks.json`/`apple-app-site-association` anywhere in the repository, no
+`eas.json` (so no EAS-managed release keystore has ever been produced). The real
+recipient email link (`apps/web/src/lib/use-capsule-draft.ts`'s `sendAnnounceToAll` →
+`${origin}/c/${accessToken}#${encodeCapsuleKeyForLink(...)}`) opens in a browser for
+100% of real recipients today, on both platforms — mobile's fully-built PHASE-5.1–5.4
+reveal surface is unreachable by any real recipient until this ships.
+
+**A real, isolated, disposed-of experiment** (methodology mirrors E0.2's own "smallest
+isolated test domain" discipline): a real HTTPS domain (a `localtunnel` tunnel, real
+trusted cert) served a real `assetlinks.json` naming this repo's real package and this
+machine's real local debug-keystore SHA-256 fingerprint; a temporary `intentFilters`
+block was added to `app.json`, the native project rebuilt (`expo prebuild -p android`
+was required explicitly — a real, reproduced toolchain finding: `expo run:android`
+does **not** regenerate the native project from `app.json` once `android/` already
+exists locally from an earlier build), and the real `https://` link tested against a
+real running backend. **Result: the `#k=...` fragment survived byte-for-byte through
+this repo's real Expo Router reveal route, all the way to a genuine successful AES-GCM
+decrypt and a rendered letter — the first time this exact question was answered
+against this repository's own code rather than a throwaway one.** Without explicit
+package targeting the OS opened Chrome instead (expected, matching E0.2 exactly — no
+"Always" disambiguation had been recorded). All experiment artifacts (the `app.json`
+edit, the tunnel, the local server, two disposable seeded capsules) were removed before
+this entry was written; `app.json`'s diff was confirmed empty via `git diff` afterward.
+
+**A genuine, disclosed toolchain finding, distinct from E0.2's own**: `Linking.
+useLinkingURL()` (what PHASE-5.2 actually shipped in `[token].tsx`) seeds its initial
+state from a *synchronous* native getter (`ExpoLinking.getLinkingURL`), not the *async*
+`getInitialURL()` the older, deprecated `useURL()` hook (and E0.4's own spike) used —
+a materially different, newer API that this session's real-device test confirmed
+correctly handles a warm "app already running, new link arrives" delivery without the
+root-layout-capture workaround E0.4 needed for the older hook. `app/_layout.tsx`'s own
+header comment ("no route in this ticket consumes a captured URL") is now stale prose,
+not a functional gap — flagged, not fixed (out of this spike's own scope to edit
+unrelated files).
+
+**Not verified, honestly disclosed, not assumed either way**: cold start after a fully
+killed process could not be cleanly tested — a local **debug dev-client build** must
+reconnect to the Metro bundler before any JS routing code is alive at all, which is a
+real limitation of *this test rig* (confirmed: the app fell back to its own dev-client
+launcher, not a code-level failure), not evidence about a real EAS-built preview/
+release binary's actual cold-start behavior. iOS was not attempted at all this
+session, for the identical hard blockers E0.2 already established (no interactive iOS
+tooling in this environment; `associatedDomains` needs a real, signed-in Apple
+Developer Team, confirmed absent).
+
+**Security**: token/fragment/plaintext logcat-grepped clean throughout the real-link
+experiment (matching every prior ticket's own discipline); confirmed no redirect/
+referrer leak path exists (`next.config.ts` has no `redirects()`, no middleware);
+confirmed the reveal route requires no authentication regardless of link type; and
+flagged, with a concrete fix already specified (Android `pathPrefix`/iOS AASA `paths`
+scoping to `/c/*`), the real risk that a careless `associatedDomains`/bare-host
+`intentFilters` config would claim the *entire* `timelycapsule.com` domain rather than
+just the reveal route. The pre-existing `outbound_messages.payload` retention finding
+from E0.2 is repeated here, not re-litigated, so it isn't lost between spikes.
+
+**Deep-link/cold-start matrix**: 10 scenarios evaluated, each explicitly labeled
+VERIFIED / INFERRED / NOT VERIFIED with its evidence — see the report's own §8. Not
+every cell is green, and the report says exactly which ones aren't and why.
+
+**Decision: READY AFTER HUMAN INPUT** — the technical mechanism is proven on real
+hardware against this repo's real code (Android half); what remains is entirely
+human/external (domain hosting access, Apple Developer Program enrollment + Team ID,
+an EAS build profile for a real release signing fingerprint) — enumerated exactly in
+the report's §9, nothing invented. The mobile-side `app.json` change itself, once those
+exist, is small and low-risk (shapes proposed in the report's §4/§5) — but applying it
+before the hosted files/real fingerprint exist would be unverifiable and was
+deliberately not done.
+
+**Exact next work item**: the human/external sequence in the report's §10 (domain
+hosting access + Apple Developer enrollment + EAS build profile), not a mobile PR.
+Once those close, apply the proposed `intentFilters`/`associatedDomains` config and
+re-run this spike's own real-device methodology against the real domain on both
+platforms before considering PHASE-5.5 itself (not just this spike) complete.
+
 ### PHASE-5.4 — Error/validation + accessibility hardening pass (2026-09-02) — DONE, committed, PR open
 
 Branched `phase-5.4-error-a11y-hardening` from fresh `origin/main` (`c219ed1`, PR #74/PHASE-5.3
