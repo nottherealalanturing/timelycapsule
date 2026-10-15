@@ -385,7 +385,11 @@ describe('useCapsuleCompose', () => {
       // avoid — this call site was bypassing it, the actual cause of this
       // test's intermittent failure under loaded/CI runners).
       resolveFirstPatch({ capsule: capsuleFixture({ ownerKeyWrap: 'irrelevant-for-this-assertion' }) });
-      await flush(0);
+      // A fixed settle is not enough on loaded runners, so poll (bounded) until
+      // the follow-up PATCH has actually fired instead of guessing a duration.
+      for (let i = 0; i < 200 && patchFn.mock.calls.length < 2; i++) {
+        await flush(0);
+      }
 
       expect(patchFn).toHaveBeenCalledTimes(2); // the follow-up save fires automatically once the first clears
       const [, secondFields] = patchFn.mock.calls[1]!;
