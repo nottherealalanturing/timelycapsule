@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["J32F43M92R.com.timelycapsule.app"],
+        "components": [
+          { "/": "/c/*" }
+        ]
+      }
+    ]
+  }
+}

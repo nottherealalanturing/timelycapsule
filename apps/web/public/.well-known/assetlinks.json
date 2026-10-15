@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.timelycapsule.app",
+      "sha256_cert_fingerprints": [
+        "08:BA:89:98:3E:F5:61:75:36:35:48:00:61:4E:90:67:FD:0C:0A:F8:FB:61:7D:A8:A6:26:12:A1:22:C9:83:69"
+      ]
+    }
+  }
+]
