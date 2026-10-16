@@ -5,7 +5,8 @@
       "namespace": "android_app",
       "package_name": "com.timelycapsule.app",
       "sha256_cert_fingerprints": [
-        "08:BA:89:98:3E:F5:61:75:36:35:48:00:61:4E:90:67:FD:0C:0A:F8:FB:61:7D:A8:A6:26:12:A1:22:C9:83:69"
+        "08:BA:89:98:3E:F5:61:75:36:35:48:00:61:4E:90:67:FD:0C:0A:F8:FB:61:7D:A8:A6:26:12:A1:22:C9:83:69",
+        "72:F3:9B:CE:BF:43:F9:9B:BD:C8:B0:43:B2:21:73:3A:F8:FA:52:2B:B8:19:4C:F4:81:EC:70:8C:DF:EC:22:CA"
       ]
     }
   }
