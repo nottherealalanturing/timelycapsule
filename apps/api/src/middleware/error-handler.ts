@@ -40,6 +40,28 @@ export function errorHandler(
     return;
   }
 
+  // Errors raised by express.json()/body-parser (malformed JSON, body too
+  // large, unsupported charset...) carry a string `type` and a 4xx `status`.
+  // Without this they fell through to the generic 500 below.
+  const parsed = err as { type?: unknown; status?: unknown; statusCode?: unknown };
+  const clientStatus = typeof parsed.status === 'number' ? parsed.status : parsed.statusCode;
+  if (
+    typeof parsed.type === 'string' &&
+    typeof clientStatus === 'number' &&
+    clientStatus >= 400 &&
+    clientStatus < 500
+  ) {
+    const body: ApiErrorBody = {
+      error: {
+        code: 'validation_failed',
+        message: clientStatus === 413 ? 'Request body too large' : 'Malformed request body',
+        requestId,
+      },
+    };
+    res.status(clientStatus).json(body);
+    return;
+  }
+
   logger.error({ err, requestId }, 'unhandled error');
   const body: ApiErrorBody = {
     error: {

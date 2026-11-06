@@ -25,11 +25,42 @@ import { searchRouter } from './modules/search/index.js';
 import { settingsRouter } from './modules/settings/index.js';
 import { tagsRouter } from './modules/tags/index.js';
 
+/**
+ * CORS allow-list. Production sets CORS_ORIGINS (comma-separated) and falls
+ * back to APP_URL; requests without an Origin header (mobile apps, curl,
+ * server-to-server webhooks) are unaffected because CORS is a browser control.
+ * Outside production with nothing configured the old permissive behaviour is
+ * kept so local web dev keeps working.
+ */
+export function corsOptions(env: NodeJS.ProcessEnv = process.env): cors.CorsOptions {
+  const allowed = (env.CORS_ORIGINS ?? (env.NODE_ENV === 'production' ? env.APP_URL : '') ?? '')
+    .split(',')
+    .map((o) => o.trim().replace(/\/$/, ''))
+    .filter(Boolean);
+  if (allowed.length === 0 && env.NODE_ENV !== 'production') return {};
+  return {
+    origin: (origin, cb) => cb(null, !origin || allowed.includes(origin)),
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'Idempotency-Key', 'X-Platform', 'X-Device-Name'],
+    exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining', 'X-RateLimit-Reset'],
+    maxAge: 600,
+  };
+}
+
 export function createApp(db: Database): express.Express {
   const app = express();
 
+  // Behind Caddy (and Cloudflare in front of it) the socket peer is the proxy,
+  // so `req.ip` (rate-limit keys, session/audit ip) is only meaningful when
+  // Express is told how many proxy hops to trust. A hop COUNT is used on
+  // purpose (not a CIDR list). Unset/0 = trust nothing (dev, tests).
+  const proxyHops = Number(process.env.TRUST_PROXY_HOPS);
+  if (Number.isInteger(proxyHops) && proxyHops > 0) {
+    app.set('trust proxy', proxyHops);
+  }
+
   app.use(helmet());
-  app.use(cors());
+  app.use(cors(corsOptions()));
   app.use(
     express.json({
       // Resend's webhook (modules/email/webhook.ts) is Svix-signed against
