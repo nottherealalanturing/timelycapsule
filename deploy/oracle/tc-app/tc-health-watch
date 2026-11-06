@@ -1,0 +1,24 @@
+#!/bin/bash
+# tc-health-watch (tc-app): one journal line per run; priority err on any problem. Optional dead-man ping if /etc/tc-health/ping-url exists.
+set -u
+alerts=(); cd /opt/timelycapsule 2>/dev/null || true
+for s in api worker scheduler caddy; do
+  r=$(docker inspect -f '{{.State.Status}} {{.State.OOMKilled}} {{.RestartCount}}' timelycapsule-$s-1 2>/dev/null || echo "missing")
+  case "$r" in
+    "running false "*) rc=${r##* }; mkdir -p /var/lib/tc-health-watch; prev=$(cat /var/lib/tc-health-watch/restarts.$s 2>/dev/null || echo "$rc"); echo "$rc" > /var/lib/tc-health-watch/restarts.$s
+                      [ "$rc" -le "$prev" ] || alerts+=("$s restarted $((rc-prev))x since last check");;
+    *) alerts+=("$s=$r");;
+  esac
+done
+h=$(docker inspect -f '{{.State.Health.Status}}' timelycapsule-api-1 2>/dev/null); [ "$h" = healthy ] || alerts+=("api health=$h")
+code=$(curl -sk -m 8 -o /dev/null -w '%{http_code}' --resolve api.timelycapsule.com:443:127.0.0.1 https://api.timelycapsule.com/health 2>/dev/null); [ "$code" = 200 ] || alerts+=("https health=$code")
+timeout 4 bash -c 'exec 3<>/dev/tcp/10.0.1.4/5432' 2>/dev/null || alerts+=("db 10.0.1.4:5432 unreachable")
+avail=$(free -m | awk '/^Mem:/{print $7}'); [ "$avail" -ge 100 ] || alerts+=("available memory ${avail}MB")
+swap=$(free -m | awk '/^Swap:/{print $3}'); [ "$swap" -lt 1500 ] || alerts+=("swap used ${swap}MB")
+dfr=$(df --output=pcent / | tail -1 | tr -dc 0-9); [ "$dfr" -lt 80 ] || alerts+=("root fs ${dfr}% full")
+wg=$(systemctl is-active wg-quick@wg0 2>/dev/null); [ "$wg" = active ] || alerts+=("wireguard=$wg")
+oom=$(journalctl -k --since "-10min" --no-pager 2>/dev/null | grep -c -i "out of memory"); [ "$oom" = 0 ] || alerts+=("kernel OOM x$oom")
+msg="https=$code api=$h memavail=${avail}MB swap=${swap}MB root=${dfr}% wg=$wg"
+if [ ${#alerts[@]} -gt 0 ]; then logger -t tc-health-watch -p user.err "ALERT: ${alerts[*]} | $msg"; ok=0; else logger -t tc-health-watch -p user.info "ok $msg"; ok=1; fi
+if [ -r /etc/tc-health/ping-url ]; then u=$(cat /etc/tc-health/ping-url); curl -fsS -m 10 -o /dev/null "$( [ $ok = 1 ] && echo "$u" || echo "$u/fail" )" || logger -t tc-health-watch -p user.warning "ping failed"; fi
+[ $ok = 1 ]

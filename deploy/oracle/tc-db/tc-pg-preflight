@@ -1,0 +1,19 @@
+#!/bin/bash
+# tc-pg-preflight: read-only checks before every start. Never consumes or changes anything.
+set -u
+fail(){ echo "tc-pg-preflight: FAIL: $*" >&2; exit 1; }
+for f in postgresql.conf pg_hba.conf pg_ident.conf; do
+  [ "$(stat -c '%u %a' /etc/tc-postgres/$f 2>/dev/null)" = "0 644" ] || fail "$f must exist, root-owned, mode 0644"
+done
+[ "$(stat -c '%u:%g %a' /etc/tc-postgres/pg_password 2>/dev/null)" = "999:999 400" ] || fail "pg_password must exist as 999:999 mode 0400"
+[ -s /etc/tc-postgres/pg_password ] || fail "pg_password is empty"
+[ -s /opt/tc-db/docker-compose.yml ] && [ -s /opt/tc-db/.env ] || fail "compose file or .env missing"
+ip -4 -o addr show dev ens3 | grep -qw 10.0.1.4 || fail "10.0.1.4 is not configured on ens3"
+docker image inspect postgres@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9 >/dev/null 2>&1 || fail "pinned image not present locally"
+if [ "$(docker inspect -f '{{.State.Running}}' tc-postgres 2>/dev/null)" = "true" ]; then
+  echo "tc-pg-preflight: container already running (re-attach case); skipping port check"
+else
+  ss -tln '( sport = :5432 )' | grep -q LISTEN && fail "port 5432 already in use by something else"
+fi
+( cd /opt/tc-db && docker compose config -q ) || fail "compose configuration invalid"
+echo "tc-pg-preflight: OK"

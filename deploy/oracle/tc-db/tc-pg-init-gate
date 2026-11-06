@@ -1,0 +1,17 @@
+#!/bin/bash
+# tc-pg-init-gate: runs only AFTER tc-pg-preflight. Read-only: it never consumes the flag or writes the marker.
+# The flag is removed and the marker written only by tc-pg-wait-healthy after a verified healthy start.
+set -u
+D=/srv/pgdata/pgdata; FLAG=/etc/tc-postgres/allow-init; MARK=/srv/pgdata/.tc-pg-initialized
+fail(){ echo "tc-pg-init-gate: REFUSING: $*" >&2; exit 1; }
+[ -d "$D" ] || fail "$D missing"
+[ "$(stat -c '%u:%g %a' "$D")" = "999:999 700" ] || fail "$D must be owned 999:999 with mode 700"
+if [ -e "$D/PG_VERSION" ]; then
+  [ "$(cat "$D/PG_VERSION")" = "16" ] || fail "unexpected PG_VERSION"
+  [ -f "$MARK" ] || fail "PG_VERSION exists but initialization was never confirmed (possible partial initialization) - manual review required"
+  echo "tc-pg-init-gate: OK (existing, confirmed cluster, version 16)"; exit 0
+fi
+[ ! -e "$MARK" ] || fail "init marker exists but PG_VERSION is missing (possible data loss) - manual review required"
+[ -z "$(ls -A "$D")" ] || fail "data directory is non-empty but has no PG_VERSION - manual review required"
+[ -f "$FLAG" ] && [ "$(stat -c '%u %a' "$FLAG")" = "0 600" ] || fail "empty data directory and no valid $FLAG (initialization not authorized)"
+echo "tc-pg-init-gate: OK (initialization authorized by $FLAG)"

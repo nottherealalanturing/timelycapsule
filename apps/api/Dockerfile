@@ -11,7 +11,8 @@
 # before installing, keeping the image from dragging in apps/web,
 # apps/mobile, or unrelated packages.
 
-FROM node:22-alpine AS base
+# Base image pinned by digest (node:22-alpine as of 2026-11-06). Bump deliberately.
+FROM node:22-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS base
 # Install pnpm as a real global binary (not via Corepack's shim) pinned to
 # root package.json's "packageManager" version. Corepack's shim looked
 # appealing but lazily re-downloads pnpm from the registry on first use in
@@ -24,7 +25,7 @@ RUN apk add --no-cache libc6-compat
 
 FROM base AS pruner
 WORKDIR /app
-RUN npm install -g turbo
+RUN npm install -g turbo@2.10.12
 COPY . .
 RUN turbo prune @tc/api --docker
 
@@ -54,6 +55,10 @@ RUN addgroup --system --gid 1001 tcapi && adduser --system --uid 1001 --ingroup 
 COPY --from=installer --chown=tcapi:tcapi /app .
 USER tcapi
 ENV NODE_ENV=production
+# Provenance: set by deploy/oracle/release.sh (git SHA of the clean tagged commit).
+ARG GIT_SHA=unknown
+LABEL org.opencontainers.image.revision=$GIT_SHA \
+      org.opencontainers.image.source="https://github.com/nottherealalanturing/timelycapsule"
 EXPOSE 4001
 
 # Default process is the API; docker-compose.prod.yml overrides `command:`

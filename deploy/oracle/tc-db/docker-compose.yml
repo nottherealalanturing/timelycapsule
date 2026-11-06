@@ -1,0 +1,59 @@
+name: tc-db
+services:
+  postgres:
+    # Index digest (resolves locally). The linux/amd64 manifest inside it is sha256:5983db9a9c6ad225a48a46cfe2e03e6680b1826662befd0465eb05b34cb1c64e (verified).
+    image: postgres@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9
+    platform: linux/amd64
+    pull_policy: never
+    container_name: tc-postgres
+    network_mode: host
+    restart: "no"
+    user: "999:999"
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set in /opt/tc-db/.env}
+      POSTGRES_DB: ${POSTGRES_DB:?set in /opt/tc-db/.env}
+      POSTGRES_PASSWORD_FILE: /run/secrets/pg_password
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    secrets:
+      - pg_password
+    volumes:
+      - type: bind
+        source: /srv/pgdata/pgdata
+        target: /var/lib/postgresql/data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: /etc/tc-postgres/postgresql.conf
+        target: /etc/postgresql/postgresql.conf
+        read_only: true
+      - type: bind
+        source: /etc/tc-postgres/pg_hba.conf
+        target: /etc/postgresql/pg_hba.conf
+        read_only: true
+      - type: bind
+        source: /etc/tc-postgres/pg_ident.conf
+        target: /etc/postgresql/pg_ident.conf
+        read_only: true
+    shm_size: 64m
+    mem_limit: 512m
+    memswap_limit: 640m
+    cpus: 1.0
+    pids_limit: 128
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
+    stop_grace_period: 60s
+    # Healthy only when BOTH hold: (1) the REAL server accepts TCP on 10.0.1.4:5432 (the init-time temporary server has
+    # listen_addresses='' so it cannot satisfy this), and (2) a local admin query over the container's socket succeeds
+    # (peer auth; no TCP login, so tc_admin stays rejected over TCP and nothing is logged for either probe).
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/10.0.1.4/5432' && psql -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\" -tAc 'select 1' | grep -qx 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 300s
+secrets:
+  pg_password:
+    file: /etc/tc-postgres/pg_password

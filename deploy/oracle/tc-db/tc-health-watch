@@ -1,0 +1,17 @@
+#!/bin/bash
+# tc-health-watch (tc-db): one journal line per run; priority err on any problem. Optional dead-man ping if /etc/tc-health/ping-url exists.
+set -u
+alerts=()
+st=$(systemctl is-active tc-postgres 2>/dev/null); [ "$st" = active ] || alerts+=("tc-postgres unit=$st")
+hs=$(docker inspect -f '{{.State.Health.Status}} oom={{.State.OOMKilled}}' tc-postgres 2>/dev/null); case "$hs" in "healthy oom=false") ;; *) alerts+=("container=$hs");; esac
+last=$(ls -1t /var/backups/tc-db/*.dump 2>/dev/null | head -1); if [ -z "$last" ]; then alerts+=("no backup found"); else age=$(( ($(date +%s) - $(stat -c %Y "$last")) / 3600 )); [ "$age" -le 26 ] || alerts+=("newest backup is ${age}h old"); fi
+dfp=$(df --output=pcent /srv/pgdata | tail -1 | tr -dc 0-9); [ "$dfp" -lt 80 ] || alerts+=("/srv/pgdata ${dfp}% full")
+dfr=$(df --output=pcent / | tail -1 | tr -dc 0-9); [ "$dfr" -lt 80 ] || alerts+=("root fs ${dfr}% full")
+conns=$(docker exec tc-postgres psql -U tc_admin -d postgres -tAc "select count(*) from pg_stat_activity where backend_type='client backend'" </dev/null 2>/dev/null || echo "?"); 
+mx=$(docker exec tc-postgres psql -U tc_admin -d postgres -tAc "show max_connections" </dev/null 2>/dev/null || echo 30); if [[ "$conns" =~ ^[0-9]+$ ]] && [ "$conns" -ge $(( mx - 4 )) ]; then alerts+=("connections ${conns}/${mx}"); fi
+avail=$(free -m | awk '/^Mem:/{print $7}'); [ "$avail" -ge 120 ] || alerts+=("available memory ${avail}MB")
+oom=$(journalctl -k --since "-10min" --no-pager 2>/dev/null | grep -c -i "out of memory"); [ "$oom" = 0 ] || alerts+=("kernel OOM x$oom")
+msg="pg=$st/$hs conns=$conns/$mx backup=$( [ -n "${last:-}" ] && echo "${age}h" || echo none ) data=${dfp}% root=${dfr}% memavail=${avail}MB"
+if [ ${#alerts[@]} -gt 0 ]; then logger -t tc-health-watch -p user.err "ALERT: ${alerts[*]} | $msg"; ok=0; else logger -t tc-health-watch -p user.info "ok $msg"; ok=1; fi
+if [ -r /etc/tc-health/ping-url ]; then u=$(cat /etc/tc-health/ping-url); curl -fsS -m 10 -o /dev/null "$( [ $ok = 1 ] && echo "$u" || echo "$u/fail" )" || logger -t tc-health-watch -p user.warning "ping failed"; fi
+[ $ok = 1 ]
