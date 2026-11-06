@@ -5,7 +5,8 @@
 #    offline by the owner, so a compromised tc-db cannot decrypt old uploads).
 #  - Transport: rclone (Docker image, pinned) over HTTPS via the tc-app NAT.
 #  - Credentials: /etc/tc-postgres/b2.env (root 0600): B2_KEY_ID, B2_APP_KEY, B2_BUCKET.
-#  - Never deletes anything (B2 lifecycle rules on the oracle/ prefix decide retention).
+#  - Never deletes anything and its key cannot: retention is enforced server-side by a
+#    B2 bucket lifecycle rule on the oracle/ prefix (see remediation-plan.md, B2 retention).
 #  - Verifies: local sha256, remote existence and byte size, and records a marker
 #    the health watch can age-check. Exit non-zero on any failure.
 set -euo pipefail
@@ -36,12 +37,17 @@ trap 'rm -f "$enc"' EXIT
 age -R "$RECIPIENT_FILE" -o "$enc" "$latest"
 want=$(stat -c %s "$enc")
 
-rc() {  # rclone with credentials via env, nothing on the command line
+# Credentials are passed to the container by NAME only (-e VAR): docker reads the
+# value from this process's environment, so the secret never appears in argv
+# (`ps`, /proc/*/cmdline) or in the unit file.
+export RCLONE_CONFIG_B2_TYPE=b2 RCLONE_CONFIG_B2_ACCOUNT="$B2_KEY_ID" RCLONE_CONFIG_B2_KEY="$B2_APP_KEY"
+rc() {
   docker run --rm -i \
-    -e RCLONE_CONFIG_B2_TYPE=b2 -e RCLONE_CONFIG_B2_ACCOUNT="$B2_KEY_ID" -e RCLONE_CONFIG_B2_KEY="$B2_APP_KEY" \
+    -e RCLONE_CONFIG_B2_TYPE -e RCLONE_CONFIG_B2_ACCOUNT -e RCLONE_CONFIG_B2_KEY \
     -v "$STATE":/work:ro "$RCLONE_IMAGE" "$@"
 }
-rc copyto "/work/$name.age" "B2:$B2_BUCKET/$PREFIX/$name.age" --b2-hard-delete=false
+# New file name every night => a new B2 object, never an overwrite or a delete.
+rc copyto "/work/$name.age" "B2:$B2_BUCKET/$PREFIX/$name.age"
 got=$(rc lsjson "B2:$B2_BUCKET/$PREFIX/$name.age" | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j[0]["Size"] if j else -1)')
 [ "$got" = "$want" ] || { echo "tc-pg-offsite: size mismatch local=$want remote=$got"; exit 5; }
 

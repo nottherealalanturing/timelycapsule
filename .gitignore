@@ -28,3 +28,4 @@ build/
 
 # Design-review capture scratch (regenerate with design/.shoot.mjs)
 design/shots/
+.idea/

@@ -5,6 +5,8 @@ alerts=()
 st=$(systemctl is-active tc-postgres 2>/dev/null); [ "$st" = active ] || alerts+=("tc-postgres unit=$st")
 hs=$(docker inspect -f '{{.State.Health.Status}} oom={{.State.OOMKilled}}' tc-postgres 2>/dev/null); case "$hs" in "healthy oom=false") ;; *) alerts+=("container=$hs");; esac
 last=$(ls -1t /var/backups/tc-db/*.dump 2>/dev/null | head -1); if [ -z "$last" ]; then alerts+=("no backup found"); else age=$(( ($(date +%s) - $(stat -c %Y "$last")) / 3600 )); [ "$age" -le 26 ] || alerts+=("newest backup is ${age}h old"); fi
+# Off-site upload staleness (only once B2 is configured on this host)
+if [ -r /etc/tc-postgres/b2.env ]; then ofs=$(cat /var/lib/tc-offsite/last-success-epoch 2>/dev/null || echo 0); oage=$(( ($(date +%s) - ofs) / 3600 )); [ "$oage" -le 30 ] || alerts+=("off-site upload ${oage}h old"); fi
 dfp=$(df --output=pcent /srv/pgdata | tail -1 | tr -dc 0-9); [ "$dfp" -lt 80 ] || alerts+=("/srv/pgdata ${dfp}% full")
 dfr=$(df --output=pcent / | tail -1 | tr -dc 0-9); [ "$dfr" -lt 80 ] || alerts+=("root fs ${dfr}% full")
 conns=$(docker exec tc-postgres psql -U tc_admin -d postgres -tAc "select count(*) from pg_stat_activity where backend_type='client backend'" </dev/null 2>/dev/null || echo "?"); 
