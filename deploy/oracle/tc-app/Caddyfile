@@ -17,15 +17,17 @@
 {$API_DOMAIN} {
 	# Cloudflare Origin CA certificate (15-year, trusted only by Cloudflare).
 	# Files live OUTSIDE the repo in /opt/timelycapsule/certs (key mode 0600).
-	tls /certs/origin.pem /certs/origin.key {
-		# Authenticated Origin Pulls: only Cloudflare presents this client cert.
-		client_auth {
-			mode require_and_verify
-			trust_pool file {
-				pem_file /certs/authenticated_origin_pull_ca.pem
-			}
-		}
-	}
+	tls /certs/origin.pem /certs/origin.key
+	# PHASE 2 (after "Authenticated Origin Pulls" is switched ON for the zone in
+	# Cloudflare and tested): replace the line above with
+	#   tls /certs/origin.pem /certs/origin.key {
+	#       client_auth {
+	#           mode require_and_verify
+	#           trust_pool file { pem_file /certs/authenticated_origin_pull_ca.pem }
+	#       }
+	#   }
+	# Enabling it BEFORE Cloudflare presents the client cert would make every
+	# request fail (Cloudflare 525/526).
 
 	encode gzip
 
