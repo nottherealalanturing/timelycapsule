@@ -4,7 +4,7 @@ import '../../env.js';
 import { db, pool } from '../../db/client.js';
 import { scheduledActions, users } from '../../db/schema/index.js';
 import { VirtualClock } from '../../lib/clock.js';
-import { reresolveWallClockActions } from './resolver.js';
+import { reresolveWallClockActions, resolveWallClock } from './resolver.js';
 import { createTestCapsule, createTestUser, insertScheduledAction } from './test-helpers.js';
 
 const trackedUserIds: string[] = [];
@@ -111,5 +111,22 @@ describe('resolver (T-13) — nightly wall-clock re-resolution', () => {
     const clock = new VirtualClock(new Date('2026-05-01T00:00:00Z'));
     const updated = await reresolveWallClockActions(db, clock);
     expect(updated).toBe(0);
+  });
+});
+
+describe('resolveWallClock (pure)', () => {
+  it('ambiguous fall-back time -> first occurrence (New York)', () => {
+    expect(resolveWallClock({ date: '2024-11-03', time: '01:30', tz: 'America/New_York' }).toUTC().toISO()).toBe('2024-11-03T05:30:00.000Z');
+  });
+  it('ambiguous fall-back time -> first occurrence (Berlin)', () => {
+    expect(resolveWallClock({ date: '2024-10-27', time: '02:30', tz: 'Europe/Berlin' }).toUTC().toISO()).toBe('2024-10-27T00:30:00.000Z');
+  });
+  it('unambiguous times are unchanged', () => {
+    expect(resolveWallClock({ date: '2024-11-03', time: '00:30', tz: 'America/New_York' }).toUTC().toISO()).toBe('2024-11-03T04:30:00.000Z');
+    expect(resolveWallClock({ date: '2024-11-03', time: '02:30', tz: 'America/New_York' }).toUTC().toISO()).toBe('2024-11-03T07:30:00.000Z');
+    expect(resolveWallClock({ date: '2024-06-01', time: '12:00', tz: 'UTC' }).toUTC().toISO()).toBe('2024-06-01T12:00:00.000Z');
+  });
+  it('spring-forward gap keeps Luxon behaviour (shifted forward)', () => {
+    expect(resolveWallClock({ date: '2024-03-10', time: '02:30', tz: 'America/New_York' }).toUTC().toISO()).toBe('2024-03-10T07:30:00.000Z');
   });
 });
