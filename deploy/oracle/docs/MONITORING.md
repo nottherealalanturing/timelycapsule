@@ -12,20 +12,22 @@ Today alerts only go to the local journal (`tc-health-watch`, every 5 minutes, `
 Channels: your email (add Telegram/Slack/SMS later if wanted).
 Existing UptimeRobot monitors `TimelyCapsule API` (`https://api.timelycapsule.com/health`) and `TimelyCapsule Web` (apex) cover the public side after DNS cutover; I cannot see them (no login), please confirm they are still active.
 
-## How each URL is installed (you type it; it never goes through chat or shell history)
-The ping URL is the secret. On tc-app and tc-db:
+## How each URL is installed (you type it; hidden input; never in chat or shell history)
+The ping URL is the secret. `tc-secret` (see docs/CREDENTIALS.md) refuses to run without a terminal and prints only the length.
 ```bash
+# tc-app and tc-db: host health (same command on both hosts)
+ssh -t tc-app          # and again for tc-db
 sudo install -d -m 0750 /etc/tc-health
-read -rs U && printf '%s' "$U" | sudo install -m 0600 /dev/stdin /etc/tc-health/ping-url; unset U   # paste the URL, press Enter (nothing is echoed)
-sudo systemctl start tc-health-watch.service && journalctl -t tc-health-watch -n 1 --no-pager     # then confirm the check turned green
+sudo tc-secret value /etc/tc-health/ping-url --kind ping-url
+sudo systemctl start tc-health-watch.service && journalctl -t tc-health-watch -n 1 --no-pager   # the check turns green
+
+# tc-app: scheduler heartbeat (stage like the other secrets; applied at the next release/recreate of the scheduler)
+sudo tc-secret env /opt/timelycapsule/.env.production.next --like /opt/timelycapsule/.env.production HEALTHCHECKS_PING_URL
+
+# tc-db: off-site backup success ping
+sudo tc-secret value /etc/tc-health/offsite-ping-url --kind ping-url
 ```
-Scheduler (tc-app, needs a restart of the scheduler container only):
-```bash
-cd /opt/timelycapsule && read -rs U && printf 'HEALTHCHECKS_PING_URL=%s\n' "$U" | sudo tee -a .env.production >/dev/null; unset U
-sudo docker compose up -d --force-recreate scheduler
-```
-Off-site backup (tc-db): same as above with `/etc/tc-health/offsite-ping-url`.
-Rollback for any of them: delete the file (or the `.env.production` line + recreate scheduler); a missing URL simply disables the ping.
+Rollback for any of them: delete the file (or the line in the staged env file); a missing URL simply disables the ping.
 
 ## Test (before relying on it)
 Pause or break nothing in production: use healthchecks' "Send test notification"; then stop pinging for one period on a *test* check, or `curl <URL>/fail` once, and confirm the email arrives.
