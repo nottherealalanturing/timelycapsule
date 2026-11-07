@@ -1,19 +1,62 @@
 #!/bin/bash
-# Nightly logical backup of the production database (custom format, compressed, restorable with pg_restore).
-# Runs pg_dump INSIDE the container over the local peer socket (tc_admin; no network, no password).
-# Writes <dir>/timelycapsule-<UTC>.dump + .sha256, verifies it is a readable archive, then publishes it atomically.
-# Deliberately NEVER deletes anything (standing rule: no backup deletion without approval); prints disk usage instead.
+# Nightly logical backup of the production database.
+# Produces, atomically published into $TC_BACKUP_DIR (default /var/backups/tc-db), per run <name> = timelycapsule-<UTC>:
+#   <name>.dump           pg_dump custom format (-Fc -Z 6): all schemas of the database incl. pgboss and drizzle
+#   <name>.dump.sha256    checksum of the dump (sha256sum format)
+#   <name>.globals.sql    pg_dumpall --globals-only: roles, passwords (SCRAM hashes), role settings, connection limits.
+#                         pg_dump does NOT include these; without them a rebuilt server cannot authenticate tc_app.
+#   <name>.manifest.json  schema hash + exact row counts per table taken before and after the dump
+#                         (tc-pg-restore-drill proves a restore against it)
+# Runs INSIDE the postgres container over the local peer socket (tc_admin; no network, no password).
+# Deliberately NEVER deletes any finished backup (standing rule). A failed run removes only its own partial files.
 set -euo pipefail
 umask 077
-DIR=${TC_BACKUP_DIR:-/var/backups/tc-db}; DB=timelycapsule
-ts=$(date -u +%Y%m%dT%H%M%SZ); f="$DIR/$DB-$ts.dump"
-[ "$(docker inspect -f '{{.State.Health.Status}}' tc-postgres 2>/dev/null)" = healthy ] || { echo "tc-pg-backup: tc-postgres not healthy, aborting" >&2; exit 1; }
-docker exec tc-postgres pg_dump -U tc_admin -d "$DB" -Fc -Z 6 > "$f.tmp"
-# integrity: pg_restore must read the archive (exit 0) and its header must report >= 1 TOC entry
-listing=$(docker exec -i tc-postgres pg_restore -l < "$f.tmp") || { echo "tc-pg-backup: pg_restore cannot read the archive" >&2; rm -f "$f.tmp"; exit 1; }
+DIR=${TC_BACKUP_DIR:-/var/backups/tc-db}; DB=${TC_DB:-timelycapsule}; C=${TC_PG_CONTAINER:-tc-postgres}; ADMIN=${TC_PG_ADMIN:-tc_admin}
+ts=$(date -u +%Y%m%dT%H%M%SZ); name="$DB-$ts"; base="$DIR/$name"
+tmp=$(mktemp -d "$DIR/.tmp-$name.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT
+dx() { docker exec -i "$C" "$@"; }
+[ "$(docker inspect -f '{{.State.Health.Status}}' "$C" 2>/dev/null)" = healthy ] || { echo "tc-pg-backup: $C not healthy, aborting" >&2; exit 1; }
+
+counts() {  # exact count(*) of every base table in the application schemas, as "schema.table<TAB>n"
+  dx psql -U "$ADMIN" -d "$DB" -tAF $'\t' -c "
+    select table_schema||'.'||table_name,
+           (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text
+    from information_schema.tables
+    where table_schema in ('public','pgboss','drizzle') and table_type='BASE TABLE' order by 1"
+}
+counts > "$tmp/before.tsv"
+dx pg_dump -U "$ADMIN" -d "$DB" -Fc -Z 6 > "$tmp/dump"
+counts > "$tmp/after.tsv"
+dx pg_dump -U "$ADMIN" -d "$DB" --schema-only > "$tmp/schema.sql"
+dx pg_dumpall -U "$ADMIN" --globals-only > "$tmp/globals.sql"
+
+# integrity: pg_restore must read the archive and its header must report >= 1 TOC entry; globals must define the app role
+listing=$(dx pg_restore -l < "$tmp/dump") || { echo "tc-pg-backup: pg_restore cannot read the archive" >&2; exit 1; }
 n=$(printf '%s\n' "$listing" | sed -n 's/^; *TOC Entries: \([0-9][0-9]*\)$/\1/p' | head -1)
-[ "${n:-0}" -ge 1 ] || { echo "tc-pg-backup: archive header reports no TOC entries" >&2; rm -f "$f.tmp"; exit 1; }
-( cd "$DIR" && sha256sum "$(basename "$f.tmp")" | sed "s/\.tmp\$//" > "$(basename "$f").sha256" )
-mv "$f.tmp" "$f"
+[ "${n:-0}" -ge 1 ] || { echo "tc-pg-backup: archive header reports no TOC entries" >&2; exit 1; }
+grep -q '^CREATE ROLE tc_app;' "$tmp/globals.sql" || { echo "tc-pg-backup: globals dump does not define role tc_app" >&2; exit 1; }
+[ -s "$tmp/before.tsv" ] && [ -s "$tmp/after.tsv" ] || { echo "tc-pg-backup: row-count snapshot is empty" >&2; exit 1; }
+
+python3 - "$tmp" "$name" "$n" > "$tmp/manifest.json" <<'PY'
+import json, sys, hashlib, datetime
+tmp, name, toc = sys.argv[1], sys.argv[2], int(sys.argv[3])
+def load(p):
+    return {l.split("\t")[0]: int(l.split("\t")[1]) for l in open(p).read().splitlines() if l.strip()}
+b, a = load(tmp + "/before.tsv"), load(tmp + "/after.tsv")
+print(json.dumps({
+  "format": 1, "name": name, "created_utc": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+  "toc_entries": toc,
+  # pg_dump >= 16.10 writes random \restrict/\unrestrict tokens into plain dumps: drop them so the hash is stable
+  "schema_sha256": hashlib.sha256(b"".join(l for l in open(tmp + "/schema.sql", "rb").readlines() if not l.startswith((b"\\restrict ", b"\\unrestrict ")))).hexdigest(),
+  "tables": {t: {"before": b.get(t), "after": a.get(t)} for t in sorted(set(a) | set(b))},
+}, indent=1, sort_keys=True))
+PY
+
+( cd "$tmp" && sha256sum dump | sed "s/ dump\$/ $name.dump/" > "$name.dump.sha256" )
+mv "$tmp/globals.sql" "$tmp/$name.globals.sql"; mv "$tmp/manifest.json" "$tmp/$name.manifest.json"; mv "$tmp/dump" "$tmp/$name.dump"
+# publish: the .dump is moved last, so a visible .dump always has its companions
+mv "$tmp/$name.dump.sha256" "$tmp/$name.globals.sql" "$tmp/$name.manifest.json" "$DIR/"
+mv "$tmp/$name.dump" "$DIR/"
 used=$(du -sm "$DIR" | cut -f1); avail=$(df -m --output=avail "$DIR" | tail -1 | tr -d ' ')
-echo "tc-pg-backup: ok file=$(basename "$f") size=$(stat -c %s "$f")B toc_entries=$n dir_total=${used}MB free=${avail}MB count=$(ls "$DIR"/*.dump | wc -l)"
+echo "tc-pg-backup: ok file=$name.dump size=$(stat -c %s "$base.dump")B toc_entries=$n tables=$(wc -l < "$tmp/after.tsv" 2>/dev/null || echo ?) dir_total=${used}MB free=${avail}MB count=$(ls "$DIR"/*.dump | wc -l)"

@@ -5,6 +5,6 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-Environment=RCLONE_IMAGE=rclone/rclone@sha256:REPLACE_WITH_PINNED_DIGEST
+Environment=RCLONE_IMAGE=rclone/rclone@sha256:7cbeec24a44f206067597c0368be4de90ae19a64d5113c7d1938bd737a81e466
 ExecStart=/usr/local/sbin/tc-pg-offsite
 # Dump is already created by tc-pg-backup.service; this only uploads.

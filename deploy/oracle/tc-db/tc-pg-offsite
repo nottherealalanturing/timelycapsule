@@ -1,5 +1,5 @@
 #!/bin/bash
-# Encrypted off-site copy of the newest local dump to Backblaze B2.
+# Encrypted off-site copy of the newest local backup (dump + sha256 + globals + manifest) to Backblaze B2.
 #
 #  - Encryption: `age` public-key (recipient file only; the PRIVATE identity is kept
 #    offline by the owner, so a compromised tc-db cannot decrypt old uploads).
@@ -32,9 +32,16 @@ name=$(basename "$latest")
 
 ( cd "$DUMPDIR" && sha256sum -c "$name.sha256" >/dev/null ) || { echo "tc-pg-offsite: local checksum FAILED for $name"; exit 4; }
 
-enc="$STATE/$name.age"
+# One encrypted bundle per backup: everything a restore needs (see deploy/oracle/RESTORE.md).
+base=${name%.dump}
+files=("$name" "$name.sha256")
+for extra in "$base.globals.sql" "$base.manifest.json"; do
+  if [ -f "$DUMPDIR/$extra" ]; then files+=("$extra"); else echo "tc-pg-offsite: note: $extra missing (backup made by an older tc-pg-backup)"; fi
+done
+bundle="$base.bundle.tar.age"
+enc="$STATE/$bundle"
 trap 'rm -f "$enc"' EXIT
-age -R "$RECIPIENT_FILE" -o "$enc" "$latest"
+tar -C "$DUMPDIR" -cf - "${files[@]}" | age -R "$RECIPIENT_FILE" -o "$enc"
 want=$(stat -c %s "$enc")
 
 # Credentials are passed to the container by NAME only (-e VAR): docker reads the
@@ -47,10 +54,15 @@ rc() {
     -v "$STATE":/work:ro "$RCLONE_IMAGE" "$@"
 }
 # New file name every night => a new B2 object, never an overwrite or a delete.
-rc copyto "/work/$name.age" "B2:$B2_BUCKET/$PREFIX/$name.age"
-got=$(rc lsjson "B2:$B2_BUCKET/$PREFIX/$name.age" | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j[0]["Size"] if j else -1)')
+rc copyto "/work/$bundle" "B2:$B2_BUCKET/$PREFIX/$bundle"
+got=$(rc lsjson "B2:$B2_BUCKET/$PREFIX/$bundle" | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j[0]["Size"] if j else -1)')
 [ "$got" = "$want" ] || { echo "tc-pg-offsite: size mismatch local=$want remote=$got"; exit 5; }
 
 echo "$name" > "$STATE/last-uploaded"
 date +%s > "$STATE/last-success-epoch"
-echo "tc-pg-offsite: ok file=$name.age bytes=$want bucket=$B2_BUCKET prefix=$PREFIX"
+echo "tc-pg-offsite: ok file=$bundle files=${#files[@]} bytes=$want bucket=$B2_BUCKET prefix=$PREFIX"
+# Optional external dead-man ping on success only (healthchecks.io check "oracle-offsite-backup"). Failures simply do not ping,
+# so the check goes late and alerts; a failed ping must never fail the backup.
+if [ -r /etc/tc-health/offsite-ping-url ]; then
+  curl -fsS -m 10 -o /dev/null "$(cat /etc/tc-health/offsite-ping-url)" || echo "tc-pg-offsite: note: ping failed (backup itself is fine)"
+fi

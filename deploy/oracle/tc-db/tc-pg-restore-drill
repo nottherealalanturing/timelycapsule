@@ -1,0 +1,64 @@
+#!/bin/bash
+# tc-pg-restore-drill: prove that a backup can actually be restored, in a throwaway PostgreSQL container.
+#   usage: tc-pg-restore-drill <backup-dir> [<name>]
+#     <backup-dir> holds one backup's files: <name>.dump, .dump.sha256, .globals.sql, .manifest.json
+#     (copy them from /var/backups/tc-db, or decrypt a B2 bundle: age -d -i identity.txt X.bundle.tar.age | tar -x -C <dir>)
+#   <name> defaults to the newest *.dump in <backup-dir>.
+# Never touches production: scratch container, no network, tmpfs storage, dummy passwords, removed on exit.
+# Run it on a machine with spare RAM (NOT on tc-db: that host has 1 GB and runs the production database).
+# Checks: sha256; globals define tc_app; pg_restore --exit-on-error; schema hash == manifest;
+#         every table's restored row count lies within the manifest's before/after counts; tc_app can read its data.
+set -uo pipefail
+D=${1:?usage: tc-pg-restore-drill <backup-dir> [<name>]}
+IMG=${PG_IMAGE:-postgres@sha256:5264710be20f409750ac6dc4e5706dcef929c87e241605463f0f9aefa932a8d9}   # same image as production
+DB=${TC_DB:-timelycapsule}
+name=${2:-$(cd "$D" && ls -1t ./*.dump 2>/dev/null | head -1 | sed 's#^\./##; s#\.dump$##')}
+[ -n "$name" ] && [ -f "$D/$name.dump" ] || { echo "FAIL: no $name.dump in $D"; exit 2; }
+C=tc-restore-drill-$$
+fail=0; ok(){ echo "  ok   $*"; }; bad(){ echo "  FAIL $*"; fail=1; }
+cleanup(){ docker rm -f "$C" >/dev/null 2>&1; }; trap cleanup EXIT
+echo "restore drill: $name  (image ${IMG##*@})"
+
+for f in dump dump.sha256 globals.sql manifest.json; do [ -f "$D/$name.$f" ] || bad "missing $name.$f"; done
+[ $fail = 0 ] || exit 1
+( cd "$D" && sha256sum -c "$name.dump.sha256" >/dev/null 2>&1 ) && ok "sha256 of dump matches" || { bad "sha256 mismatch"; exit 1; }
+grep -q '^CREATE ROLE tc_app;' "$D/$name.globals.sql" && grep -q '^ALTER ROLE tc_app .*CONNECTION LIMIT' "$D/$name.globals.sql" && ok "globals define role tc_app (with connection limit)" || bad "globals do not define tc_app / its connection limit"
+
+docker run -d --rm --name "$C" --network none --tmpfs /var/lib/postgresql/data -e POSTGRES_USER=tc_admin -e POSTGRES_PASSWORD=drill-dummy "$IMG" >/dev/null || { echo "FAIL: cannot start scratch postgres"; exit 1; }
+for i in $(seq 1 60); do docker exec "$C" pg_isready -U tc_admin -q 2>/dev/null && break; sleep 1; done
+sleep 2
+px() { docker exec -i "$C" psql -U tc_admin -v ON_ERROR_STOP=1 -qtA "$@"; }
+px -d postgres -c "create role tc_app login password 'drill-dummy'" -c "create database $DB owner tc_app" >/dev/null || { echo "FAIL: scratch setup"; exit 1; }
+if docker exec -i "$C" pg_restore -U tc_admin -d "$DB" --exit-on-error < "$D/$name.dump" 2> /tmp/drill-restore.$$.err; then ok "pg_restore --exit-on-error succeeded"; else bad "pg_restore failed: $(head -3 /tmp/drill-restore.$$.err)"; fi
+rm -f /tmp/drill-restore.$$.err
+
+# schema hash (same normalisation as tc-pg-backup)
+got=$(docker exec "$C" pg_dump -U tc_admin -d "$DB" --schema-only | python3 -c 'import sys,hashlib;print(hashlib.sha256(b"".join(l for l in sys.stdin.buffer.readlines() if not l.startswith((b"\\restrict ", b"\\unrestrict ")))).hexdigest())')
+want=$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1]))["schema_sha256"])' "$D/$name.manifest.json")
+[ "$got" = "$want" ] && ok "schema hash equals manifest ($want)" || bad "schema hash differs: restored=$got manifest=$want"
+
+# row counts per table vs manifest bounds
+docker exec -i "$C" psql -U tc_admin -d "$DB" -tAF $'\t' -c "
+  select table_schema||'.'||table_name,
+         (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from %I.%I', table_schema, table_name), false, true, '')))[1]::text
+  from information_schema.tables where table_schema in ('public','pgboss','drizzle') and table_type='BASE TABLE' order by 1" > /tmp/drill-counts.$$
+python3 - "$D/$name.manifest.json" /tmp/drill-counts.$$ <<'PY'
+import json, sys
+m = json.load(open(sys.argv[1]))["tables"]
+r = {l.split("\t")[0]: int(l.split("\t")[1]) for l in open(sys.argv[2]).read().splitlines() if l.strip()}
+bad = []; total = 0
+for t, v in m.items():
+    lo, hi = sorted([v["before"], v["after"]]); n = r.get(t)
+    total += n or 0
+    if n is None: bad.append(f"{t}: table missing after restore")
+    elif not (lo <= n <= hi): bad.append(f"{t}: restored {n} rows, manifest {lo}..{hi}")
+for t in r:
+    if t not in m: bad.append(f"{t}: table not in manifest")
+print(f"  {'ok  ' if not bad else 'FAIL'} row counts: {len(m)} tables, {total} rows restored" + ("" if not bad else "\n    " + "\n    ".join(bad)))
+sys.exit(1 if bad else 0)
+PY
+[ $? = 0 ] || fail=1; rm -f /tmp/drill-counts.$$
+# the application role can use what it owns
+docker exec "$C" psql -U tc_app -d "$DB" -tAc "select count(*) from public.users" >/dev/null 2>&1 && ok "role tc_app can read its tables (ownership/privileges intact)" || bad "tc_app cannot read public.users"
+[ $fail = 0 ] && echo "RESULT: PASS" || echo "RESULT: FAIL"
+exit $fail
