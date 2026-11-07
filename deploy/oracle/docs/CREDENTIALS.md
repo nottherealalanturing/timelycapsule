@@ -44,16 +44,17 @@ Values: `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_MEDIA=tc-media-pr
 Open a terminal and connect with a TTY (`ssh -t`); you type, nothing is echoed:
 ```bash
 ssh -t tc-app
-# stage the Resend key (seeded from the live file so the staged file is complete; the live file is not modified)
-sudo tc-secret env /opt/timelycapsule/.env.production.next --from /opt/timelycapsule/.env.production --like /opt/timelycapsule/.env.production RESEND_API_KEY
-# stage the R2 values (bucket name is not secret but is entered the same way to keep the set consistent)
+# stage the Resend key and the R2 values (any order; each command only touches the keys it names)
+sudo tc-secret env /opt/timelycapsule/.env.production.next --like /opt/timelycapsule/.env.production RESEND_API_KEY
 sudo tc-secret env /opt/timelycapsule/.env.production.next --like /opt/timelycapsule/.env.production R2_BUCKET_MEDIA R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY
+# make the staged file COMPLETE: add every other variable from the live file (never overwrites what you entered; no prompts, no values shown)
+sudo tc-secret complete /opt/timelycapsule/.env.production.next --from /opt/timelycapsule/.env.production --like /opt/timelycapsule/.env.production
 # later, after cutover:
 sudo tc-secret env /opt/timelycapsule/.env.production.next --like /opt/timelycapsule/.env.production RESEND_WEBHOOK_SECRET
 # review: names, lengths, same/different vs the live file (never values)
 sudo tc-secret status /opt/timelycapsule/.env.production.next --against /opt/timelycapsule/.env.production
 ```
-Expected `status`: `RESEND_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_MEDIA` all **different**; everything else **same**. Then tell me "staged"; I never see the values.
+Expected `status`: 17 keys; `RESEND_API_KEY`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET_MEDIA` **different**; the other 13 **same**. A staged file with fewer keys is incomplete and must not be activated (the containers would start without `DATABASE_URL`, the JWT keys, etc.); `complete` fixes that. Then tell me "staged"; I never see the values.
 
 ## 4. What happens when you say "staged" (my steps, with rollback)
 
