@@ -1,0 +1,10 @@
+[Unit]
+Description=TimelyCapsule encrypted off-site dump copy (Backblaze B2)
+After=tc-pg-backup.service network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=RCLONE_IMAGE=rclone/rclone@sha256:REPLACE_WITH_PINNED_DIGEST
+ExecStart=/usr/local/sbin/tc-pg-offsite
+# Dump is already created by tc-pg-backup.service; this only uploads.

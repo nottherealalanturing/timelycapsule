@@ -1,0 +1,19 @@
+#!/bin/bash
+# Nightly logical backup of the production database (custom format, compressed, restorable with pg_restore).
+# Runs pg_dump INSIDE the container over the local peer socket (tc_admin; no network, no password).
+# Writes <dir>/timelycapsule-<UTC>.dump + .sha256, verifies it is a readable archive, then publishes it atomically.
+# Deliberately NEVER deletes anything (standing rule: no backup deletion without approval); prints disk usage instead.
+set -euo pipefail
+umask 077
+DIR=${TC_BACKUP_DIR:-/var/backups/tc-db}; DB=timelycapsule
+ts=$(date -u +%Y%m%dT%H%M%SZ); f="$DIR/$DB-$ts.dump"
+[ "$(docker inspect -f '{{.State.Health.Status}}' tc-postgres 2>/dev/null)" = healthy ] || { echo "tc-pg-backup: tc-postgres not healthy, aborting" >&2; exit 1; }
+docker exec tc-postgres pg_dump -U tc_admin -d "$DB" -Fc -Z 6 > "$f.tmp"
+# integrity: pg_restore must read the archive (exit 0) and its header must report >= 1 TOC entry
+listing=$(docker exec -i tc-postgres pg_restore -l < "$f.tmp") || { echo "tc-pg-backup: pg_restore cannot read the archive" >&2; rm -f "$f.tmp"; exit 1; }
+n=$(printf '%s\n' "$listing" | sed -n 's/^; *TOC Entries: \([0-9][0-9]*\)$/\1/p' | head -1)
+[ "${n:-0}" -ge 1 ] || { echo "tc-pg-backup: archive header reports no TOC entries" >&2; rm -f "$f.tmp"; exit 1; }
+( cd "$DIR" && sha256sum "$(basename "$f.tmp")" | sed "s/\.tmp\$//" > "$(basename "$f").sha256" )
+mv "$f.tmp" "$f"
+used=$(du -sm "$DIR" | cut -f1); avail=$(df -m --output=avail "$DIR" | tail -1 | tr -d ' ')
+echo "tc-pg-backup: ok file=$(basename "$f") size=$(stat -c %s "$f")B toc_entries=$n dir_total=${used}MB free=${avail}MB count=$(ls "$DIR"/*.dump | wc -l)"

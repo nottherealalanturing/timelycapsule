@@ -1,0 +1,44 @@
+#!/bin/bash
+# tc-pg-wait-healthy [seconds]: waits for the REAL server. Writes the init marker and clears the init flag only after
+# (1) Docker reports healthy, and (2) an independent local admin query shows: expected database, data_checksums=on,
+# not in recovery. Anything else leaves marker and flag untouched.
+#
+# ExecStartPost runs the moment the main process forks, i.e. BEFORE `compose up` has restarted a stopped container. A
+# container left over from a previous run still carries its old State (exited / stale health), so state is only
+# trusted if the container is RUNNING, or if it EXITED AFTER this script started. Anything older means "keep waiting".
+t=${1:-420}; end=$((SECONDS+t)); T0=$(date +%s)
+MARK=${TC_MARK:-/srv/pgdata/.tc-pg-initialized}; FLAG=${TC_FLAG:-/etc/tc-postgres/allow-init}; ENVF=${TC_ENVF:-/opt/tc-db/.env}
+EXPECT_DB=$(grep -E '^POSTGRES_DB=' "$ENVF" | head -1 | cut -d= -f2-)
+[ -n "$EXPECT_DB" ] || { echo "tc-pg-wait-healthy: cannot read POSTGRES_DB from $ENVF" >&2; exit 1; }
+while [ $SECONDS -lt $end ]; do
+  st=$(docker inspect -f '{{.State.Status}}|{{if .State.Health}}{{.State.Health.Status}}{{end}}|{{.State.FinishedAt}}' tc-postgres 2>/dev/null)
+  status=${st%%|*}; rest=${st#*|}; hs=${rest%%|*}; fin=${rest#*|}
+  case "$status" in
+    running)
+      case "$hs" in
+        healthy)
+          q=$(docker exec -i tc-postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tA -F"|" -f -' 2>/dev/null <<'SQL'
+select current_database(), current_setting('data_checksums'), pg_is_in_recovery(), (select system_identifier from pg_control_system());
+SQL
+)
+          db=${q%%|*}; r=${q#*|}; ck=${r%%|*}; r=${r#*|}; rec=${r%%|*}; sysid=${r#*|}
+          if [ "$db" = "$EXPECT_DB" ] && [ "$ck" = "on" ] && [ "$rec" = "f" ] && [ -n "$sysid" ]; then
+            if [ ! -f "$MARK" ]; then
+              printf 'initialized=%s\ndatabase=%s\ndata_checksums=%s\nsystem_identifier=%s\n' "$(date -u +%FT%TZ)" "$db" "$ck" "$sysid" > "$MARK.tmp" && chmod 0644 "$MARK.tmp" && mv "$MARK.tmp" "$MARK"
+            fi
+            rm -f "$FLAG"
+            echo "tc-pg-wait-healthy: healthy; admin query verified (db=$db checksums=$ck recovery=$rec); marker present, init flag cleared"; exit 0
+          fi
+          # a query failure right after "healthy" can be a transient (e.g. exec raced a restart): only fail if it persists
+          bad=$((bad+1)); if [ "$bad" -ge 3 ]; then
+            echo "tc-pg-wait-healthy: healthy but local admin verification failed (db='$db' checksums='$ck' recovery='$rec')" >&2; exit 1; fi;;
+        unhealthy) echo "tc-pg-wait-healthy: running container reports unhealthy" >&2; exit 1;;
+      esac;;
+    exited|dead)
+      fe=$(date -d "$fin" +%s 2>/dev/null || echo 0)
+      if [ "$fe" -ge "$T0" ]; then echo "tc-pg-wait-healthy: container exited after start ($status at $fin)" >&2; exit 1; fi;;
+    *) : ;;   # not created yet / created / restarting: keep waiting
+  esac
+  sleep 3
+done
+echo "tc-pg-wait-healthy: timed out after ${t}s without a healthy server" >&2; exit 1

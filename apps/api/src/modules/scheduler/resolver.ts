@@ -6,6 +6,7 @@ import { logger } from '../../logger.js';
 import { capsules, scheduledActions } from '../../db/schema/index.js';
 
 const HORIZON_MS = 60 * 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 interface UnlockLocal {
   date: string; // YYYY-MM-DD
@@ -30,6 +31,28 @@ interface UnlockLocal {
  * twice) resolves to the first (pre-fallback) occurrence. Both keep
  * `isValid: true` — there's no "reject" case to guard here.
  */
+/**
+ * Wall-clock -> instant. Luxon 3.7 resolves an ambiguous (fall-back) local
+ * time to the SECOND occurrence, contrary to what this module documents, so
+ * the first occurrence is selected explicitly. Nonexistent (spring-forward)
+ * times keep Luxon's behaviour (shifted forward by the gap).
+ */
+export function resolveWallClock(local: { date: string; time: string; tz: string }): DateTime {
+  const resolved = DateTime.fromISO(`${local.date}T${local.time}`, { zone: local.tz });
+  if (!resolved.isValid) return resolved;
+  const ms = resolved.toMillis();
+  const offsetBefore = resolved.zone.offset(ms - DAY_MS);
+  const offsetAfter = resolved.zone.offset(ms + DAY_MS);
+  if (offsetBefore > offsetAfter) {
+    // Clocks go back near this instant: try the earlier (pre-fallback) reading.
+    const wallAsUtc = DateTime.fromISO(`${local.date}T${local.time}`, { zone: 'utc' }).toMillis();
+    const earlier = DateTime.fromMillis(wallAsUtc - offsetBefore * 60_000, { zone: resolved.zone });
+    const fmt = "yyyy-MM-dd'T'HH:mm";
+    if (earlier.toFormat(fmt) === resolved.toFormat(fmt)) return earlier;
+  }
+  return resolved;
+}
+
 export async function reresolveWallClockActions(db: Database, clock: Clock): Promise<number> {
   const now = clock.now();
   const horizon = new Date(now.getTime() + HORIZON_MS);
@@ -57,7 +80,7 @@ export async function reresolveWallClockActions(db: Database, clock: Clock): Pro
     const local = row.unlockLocal as UnlockLocal | null;
     if (!local?.date || !local.time || !local.tz) continue;
 
-    const resolved = DateTime.fromISO(`${local.date}T${local.time}`, { zone: local.tz });
+    const resolved = resolveWallClock(local);
     if (!resolved.isValid) continue;
 
     const newRunAt = resolved.toJSDate();

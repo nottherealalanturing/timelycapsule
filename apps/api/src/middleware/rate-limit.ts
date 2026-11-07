@@ -22,6 +22,18 @@ export interface RateLimitOptions {
 export function rateLimit(options: RateLimitOptions) {
   const buckets = new Map<string, Bucket>();
 
+  // Expired buckets used to stay in the Map until restart, so keys that never
+  // return (rotating IPs, guest-session ids) grew memory without bound.
+  // Sweep them; unref() so the timer never keeps the process alive.
+  const sweep = setInterval(
+    () => {
+      const cutoff = Date.now() - options.windowMs;
+      for (const [k, b] of buckets) if (b.windowStart <= cutoff) buckets.delete(k);
+    },
+    Math.max(options.windowMs, 60_000),
+  );
+  sweep.unref();
+
   return (req: Request, res: Response, next: NextFunction): void => {
     const key = (options.keyFn ?? ((r) => r.ip ?? 'unknown'))(req);
     const now = Date.now();

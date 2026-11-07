@@ -3,11 +3,9 @@ name: Deploy Web
 # Same "only after CI passes on main" gate as .github/workflows/deploy.yml,
 # just deploying apps/web to Cloudflare Workers (via the OpenNext adapter)
 # instead of the API to the VM.
+# Production web deploy is MANUAL (Run workflow) while the API moves to Oracle: a merge to main must not publish the site by itself.
 on:
-  workflow_run:
-    workflows: [CI]
-    branches: [main]
-    types: [completed]
+  workflow_dispatch:
 
 concurrency:
   group: deploy-web-production
@@ -15,12 +13,11 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
 
       - uses: pnpm/action-setup@v4
 

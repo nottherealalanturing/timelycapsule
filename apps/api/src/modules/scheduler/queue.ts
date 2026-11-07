@@ -43,7 +43,13 @@ export async function getQueue(): Promise<PgBoss> {
     throw new Error('DATABASE_URL is not set');
   }
 
-  const instance = new PgBoss({ connectionString });
+  // pg-boss keeps its own pool (default 10): cap it so api + worker + scheduler
+  // stay well inside the database's max_connections. Override with PGBOSS_POOL_MAX.
+  const bossMax = Number(process.env.PGBOSS_POOL_MAX);
+  const instance = new PgBoss({
+    connectionString,
+    max: Number.isInteger(bossMax) && bossMax > 0 ? bossMax : 3,
+  });
   instance.on('error', (err: Error) => logger.error({ event: 'pgboss_error', err }, 'pg-boss error'));
 
   await instance.start();

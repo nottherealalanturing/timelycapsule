@@ -1,0 +1,56 @@
+#!/bin/bash
+# Encrypted off-site copy of the newest local dump to Backblaze B2.
+#
+#  - Encryption: `age` public-key (recipient file only; the PRIVATE identity is kept
+#    offline by the owner, so a compromised tc-db cannot decrypt old uploads).
+#  - Transport: rclone (Docker image, pinned) over HTTPS via the tc-app NAT.
+#  - Credentials: /etc/tc-postgres/b2.env (root 0600): B2_KEY_ID, B2_APP_KEY, B2_BUCKET.
+#  - Never deletes anything and its key cannot: retention is enforced server-side by a
+#    B2 bucket lifecycle rule on the oracle/ prefix (see remediation-plan.md, B2 retention).
+#  - Verifies: local sha256, remote existence and byte size, and records a marker
+#    the health watch can age-check. Exit non-zero on any failure.
+set -euo pipefail
+
+DUMPDIR=/var/backups/tc-db
+RECIPIENT_FILE=/etc/tc-postgres/age-recipient.txt     # public key line, e.g. age1...
+ENVFILE=/etc/tc-postgres/b2.env
+STATE=/var/lib/tc-offsite
+RCLONE_IMAGE="${RCLONE_IMAGE:?pin rclone image by digest in the unit file}"
+PREFIX=oracle
+
+umask 077
+mkdir -p "$STATE"
+[ -r "$ENVFILE" ] && [ -r "$RECIPIENT_FILE" ] || { echo "tc-pg-offsite: missing $ENVFILE or $RECIPIENT_FILE"; exit 2; }
+# shellcheck disable=SC1090
+. "$ENVFILE"
+: "${B2_KEY_ID:?}" "${B2_APP_KEY:?}" "${B2_BUCKET:?}"
+
+latest=$(ls -1t "$DUMPDIR"/timelycapsule-*.dump 2>/dev/null | head -1 || true)
+[ -n "$latest" ] || { echo "tc-pg-offsite: no dump found"; exit 3; }
+name=$(basename "$latest")
+[ "$(cat "$STATE/last-uploaded" 2>/dev/null || true)" = "$name" ] && { echo "tc-pg-offsite: $name already uploaded"; exit 0; }
+
+( cd "$DUMPDIR" && sha256sum -c "$name.sha256" >/dev/null ) || { echo "tc-pg-offsite: local checksum FAILED for $name"; exit 4; }
+
+enc="$STATE/$name.age"
+trap 'rm -f "$enc"' EXIT
+age -R "$RECIPIENT_FILE" -o "$enc" "$latest"
+want=$(stat -c %s "$enc")
+
+# Credentials are passed to the container by NAME only (-e VAR): docker reads the
+# value from this process's environment, so the secret never appears in argv
+# (`ps`, /proc/*/cmdline) or in the unit file.
+export RCLONE_CONFIG_B2_TYPE=b2 RCLONE_CONFIG_B2_ACCOUNT="$B2_KEY_ID" RCLONE_CONFIG_B2_KEY="$B2_APP_KEY"
+rc() {
+  docker run --rm -i \
+    -e RCLONE_CONFIG_B2_TYPE -e RCLONE_CONFIG_B2_ACCOUNT -e RCLONE_CONFIG_B2_KEY \
+    -v "$STATE":/work:ro "$RCLONE_IMAGE" "$@"
+}
+# New file name every night => a new B2 object, never an overwrite or a delete.
+rc copyto "/work/$name.age" "B2:$B2_BUCKET/$PREFIX/$name.age"
+got=$(rc lsjson "B2:$B2_BUCKET/$PREFIX/$name.age" | python3 -c 'import json,sys;j=json.load(sys.stdin);print(j[0]["Size"] if j else -1)')
+[ "$got" = "$want" ] || { echo "tc-pg-offsite: size mismatch local=$want remote=$got"; exit 5; }
+
+echo "$name" > "$STATE/last-uploaded"
+date +%s > "$STATE/last-success-epoch"
+echo "tc-pg-offsite: ok file=$name.age bytes=$want bucket=$B2_BUCKET prefix=$PREFIX"

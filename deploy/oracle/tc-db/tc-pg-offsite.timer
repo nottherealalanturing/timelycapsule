@@ -1,0 +1,10 @@
+[Unit]
+Description=Upload newest TimelyCapsule dump off-site shortly after the nightly dump
+
+[Timer]
+OnCalendar=*-*-* 03:45:00 UTC
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

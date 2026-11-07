@@ -1,0 +1,28 @@
+[Unit]
+Description=TimelyCapsule PostgreSQL 16 (docker compose, host network)
+Wants=docker.service network-online.target
+After=docker.service network-online.target
+RequiresMountsFor=/srv/pgdata
+BindsTo=srv-pgdata.mount
+After=srv-pgdata.mount
+StartLimitIntervalSec=900
+StartLimitBurst=3
+
+[Service]
+Type=simple
+SuccessExitStatus=130
+WorkingDirectory=/opt/tc-db
+ExecStartPre=/usr/local/sbin/tc-datavol-guard
+ExecStartPre=/usr/local/sbin/tc-pg-preflight
+ExecStartPre=/usr/local/sbin/tc-pg-init-gate
+ExecStart=/usr/bin/docker compose up --no-log-prefix --exit-code-from postgres
+ExecStartPost=/usr/local/sbin/tc-pg-wait-healthy 420
+ExecStop=/usr/bin/docker compose stop -t 60
+Restart=always
+RestartSec=30
+TimeoutStartSec=480
+TimeoutStopSec=90
+SyslogIdentifier=tc-postgres
+
+[Install]
+WantedBy=multi-user.target
