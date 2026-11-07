@@ -19,6 +19,12 @@ export function getStorageAdapter(): StorageAdapter {
     const endpoint = process.env.R2_ENDPOINT;
     const bucket = process.env.R2_BUCKET_MEDIA;
 
+    if (process.env.NODE_ENV === 'production' && !(accountId && accessKeyId && secretAccessKey && endpoint && bucket)) {
+      // Never fall back to the in-memory fake in production: uploads would
+      // appear to succeed and then vanish on restart.
+      throw new Error('Object storage is not configured (R2_ACCOUNT_ID / R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_ENDPOINT / R2_BUCKET_MEDIA)');
+    }
+
     cached =
       process.env.NODE_ENV !== 'test' && accountId && accessKeyId && secretAccessKey && endpoint && bucket
         ? new R2StorageAdapter({ accountId, accessKeyId, secretAccessKey, endpoint, bucket })
