@@ -151,6 +151,21 @@ async function flush() {
   });
 }
 
+/**
+ * Bounded wait for an outcome, instead of a fixed 10ms window. The Place Seal check awaits
+ * `import('expo-location')`, which under vitest goes through the mock registry (an RPC to the
+ * main process), so it has no fixed duration: on a loaded or emulated CPU it can exceed 10ms
+ * and the assertion ran before the screen had updated. Polls every 5ms, up to 3s, inside act().
+ */
+async function settleUntil(done: () => boolean, timeoutMs = 3000) {
+  await act(async () => {
+    const start = Date.now();
+    while (!done() && Date.now() - start < timeoutMs) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+  });
+}
+
 function lockedFixture(overrides: Partial<Extract<RevealResponse, { status: 'locked' }>> = {}): RevealResponse {
   return {
     status: 'locked',
@@ -299,8 +314,8 @@ describe('Place Seal gate', () => {
     const button = instance.root.findByProps({ accessibilityLabel: 'Check my location' });
     await act(async () => {
       button.props.onPress();
-      await new Promise((resolve) => setTimeout(resolve, 10));
     });
+    await settleUntil(() => get.mock.calls.some((c) => c[1]?.placeGate === 'place-gate-token'));
     await flush();
 
     expect(placeCheck).toHaveBeenCalledWith('test-token', { lat: 1, lng: 2 });
@@ -319,8 +334,8 @@ describe('Place Seal gate', () => {
     const button = instance.root.findByProps({ accessibilityLabel: 'Check my location' });
     await act(async () => {
       button.props.onPress();
-      await new Promise((resolve) => setTimeout(resolve, 10));
     });
+    await settleUntil(() => texts(instance).join(' ').includes('km away'));
 
     expect(texts(instance).join(' ')).toContain('12.0 km away');
     expect(get).toHaveBeenCalledTimes(1);
@@ -337,8 +352,8 @@ describe('Place Seal gate', () => {
     const button = instance.root.findByProps({ accessibilityLabel: 'Check my location' });
     await act(async () => {
       button.props.onPress();
-      await new Promise((resolve) => setTimeout(resolve, 10));
     });
+    await settleUntil(() => texts(instance).join(' ').includes('Something went wrong checking your location'));
 
     expect(texts(instance).join(' ')).toContain('Something went wrong checking your location');
     expect(placeCheck).not.toHaveBeenCalled();
@@ -354,8 +369,8 @@ describe('Place Seal gate', () => {
     const button = instance.root.findByProps({ accessibilityLabel: 'Check my location' });
     await act(async () => {
       button.props.onPress();
-      await new Promise((resolve) => setTimeout(resolve, 10));
     });
+    await settleUntil(() => texts(instance).join(' ').includes("couldn't access your location"));
 
     expect(placeCheck).not.toHaveBeenCalled();
     expect(texts(instance).join(' ')).toContain("couldn't access your location");
